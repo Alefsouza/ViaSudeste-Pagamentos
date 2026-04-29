@@ -1,13 +1,19 @@
+import { useState } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { LogOut, LayoutDashboard, Camera, FileText } from 'lucide-react'
+import { LogOut, LayoutDashboard, Camera, FileText, Upload, FileSpreadsheet } from 'lucide-react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
+import { UploadFotosModal } from '@/components/UploadFotosModal'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 
 export function Header() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [uploadModalOpen, setUploadModalOpen] = useState(false)
 
   if (!user) return null
 
@@ -51,6 +57,20 @@ export function Header() {
                 <FileText size={16} />
                 <span className="hidden sm:inline">Relatórios</span>
               </Link>
+              <button
+                onClick={() => setImportModalOpen(true)}
+                className="flex items-center gap-1.5 transition-colors text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              >
+                <FileSpreadsheet size={16} />
+                <span className="hidden sm:inline">Importar Excel</span>
+              </button>
+              <button
+                onClick={() => setUploadModalOpen(true)}
+                className="flex items-center gap-1.5 transition-colors text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              >
+                <Upload size={16} />
+                <span className="hidden sm:inline">Upload de Fotos</span>
+              </button>
             </nav>
           )}
         </div>
@@ -74,8 +94,28 @@ export function Header() {
           >
             <LogOut size={20} />
           </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLogout}
+                  className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                  title="Sair"
+                >
+                  <LogOut size={20} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Sair do sistema</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
+      <ImportPlanilhaModal open={importModalOpen} onOpenChange={setImportModalOpen} />
+      <UploadFotosModal open={uploadModalOpen} onOpenChange={setUploadModalOpen} />
     </header>
   )
 }

@@ -37,6 +37,24 @@ export default function Index() {
       return
     }
 
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      toast({
+        title: 'Email inválido',
+        description: 'Por favor, insira um endereço de email válido.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (password.length < 8) {
+      toast({
+        title: 'Senha muito curta',
+        description: 'A senha deve ter no mínimo 8 caracteres.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsLoading(true)
     try {
       await login(email, password)

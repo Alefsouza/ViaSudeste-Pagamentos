@@ -105,9 +105,14 @@ export default function RelatorioPagamentos() {
       setStats(newStats)
       setData(paginated.items)
       setTotalPages(paginated.totalPages || 1)
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
       setError(true)
+      toast({
+        title: 'Erro de conexão',
+        description: err.response?.message || 'Falha ao carregar o relatório.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }

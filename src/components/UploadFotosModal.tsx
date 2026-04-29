@@ -105,7 +105,8 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
         successCount++
       } catch (error: any) {
         currentFiles[i].status = 'error'
-        currentFiles[i].error = error.message || 'Erro ao enviar foto'
+        currentFiles[i].error =
+          error.response?.message || error.message || 'Erro ao enviar foto. Verifique a conexão.'
         errorCount++
       }
       setFiles([...currentFiles])

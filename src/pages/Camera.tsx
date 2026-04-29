@@ -1,407 +1,278 @@
-import { useState, useEffect, useRef } from 'react'
-import { useAuth } from '@/hooks/use-auth'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { useToast } from '@/hooks/use-toast'
 import {
+  Loader2,
+  Search,
   Camera as CameraIcon,
+  Upload,
   CheckCircle2,
-  ScanFace,
-  XCircle,
-  RefreshCw,
   User,
+  Building,
+  DollarSign,
 } from 'lucide-react'
 import { getColaboradorByRegistro } from '@/services/colaboradores'
 import { createPagamento } from '@/services/pagamentos'
-import { mockRecognizeFace } from '@/services/reconhecimento-facial'
-import { useToast } from '@/hooks/use-toast'
-import pb from '@/lib/pocketbase/client'
-import { getErrorMessage } from '@/lib/pocketbase/errors'
-
-type Status = 'idle' | 'loading' | 'success' | 'error'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function Camera() {
-  const { user } = useAuth()
+  const [registro, setRegistro] = useState('')
+  const [colaborador, setColaborador] = useState<any>(null)
+  const [loadingSearch, setLoadingSearch] = useState(false)
+  const [foto, setFoto] = useState<File | null>(null)
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [loadingPagamento, setLoadingPagamento] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
-  const [status, setStatus] = useState<Status>('idle')
-  const [capturedImage, setCapturedImage] = useState<string | null>(null)
-  const [colaborador, setColaborador] = useState<any>(null)
-  const [errorMsg, setErrorMsg] = useState('')
-  const [confirmErrorMsg, setConfirmErrorMsg] = useState('')
-  const [isConfirming, setIsConfirming] = useState(false)
-  const [isInitializingCamera, setIsInitializingCamera] = useState(true)
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!registro.trim()) return
 
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-
-  useEffect(() => {
-    let stream: MediaStream | null = null
-    let isMounted = true
-
-    const startCamera = async () => {
-      if (!videoRef.current) return
-
-      try {
-        setIsInitializingCamera(true)
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-          })
-        } catch (initialErr: any) {
-          if (
-            initialErr.name === 'OverconstrainedError' ||
-            initialErr.name === 'ConstraintNotSatisfiedError'
-          ) {
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: 'user' },
-            })
-          } else {
-            throw initialErr
-          }
-        }
-
-        if (isMounted && videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.onloadedmetadata = () => {
-            if (isMounted) setIsInitializingCamera(false)
-          }
-        } else if (stream) {
-          stream.getTracks().forEach((track) => track.stop())
-        }
-      } catch (err: any) {
-        console.error('Camera initialization error', err)
-        if (!isMounted) return
-
-        const errorName = err?.name || ''
-        if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
-          setErrorMsg('Câmera em uso por outro aplicativo')
-        } else if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
-          setErrorMsg('Permissão de câmera negada')
-        } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
-          setErrorMsg('Hardware de vídeo não encontrado')
-        } else {
-          setErrorMsg('Erro ao inicializar câmera')
-        }
-        setStatus('error')
-        setIsInitializingCamera(false)
-      }
-    }
-
-    startCamera()
-
-    return () => {
-      isMounted = false
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
-      }
-    }
-  }, [])
-
-  const capturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current) return
-
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    const ctx = canvas.getContext('2d')
-
-    if (ctx) {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const imageBase64 = canvas.toDataURL('image/jpeg', 0.8)
-      setCapturedImage(imageBase64)
-      processRecognition(imageBase64)
-    }
-  }
-
-  const processRecognition = async (imageBase64: string) => {
-    setStatus('loading')
-    setConfirmErrorMsg('')
+    setLoadingSearch(true)
+    setColaborador(null)
+    setFoto(null)
+    setFotoPreview(null)
     try {
-      const registro = await mockRecognizeFace(imageBase64)
-      const colab = await getColaboradorByRegistro(registro)
+      const colab = await getColaboradorByRegistro(registro.trim())
       setColaborador(colab)
-      setStatus('success')
-    } catch (err) {
-      console.error(err)
-      setErrorMsg('Colaborador não encontrado ou erro no reconhecimento facial.')
-      setStatus('error')
+    } catch (err: any) {
+      toast({
+        title: 'Colaborador não encontrado',
+        description: 'Verifique o número de registro e tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingSearch(false)
     }
   }
 
-  const handleConfirmPayment = async () => {
-    if (!colaborador) return
-    setIsConfirming(true)
-    setConfirmErrorMsg('')
-
-    try {
-      let fotoConfirmacao: File | undefined = undefined
-
-      if (videoRef.current && canvasRef.current) {
-        const video = videoRef.current
-        const canvas = canvasRef.current
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        const ctx = canvas.getContext('2d')
-
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-          const blob = await new Promise<Blob | null>((resolve) =>
-            canvas.toBlob(resolve, 'image/jpeg', 0.8),
-          )
-          if (blob) {
-            fotoConfirmacao = new File([blob], `confirmacao_${colaborador.id}_${Date.now()}.jpg`, {
-              type: 'image/jpeg',
-            })
-          }
-        }
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0]
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Arquivo inválido',
+          description: 'Por favor, selecione uma imagem.',
+          variant: 'destructive',
+        })
+        return
       }
+      setFoto(file)
+      setFotoPreview(URL.createObjectURL(file))
+    }
+  }
 
+  const handleConfirm = async () => {
+    if (!colaborador || !foto) return
+
+    setLoadingPagamento(true)
+    try {
       await createPagamento({
         colaborador_id: colaborador.id,
         valor_pago: colaborador.valor_a_receber,
         data_pagamento: new Date().toISOString(),
-        foto_confirmacao: fotoConfirmacao,
+        foto_confirmacao: foto,
       })
 
       toast({
-        title: 'Pagamento Confirmado',
-        description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(colaborador.valor_a_receber)}`,
+        title: 'Pagamento confirmado',
+        description: 'O pagamento foi registrado com sucesso.',
       })
 
-      resetFlow()
+      // Reset form
+      setRegistro('')
+      setColaborador(null)
+      setFoto(null)
+      setFotoPreview(null)
+      setConfirmOpen(false)
     } catch (err: any) {
-      const errMsg = getErrorMessage(err)
-      setConfirmErrorMsg(`Erro ao confirmar pagamento: ${errMsg}`)
+      toast({
+        title: 'Erro ao confirmar pagamento',
+        description: err.response?.message || 'Ocorreu um erro inesperado. Verifique sua conexão.',
+        variant: 'destructive',
+      })
     } finally {
-      setIsConfirming(false)
+      setLoadingPagamento(false)
     }
   }
 
-  const resetFlow = () => {
-    setCapturedImage(null)
-    setColaborador(null)
-    setErrorMsg('')
-    setConfirmErrorMsg('')
-    setStatus('idle')
-  }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-  }
-
-  const fotoUrl = colaborador?.foto ? pb.files.getURL(colaborador, colaborador.foto) : null
+  const formatBRL = (val: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
   return (
-    <div className="container max-w-6xl mx-auto py-8 px-4 flex flex-col items-center">
-      <div className="w-full text-center mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Autenticação Facial</h1>
-        <p className="text-slate-500 mt-2">Boca de Caixa: {user?.name}</p>
-      </div>
+    <div className="container max-w-2xl mx-auto py-8 px-4 animate-fade-in">
+      <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white mb-6">
+        Registro de Pagamento
+      </h1>
 
-      <div className="flex flex-col lg:flex-row gap-8 w-full max-w-5xl">
-        {/* Left Column: Camera / Skeletons / Captured Image */}
-        <div className="flex-1 flex flex-col gap-4">
-          <div className="relative w-full aspect-video bg-slate-950 rounded-2xl overflow-hidden shadow-xl border border-slate-800 flex items-center justify-center">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`absolute inset-0 w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-300 ${isInitializingCamera ? 'opacity-0' : 'opacity-100'}`}
-            />
-
-            {isInitializingCamera && (
-              <Skeleton className="absolute inset-0 w-full h-full rounded-2xl" />
-            )}
-
-            {!isInitializingCamera && status === 'idle' && (
-              <div className="absolute inset-0 border-[6px] border-transparent border-t-emerald-500/50 border-b-emerald-500/50 rounded-2xl pointer-events-none opacity-50" />
-            )}
-
-            {status === 'loading' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 z-10">
-                <ScanFace size={64} className="mb-4 text-emerald-500 animate-pulse" />
-                <p className="text-lg font-medium tracking-widest uppercase text-emerald-500 animate-pulse">
-                  Processando Face...
-                </p>
-              </div>
-            )}
-
-            {status === 'error' && !errorMsg.includes('inicializar') && capturedImage && (
-              <img
-                src={capturedImage}
-                alt="Captured"
-                className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1] grayscale opacity-50 transition-all duration-500"
+      <Card className="mb-6 shadow-sm border-slate-200 dark:border-slate-800">
+        <CardHeader>
+          <CardTitle>Buscar Colaborador</CardTitle>
+          <CardDescription>Digite o registro para localizar o colaborador</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSearch} className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Ex: 0006962"
+                className="pl-9"
+                value={registro}
+                onChange={(e) => setRegistro(e.target.value)}
+                disabled={loadingSearch || loadingPagamento}
               />
-            )}
+            </div>
+            <Button type="submit" disabled={loadingSearch || loadingPagamento || !registro.trim()}>
+              {loadingSearch ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-            {status === 'error' && errorMsg.includes('inicializar') && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 z-10">
-                <XCircle size={64} className="mb-4 text-red-500" />
-                <p className="text-lg font-medium text-slate-400">Sem sinal de vídeo</p>
+      {loadingSearch && (
+        <Card className="shadow-sm">
+          <CardContent className="p-6 space-y-4">
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-8 w-1/4" />
+          </CardContent>
+        </Card>
+      )}
+
+      {colaborador && !loadingSearch && (
+        <Card className="shadow-sm border-blue-100 dark:border-blue-900 animate-slide-up overflow-hidden">
+          <div className="bg-blue-50 dark:bg-blue-950/30 p-6 border-b border-blue-100 dark:border-blue-900">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <User className="h-5 w-5 text-blue-600" />
+                  {colaborador.nome}
+                </h2>
+                <div className="flex items-center gap-4 mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium text-slate-500">Reg:</span> {colaborador.registro}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Building className="h-4 w-4" /> {colaborador.filial}
+                  </span>
+                </div>
               </div>
-            )}
-
-            {/* Hidden canvas for capturing */}
-            <canvas ref={canvasRef} className="hidden" />
+              <div className="text-right bg-white dark:bg-slate-900 p-3 rounded-lg shadow-sm border border-slate-100 dark:border-slate-800">
+                <div className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1 flex items-center justify-end gap-1">
+                  <DollarSign className="h-3 w-3" /> Valor a Receber
+                </div>
+                <div className="text-2xl font-bold text-emerald-600">
+                  {formatBRL(colaborador.valor_a_receber)}
+                </div>
+              </div>
+            </div>
           </div>
 
-          {status === 'idle' && (
-            <Button
-              size="lg"
-              disabled={isInitializingCamera}
-              className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-50"
-              onClick={capturePhoto}
-            >
-              <CameraIcon className="mr-2 h-6 w-6" />
-              Capturar Foto
-            </Button>
-          )}
+          <CardContent className="p-6 space-y-6">
+            <div className="space-y-3">
+              <Label className="text-base">Foto de Confirmação</Label>
 
-          {status === 'error' && !confirmErrorMsg && (
-            <Button
-              size="lg"
-              variant="destructive"
-              className="w-full h-14 text-lg transition-all active:scale-[0.98]"
-              onClick={resetFlow}
-            >
-              <RefreshCw className="mr-2 h-5 w-5" />
-              Tentar Novamente
-            </Button>
-          )}
-        </div>
-
-        {/* Right Column: Information / Actions */}
-        <div className="flex-1 flex flex-col gap-6 w-full lg:max-w-[400px]">
-          {status === 'idle' && (
-            <>
-              <Card className="border-slate-200 dark:border-slate-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ScanFace className="h-5 w-5 text-blue-500" />
-                    Instruções
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-slate-600 dark:text-slate-400">
-                    Posicione o rosto do colaborador centralizado na câmera e clique em{' '}
-                    <strong>'Capturar Foto'</strong> para iniciar o reconhecimento facial e
-                    verificar pendências de pagamento.
-                  </p>
-                </CardContent>
-              </Card>
-              <Button
-                disabled
-                size="lg"
-                className="w-full h-14 text-lg bg-emerald-600/50 cursor-not-allowed"
-              >
-                Confirmar Pagamento
-              </Button>
-            </>
-          )}
-
-          {status === 'loading' && (
-            <div className="space-y-4">
-              <Skeleton className="h-[200px] w-full rounded-xl" />
-              <Skeleton className="h-14 w-full rounded-md" />
-            </div>
-          )}
-
-          {status === 'success' && colaborador && (
-            <div className="animate-fade-in-up space-y-6">
-              <Card className="border-emerald-500/50 shadow-lg shadow-emerald-500/10 overflow-hidden">
-                <div className="bg-emerald-50 dark:bg-emerald-950/30 px-6 py-4 border-b border-emerald-100 dark:border-emerald-900/50 flex items-center gap-3">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-600" />
-                  <h3 className="font-semibold text-emerald-800 dark:text-emerald-400">
-                    Identificação Confirmada
-                  </h3>
-                </div>
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="h-20 w-20 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-slate-700 shadow-md flex items-center justify-center overflow-hidden shrink-0">
-                      {fotoUrl ? (
-                        <img
-                          src={fotoUrl}
-                          alt={colaborador.nome}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <User className="h-10 w-10 text-slate-400" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1">
-                        Colaborador
-                      </p>
-                      <h2
-                        className="text-xl font-bold text-slate-900 dark:text-white truncate"
-                        title={colaborador.nome}
-                      >
-                        {colaborador.nome}
-                      </h2>
-                      <p className="text-slate-500 text-sm mt-1">
-                        Reg: {colaborador.registro} • {colaborador.filial}
-                      </p>
-                    </div>
+              {!fotoPreview ? (
+                <div
+                  className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="bg-blue-100 dark:bg-blue-900/50 p-4 rounded-full">
+                    <CameraIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                   </div>
-
-                  <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-2">
-                      Valor Pendente
+                  <div className="text-center">
+                    <p className="font-medium text-slate-900 dark:text-slate-100">
+                      Toque para abrir a câmera
                     </p>
-                    <div className="text-4xl font-bold text-emerald-600 dark:text-emerald-400">
-                      {formatCurrency(colaborador.valor_a_receber)}
-                    </div>
+                    <p className="text-sm text-slate-500">ou selecione uma foto da galeria</p>
                   </div>
-                </CardContent>
-              </Card>
-
-              {confirmErrorMsg && (
-                <Alert variant="destructive" className="animate-fade-in">
-                  <AlertTitle>Erro na Confirmação</AlertTitle>
-                  <AlertDescription>{confirmErrorMsg}</AlertDescription>
-                </Alert>
+                </div>
+              ) : (
+                <div className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-black/5">
+                  <img
+                    src={fotoPreview}
+                    alt="Preview"
+                    className="w-full h-[300px] object-contain"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute bottom-4 right-4 shadow-md"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4 mr-2" /> Trocar foto
+                  </Button>
+                </div>
               )}
 
-              <div className="flex gap-4">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="flex-1 h-14"
-                  onClick={resetFlow}
-                  disabled={isConfirming}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="lg"
-                  className={`flex-1 h-14 text-white transition-all ${
-                    confirmErrorMsg
-                      ? 'bg-red-600 hover:bg-red-700'
-                      : 'bg-emerald-600 hover:bg-emerald-700'
-                  }`}
-                  onClick={handleConfirmPayment}
-                  disabled={isConfirming || (!confirmErrorMsg && colaborador.valor_a_receber <= 0)}
-                >
-                  {isConfirming ? (
-                    <>
-                      <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-                      Confirmando...
-                    </>
-                  ) : confirmErrorMsg ? (
-                    'Tentar Novamente'
-                  ) : (
-                    'Confirmar Pagamento'
-                  )}
-                </Button>
-              </div>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+              />
             </div>
-          )}
-        </div>
-      </div>
+
+            <Button
+              className="w-full h-12 text-base"
+              size="lg"
+              disabled={!foto || loadingPagamento}
+              onClick={() => setConfirmOpen(true)}
+            >
+              <CheckCircle2 className="h-5 w-5 mr-2" />
+              Confirmar Pagamento
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Pagamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja confirmar o pagamento de{' '}
+              <strong className="text-slate-900 dark:text-slate-100">
+                {colaborador && formatBRL(colaborador.valor_a_receber)}
+              </strong>{' '}
+              para{' '}
+              <strong className="text-slate-900 dark:text-slate-100">{colaborador?.nome}</strong>?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loadingPagamento}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirm()
+              }}
+              disabled={loadingPagamento}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {loadingPagamento ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Sim, Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

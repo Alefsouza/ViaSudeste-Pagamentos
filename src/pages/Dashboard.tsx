@@ -32,6 +32,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Info } from 'lucide-react'
 import { getPagamentosPaginated, getPagamentosAnalytics } from '@/services/pagamentos'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
@@ -39,8 +41,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { UploadFotosModal } from '@/components/UploadFotosModal'
 import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Dashboard() {
+  const { toast } = useToast()
   const [filters, setFilters] = useState({
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
@@ -53,9 +57,6 @@ export default function Dashboard() {
   const [error, setError] = useState(false)
   const [statsData, setStatsData] = useState<any[]>([])
   const [tableData, setTableData] = useState<any>(null)
-
-  const [uploadModalOpen, setUploadModalOpen] = useState(false)
-  const [importModalOpen, setImportModalOpen] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -80,8 +81,13 @@ export default function Dashboard() {
       ])
       setStatsData(stats)
       setTableData(paginated)
-    } catch (e) {
+    } catch (e: any) {
       setError(true)
+      toast({
+        title: 'Erro de conexão',
+        description: e.response?.message || 'Falha ao carregar os dados do dashboard.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -161,27 +167,25 @@ export default function Dashboard() {
             Analise a distribuição de pagamentos e monitore as filiais.
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Importar Planilha
-          </Button>
-          <Button onClick={() => setUploadModalOpen(true)}>
-            <Camera className="mr-2 h-4 w-4" />
-            Upload de Fotos
-          </Button>
-        </div>
       </div>
-
-      {/* Kept existing modals */}
-      <UploadFotosModal open={uploadModalOpen} onOpenChange={setUploadModalOpen} />
-      <ImportPlanilhaModal open={importModalOpen} onOpenChange={setImportModalOpen} />
 
       {/* Filters */}
       <Card>
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="space-y-2">
-            <Label>Data Inicial</Label>
+            <div className="flex items-center gap-1.5">
+              <Label>Data Inicial</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Filtre os pagamentos a partir desta data.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <Input
               type="date"
               value={filters.startDate}
@@ -189,7 +193,19 @@ export default function Dashboard() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Data Final</Label>
+            <div className="flex items-center gap-1.5">
+              <Label>Data Final</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Filtre os pagamentos até esta data.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <Input
               type="date"
               value={filters.endDate}
@@ -197,7 +213,19 @@ export default function Dashboard() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Filial</Label>
+            <div className="flex items-center gap-1.5">
+              <Label>Filial</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Visualize os dados de uma filial específica ou de todas.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <Select
               value={filters.filial}
               onValueChange={(val) => setFilters({ ...filters, filial: val })}
@@ -213,7 +241,19 @@ export default function Dashboard() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Buscar Colaborador</Label>
+            <div className="flex items-center gap-1.5">
+              <Label>Buscar Colaborador</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Busque por nome ou número de registro (RE).</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input

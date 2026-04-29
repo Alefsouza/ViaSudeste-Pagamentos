@@ -21,6 +21,7 @@ export function ImportPlanilhaModal({
   const [isDragging, setIsDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -57,6 +58,7 @@ export function ImportPlanilhaModal({
 
     if (validExtensions.includes(fileExtension)) {
       setFile(selectedFile)
+      setConfirming(false)
     } else {
       toast.error('Formato inválido. Por favor, envie um arquivo .xlsx ou .xls.')
     }
@@ -153,7 +155,10 @@ export function ImportPlanilhaModal({
       open={open}
       onOpenChange={(val) => {
         if (!loading) onOpenChange(val)
-        if (!val) setFile(null)
+        if (!val) {
+          setFile(null)
+          setConfirming(false)
+        }
       }}
     >
       <DialogContent className="sm:max-w-md">
@@ -201,16 +206,43 @@ export function ImportPlanilhaModal({
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <Button onClick={handleUpload} disabled={loading} className="w-full">
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Importando planilha...
-                  </>
-                ) : (
-                  'Confirmar Importação'
-                )}
-              </Button>
+              {!confirming ? (
+                <Button onClick={() => setConfirming(true)} disabled={loading} className="w-full">
+                  Verificar Importação
+                </Button>
+              ) : (
+                <div className="mt-2 p-4 border rounded-md bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 animate-fade-in-up">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-4">
+                    Tem certeza que deseja importar estes dados? Registros existentes poderão ser
+                    atualizados e novos serão criados.
+                  </p>
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirming(false)}
+                      disabled={loading}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleUpload}
+                      disabled={loading}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importando...
+                        </>
+                      ) : (
+                        'Sim, importar'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center text-center">
