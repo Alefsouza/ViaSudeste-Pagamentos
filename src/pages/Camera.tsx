@@ -150,7 +150,10 @@ export default function Camera() {
       } else if (!colab && hasFotoRecord) {
         setRecognitionError('Colaborador não encontrado')
       } else if (colab) {
-        setColaborador({ ...colab, fotoUrl, hasFotoRecord })
+        // Ignora foto_url depreciada da coleção colaboradores, garantindo
+        // que a única fonte da imagem seja fotos_colaboradores (fotoUrl)
+        const { foto_url: _deprecated, ...cleanColab } = colab
+        setColaborador({ ...cleanColab, fotoUrl, hasFotoRecord })
       }
     } catch (error) {
       setRecognitionError('Colaborador e foto não encontrados')
