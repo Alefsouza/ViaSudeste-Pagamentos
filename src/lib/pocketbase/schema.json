@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-29T14:57:52.279Z",
+  "generatedAt": "2026-04-29T15:02:58.368Z",
   "collections": [
     {
       "name": "users",
@@ -108,7 +108,7 @@
           "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": ["CREATE UNIQUE INDEX idx_colaboradores_registro ON colaboradores (registro)"]
+      "indexes": []
     },
     {
       "name": "pagamentos",

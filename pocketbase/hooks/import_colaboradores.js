@@ -32,20 +32,13 @@ routerAdd(
         else if (filialRaw === '3' || filialRaw === '4') filialName = 'Cursino'
         else continue
 
-        let record
-        try {
-          record = txApp.findFirstRecordByData('colaboradores', 'registro', registro)
-          record.set('nome', nome)
-          record.set('valor_a_receber', valor)
-          record.set('filial', filialName)
-        } catch (_) {
-          const col = txApp.findCollectionByNameOrId('colaboradores')
-          record = new Record(col)
-          record.set('registro', registro)
-          record.set('nome', nome)
-          record.set('valor_a_receber', valor)
-          record.set('filial', filialName)
-        }
+        const col = txApp.findCollectionByNameOrId('colaboradores')
+        const record = new Record(col)
+        record.set('registro', registro)
+        record.set('nome', nome)
+        record.set('valor_a_receber', valor)
+        record.set('filial', filialName)
+
         txApp.save(record)
         count++
       }
