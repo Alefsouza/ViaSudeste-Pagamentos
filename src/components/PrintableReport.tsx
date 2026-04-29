@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import {
   ChartContainer,
@@ -63,12 +64,13 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
 
   const barConfig = { total: { label: 'Total Pago', color: 'hsl(var(--chart-1))' } }
 
-  return (
-    <div className="hidden print:block p-8 bg-white text-black w-full min-h-screen absolute top-0 left-0 z-50">
+  const content = (
+    <div className="hidden print:block p-8 bg-white text-black w-full">
       <style>{`
         @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          @page { margin: 10mm; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white; margin: 0; }
+          @page { size: A4; margin: 10mm; }
+          #root { display: none !important; }
         }
       `}</style>
       <div className="mb-6 border-b pb-4 border-slate-200">
@@ -217,4 +219,6 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
       </div>
     </div>
   )
+
+  return createPortal(content, document.body)
 }

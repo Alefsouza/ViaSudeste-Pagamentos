@@ -124,16 +124,16 @@ export default function RelatorioPagamentos() {
       const filters = { search: debouncedSearch, startDate, endDate, filial }
       const allData = await getPagamentosAnalytics(filters)
       setReportData(allData)
+      setReportModalOpen(false)
+      setIsGenerating(false)
 
       setTimeout(() => {
+        window.print()
         toast({
           title: 'Relatório gerado com sucesso',
           description: 'O documento está pronto para impressão/salvamento.',
         })
-        setIsGenerating(false)
-        setReportModalOpen(false)
-        window.print()
-      }, 1000)
+      }, 500)
     } catch (err: any) {
       setIsGenerating(false)
       toast({

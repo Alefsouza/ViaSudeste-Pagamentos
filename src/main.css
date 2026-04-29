@@ -101,6 +101,12 @@
     padding: 0 !important;
     margin: 0 !important;
   }
+
+  @media print {
+    [data-radix-portal] {
+      display: none !important;
+    }
+  }
 }
 
 @layer utilities {
