@@ -330,9 +330,9 @@ export default function Camera() {
                       Foto do Sistema
                     </p>
                     <div className="aspect-[3/4] rounded-lg overflow-hidden border bg-slate-100 flex items-center justify-center">
-                      {colaborador.foto ? (
+                      {colaborador.fotoUrl ? (
                         <img
-                          src={pb.files.getURL(colaborador, colaborador.foto)}
+                          src={colaborador.fotoUrl}
                           alt="Sistema"
                           className="w-full h-full object-cover"
                         />

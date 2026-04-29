@@ -9,7 +9,6 @@ routerAdd(
 
     const data = body.data
     let count = 0
-    let fotosVinculadas = 0
 
     $app.runInTransaction((txApp) => {
       const col = txApp.findCollectionByNameOrId('colaboradores')
@@ -50,28 +49,14 @@ routerAdd(
         record.set('valor_a_receber', valor)
         record.set('filial', filialName)
 
-        try {
-          const fotoRecord = txApp.findFirstRecordByData(
-            'fotos_colaboradores',
-            'registro',
-            registro,
-          )
-          const fotoUrl = fotoRecord.getString('foto_url')
-          if (fotoUrl && record.getString('foto_url') !== fotoUrl) {
-            record.set('foto_url', fotoUrl)
-            fotosVinculadas++
-          }
-        } catch (_) {}
-
         txApp.save(record)
         count++
       }
     })
 
     return e.json(200, {
-      message: `${count} colaboradores importados. ${fotosVinculadas} fotos vinculadas automaticamente.`,
+      message: `${count} colaboradores importados.`,
       count,
-      fotosVinculadas,
     })
   },
   $apis.requireAuth(),

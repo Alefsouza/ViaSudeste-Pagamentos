@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-29T19:23:55.633Z",
+  "generatedAt": "2026-04-29T19:34:03.854Z",
   "collections": [
     {
       "name": "users",
@@ -88,12 +88,6 @@
           "selectValues": ["Cursino", "Sapopemba"]
         },
         {
-          "name": "foto",
-          "type": "file",
-          "required": false,
-          "system": false
-        },
-        {
           "name": "created",
           "type": "autodate",
           "required": false,
@@ -106,12 +100,6 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
-        },
-        {
-          "name": "foto_url",
-          "type": "text",
-          "required": false,
-          "system": false
         }
       ],
       "indexes": []

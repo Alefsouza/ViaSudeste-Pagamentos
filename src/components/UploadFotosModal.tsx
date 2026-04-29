@@ -108,15 +108,6 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
         const fotoUrl = pb.files.getURL(fotoRecord, fotoRecord.foto)
         await pb.collection('fotos_colaboradores').update(fotoRecord.id, { foto_url: fotoUrl })
 
-        try {
-          const colaborador = await pb
-            .collection('colaboradores')
-            .getFirstListItem(`registro="${registroTrimmed}"`)
-          await pb.collection('colaboradores').update(colaborador.id, { foto_url: fotoUrl })
-        } catch {
-          // Normal se o colaborador ainda não foi importado, será vinculado futuramente
-        }
-
         currentFiles[i].status = 'success'
         successCount++
         toast.success(`Foto enviada com sucesso para registro ${registroTrimmed}`)
