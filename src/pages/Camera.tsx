@@ -143,11 +143,17 @@ export default function Camera() {
 
     try {
       const registro = await reconhecimentoFacialService(base64)
-      const colab = await getColaboradorByRegistro(registro)
-      if (colab) setColaborador(colab)
-      else setRecognitionError('Colaborador não encontrado')
+      const { colab, fotoUrl, hasFotoRecord } = await getColaboradorByRegistro(registro)
+
+      if (!colab && !hasFotoRecord) {
+        setRecognitionError('Colaborador e foto não encontrados')
+      } else if (!colab && hasFotoRecord) {
+        setRecognitionError('Colaborador não encontrado')
+      } else if (colab) {
+        setColaborador({ ...colab, fotoUrl, hasFotoRecord })
+      }
     } catch (error) {
-      setRecognitionError('Colaborador não encontrado')
+      setRecognitionError('Colaborador e foto não encontrados')
     } finally {
       setIsRecognizing(false)
     }
@@ -330,7 +336,7 @@ export default function Camera() {
                     <p className="text-sm font-medium text-center text-slate-600">
                       Foto do Sistema
                     </p>
-                    <div className="aspect-[3/4] rounded-lg overflow-hidden border bg-slate-100 flex items-center justify-center">
+                    <div className="aspect-[3/4] rounded-lg overflow-hidden border bg-slate-100 flex flex-col items-center justify-center p-4 text-center">
                       {colaborador.fotoUrl ? (
                         <img
                           src={colaborador.fotoUrl}
@@ -338,13 +344,14 @@ export default function Camera() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <Avatar className="w-full h-full rounded-none">
-                          <AvatarFallback className="rounded-none bg-slate-100">
-                            <User className="h-12 w-12 text-slate-400" />
-                          </AvatarFallback>
-                        </Avatar>
+                        <>
+                          <CameraOff className="h-12 w-12 text-slate-400 mb-3" />
+                          <p className="text-sm font-medium text-slate-500">
+                            Foto não disponível para este colaborador
+                          </p>
+                        </>
                       )}
-                    </div>
+                    </div>{' '}
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-center text-slate-600">Foto Capturada</p>

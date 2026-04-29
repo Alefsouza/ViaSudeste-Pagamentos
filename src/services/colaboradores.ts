@@ -3,7 +3,10 @@ import pb from '@/lib/pocketbase/client'
 export const getColaboradores = () => pb.collection('colaboradores').getFullList({ sort: 'nome' })
 
 export const getColaboradorByRegistro = async (registro: string) => {
-  const colabPromise = pb.collection('colaboradores').getFirstListItem(`registro="${registro}"`)
+  const colabPromise = pb
+    .collection('colaboradores')
+    .getFirstListItem(`registro="${registro}"`)
+    .catch(() => null)
 
   const fotoPromise = pb
     .collection('fotos_colaboradores')
@@ -24,5 +27,5 @@ export const getColaboradorByRegistro = async (registro: string) => {
     }
   }
 
-  return { ...colab, fotoUrl }
+  return { colab, fotoUrl, hasFotoRecord: !!fotoRecord }
 }
