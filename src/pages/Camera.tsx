@@ -18,9 +18,7 @@ import {
 import { getColaboradorByRegistro } from '@/services/colaboradores'
 import { createPagamento } from '@/services/pagamentos'
 import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
-import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 type CameraErrorType = 'denied' | 'not_found' | 'in_use' | 'unsupported' | 'unknown' | 'timeout'
 
@@ -150,8 +148,6 @@ export default function Camera() {
       } else if (!colab && hasFotoRecord) {
         setRecognitionError('Colaborador não encontrado')
       } else if (colab) {
-        // Ignora foto_url depreciada da coleção colaboradores, garantindo
-        // que a única fonte da imagem seja fotos_colaboradores (fotoUrl)
         const { foto_url: _deprecated, ...cleanColab } = colab
         setColaborador({ ...cleanColab, fotoUrl, hasFotoRecord })
       }
@@ -180,6 +176,7 @@ export default function Camera() {
       setCapturedFile(null)
       setColaborador(null)
       setRecognitionError(null)
+      startCamera()
     } catch (err: any) {
       toast({ title: 'Erro ao confirmar pagamento', variant: 'destructive' })
     } finally {
@@ -219,7 +216,11 @@ export default function Camera() {
                 className={`w-full h-full object-cover transform -scale-x-100 ${capturedImage || cameraStatus !== 'active' ? 'hidden' : 'block'}`}
               />
               {capturedImage && (
-                <img src={capturedImage} alt="Captura" className="w-full h-full object-cover" />
+                <img
+                  src={capturedImage}
+                  alt="Captura"
+                  className="w-full h-full object-cover transform -scale-x-100"
+                />
               )}
               {cameraStatus === 'error' && (
                 <div className="absolute inset-0 bg-slate-900 z-10 flex flex-col items-center justify-center p-6 text-center">
@@ -354,17 +355,17 @@ export default function Camera() {
                           </p>
                         </>
                       )}
-                    </div>{' '}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-center text-slate-600">Foto Capturada</p>
-                    <div className="aspect-[3/4] rounded-lg overflow-hidden border-2 border-forest relative">
+                    <div className="aspect-[3/4] rounded-lg overflow-hidden border-2 border-forest relative bg-black">
                       <img
                         src={capturedImage || ''}
                         alt="Capturada"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transform -scale-x-100 opacity-90"
                       />
-                      <div className="absolute top-2 right-2 bg-forest text-white rounded-full p-1">
+                      <div className="absolute top-2 right-2 bg-forest text-white rounded-full p-1 z-10">
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
                     </div>
