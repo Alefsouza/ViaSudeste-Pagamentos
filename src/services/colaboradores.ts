@@ -8,7 +8,7 @@ export const updateColaborador = (id: string, data: Partial<{ foto_confirmacao_u
 export const getColaboradorByRegistro = async (registro: string) => {
   const colabPromise = pb
     .collection('colaboradores')
-    .getFirstListItem(`registro="${registro}"`)
+    .getFirstListItem(`registro="${registro}" && foto_confirmacao_url=""`)
     .catch(() => null)
 
   const fotoPromise = pb

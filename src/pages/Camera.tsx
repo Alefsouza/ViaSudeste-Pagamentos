@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast'
 type ViewState =
   | 'EMPTY'
   | 'SEARCHING'
+  | 'SEARCH_FAILED'
   | 'CAPTURING'
   | 'PROCESSING'
   | 'RECOGNITION_SUCCESS'
@@ -88,15 +89,8 @@ export default function Camera() {
 
     try {
       const result = await getColaboradorByRegistro(registro)
-      if (!result.colab) {
-        setErrorMsg('Colaborador não encontrado. Verifique o registro e tente novamente')
-        setViewState('EMPTY')
-        return
-      }
-
-      if (!result.hasFotoRecord || !result.fotoUrl) {
-        setErrorMsg('Foto não disponível para este colaborador')
-        setViewState('EMPTY')
+      if (!result.colab || !result.hasFotoRecord || !result.fotoUrl) {
+        setViewState('SEARCH_FAILED')
         return
       }
 
@@ -104,8 +98,7 @@ export default function Camera() {
       setFotoDoBanco(result.fotoUrl)
       setViewState('CAPTURING')
     } catch (err) {
-      setErrorMsg('Erro ao buscar colaborador.')
-      setViewState('EMPTY')
+      setViewState('SEARCH_FAILED')
     }
   }
 
@@ -267,53 +260,63 @@ export default function Camera() {
                     onChange={(e) => setRegistro(e.target.value)}
                     disabled={
                       viewState !== 'EMPTY' &&
+                      viewState !== 'SEARCH_FAILED' &&
                       viewState !== 'RECOGNITION_FAILED' &&
                       viewState !== 'RECOGNITION_SUCCESS'
                     }
                   />
                 </div>
-
-                {errorMsg && (
+                {(viewState === 'SEARCH_FAILED' || errorMsg) && (
                   <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
                     <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>{errorMsg}</span>
+                    <span>
+                      {viewState === 'SEARCH_FAILED'
+                        ? 'Colaborador nao encontrado ou ja recebeu pagamento'
+                        : errorMsg}
+                    </span>
                   </div>
                 )}
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={
-                    !registro.trim() ||
-                    viewState === 'SEARCHING' ||
-                    viewState === 'PROCESSING' ||
-                    viewState === 'CONFIRMING_PAYMENT'
-                  }
-                >
-                  {viewState === 'SEARCHING' ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Buscando colaborador...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Buscar
-                    </>
-                  )}
-                </Button>
-
-                {viewState !== 'EMPTY' && viewState !== 'SEARCHING' && (
+                {viewState === 'SEARCH_FAILED' ? (
+                  <Button type="button" className="w-full" onClick={handleReset}>
+                    Tentar Novamente
+                  </Button>
+                ) : (
                   <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full mt-2"
-                    onClick={handleReset}
-                    disabled={viewState === 'CONFIRMING_PAYMENT'}
+                    type="submit"
+                    className="w-full"
+                    disabled={
+                      !registro.trim() ||
+                      viewState === 'SEARCHING' ||
+                      viewState === 'PROCESSING' ||
+                      viewState === 'CONFIRMING_PAYMENT'
+                    }
                   >
-                    Nova Busca
+                    {viewState === 'SEARCHING' ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Buscando colaborador...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        Buscar
+                      </>
+                    )}
                   </Button>
                 )}
+                {viewState !== 'EMPTY' &&
+                  viewState !== 'SEARCHING' &&
+                  viewState !== 'SEARCH_FAILED' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full mt-2"
+                      onClick={handleReset}
+                      disabled={viewState === 'CONFIRMING_PAYMENT'}
+                    >
+                      Nova Busca
+                    </Button>
+                  )}{' '}
               </form>
             </CardContent>
           </Card>
@@ -374,8 +377,11 @@ export default function Camera() {
             )}
 
             <div className="relative z-10 flex-1 flex flex-col">
-              {viewState === 'EMPTY' || viewState === 'SEARCHING' ? (
+              {viewState === 'EMPTY' ||
+              viewState === 'SEARCHING' ||
+              viewState === 'SEARCH_FAILED' ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 bg-white dark:bg-slate-950">
+                  {' '}
                   <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
                     <CameraIcon className="h-8 w-8 text-slate-400" />
                   </div>
