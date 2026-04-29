@@ -272,7 +272,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
+            <DollarSign className="h-4 w-4 text-forest" />
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -285,7 +285,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Qtd. Colaboradores</CardTitle>
-            <Users className="h-4 w-4 text-blue-500" />
+            <Users className="h-4 w-4 text-forest" />
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -453,7 +453,7 @@ export default function Dashboard() {
                             </TableCell>
                             <TableCell>{p.expand?.colaborador_id?.registro}</TableCell>
                             <TableCell>{p.expand?.colaborador_id?.filial}</TableCell>
-                            <TableCell className="text-right text-emerald-600 font-medium">
+                            <TableCell className="text-right text-forest font-medium">
                               {formatBRL(p.valor_pago)}
                             </TableCell>
                             <TableCell>
@@ -477,7 +477,7 @@ export default function Dashboard() {
                         <CardContent className="p-4 flex flex-col gap-2">
                           <div className="flex justify-between font-bold">
                             <span className="truncate">{p.expand?.colaborador_id?.nome}</span>
-                            <span className="text-emerald-600">{formatBRL(p.valor_pago)}</span>
+                            <span className="text-forest">{formatBRL(p.valor_pago)}</span>
                           </div>
                           <div className="text-sm text-muted-foreground flex justify-between">
                             <span>Reg: {p.expand?.colaborador_id?.registro}</span>

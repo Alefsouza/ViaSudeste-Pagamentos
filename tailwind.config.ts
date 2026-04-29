@@ -81,6 +81,11 @@ export default {
           4: 'hsl(var(--chart-4))',
           5: 'hsl(var(--chart-5))',
         },
+        forest: '#2E7D32',
+        mint: {
+          DEFAULT: '#4CAF50',
+          light: '#81C784',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

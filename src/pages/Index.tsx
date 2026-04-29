@@ -76,8 +76,8 @@ export default function Index() {
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
       <Card className="w-full max-w-[450px] shadow-xl rounded-2xl border-slate-200 dark:border-slate-800 animate-slide-up">
         <CardHeader className="space-y-2 text-center pb-8">
-          <div className="mx-auto bg-blue-100 dark:bg-blue-900/30 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-2">
-            <Lock className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          <div className="mx-auto bg-gradient-to-tr from-mint to-mint-light p-3 rounded-full w-16 h-16 flex items-center justify-center mb-2 shadow-sm">
+            <Lock className="w-8 h-8 text-white" />
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">Bem-vindo de volta</CardTitle>
           <CardDescription className="text-base">
@@ -97,7 +97,7 @@ export default function Index() {
                     id="email"
                     type="email"
                     placeholder="nome@empresa.com"
-                    className="pl-9 focus-visible:ring-blue-500"
+                    className="pl-9 focus-visible:ring-forest"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
@@ -116,7 +116,7 @@ export default function Index() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className="pl-9 pr-10 focus-visible:ring-blue-500"
+                    className="pl-9 pr-10 focus-visible:ring-forest"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
@@ -136,7 +136,7 @@ export default function Index() {
             </div>
             <Button
               type="submit"
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white transition-all active:scale-[0.98]"
+              className="w-full h-11 bg-forest hover:bg-forest/90 text-white transition-all active:scale-[0.98]"
               disabled={isLoading}
             >
               {isLoading ? (

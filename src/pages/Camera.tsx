@@ -195,7 +195,7 @@ export default function Camera() {
               {cameraStatus === 'initializing' && (
                 <div className="absolute inset-0 z-10 bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
                   <Skeleton className="absolute inset-0 opacity-20" />
-                  <Loader2 className="h-10 w-10 animate-spin text-blue-400 mb-4 relative z-20" />
+                  <Loader2 className="h-10 w-10 animate-spin text-mint mb-4 relative z-20" />
                   <p className="text-white font-medium text-lg relative z-20">
                     Solicitando acesso à câmera...
                   </p>
@@ -235,7 +235,7 @@ export default function Camera() {
               )}
               {isRecognizing && (
                 <div className="absolute inset-0 bg-slate-900/80 flex flex-col items-center justify-center text-white z-10 backdrop-blur-sm">
-                  <Loader2 className="h-10 w-10 animate-spin mb-4 text-blue-400" />
+                  <Loader2 className="h-10 w-10 animate-spin mb-4 text-mint" />
                   <p className="font-medium text-lg">Processando imagem...</p>
                 </div>
               )}
@@ -291,11 +291,12 @@ export default function Camera() {
               </div>
             ) : colaborador ? (
               <div className="space-y-6 animate-slide-up">
-                <div className="bg-blue-50 dark:bg-blue-950/30 p-5 rounded-xl border border-blue-100">
+                <div className="bg-gradient-to-r from-mint/10 to-mint-light/10 p-5 rounded-xl border border-mint/20">
                   <div className="flex flex-col sm:flex-row justify-between gap-4">
                     <div>
-                      <h2 className="text-xl font-bold flex items-center gap-2">
-                        <User className="h-5 w-5 text-blue-600" /> {colaborador.nome}
+                      <h2 className="text-xl font-bold flex items-center gap-2 text-forest dark:text-mint-light">
+                        <User className="h-5 w-5 text-forest dark:text-mint-light" />{' '}
+                        {colaborador.nome}
                       </h2>
                       <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
                         <span className="font-medium">Reg: {colaborador.registro}</span>
@@ -308,7 +309,7 @@ export default function Camera() {
                       <div className="text-xs text-slate-500 font-medium uppercase mb-1 flex items-center justify-end gap-1">
                         <DollarSign className="h-3 w-3" /> Valor a Receber
                       </div>
-                      <div className="text-xl font-bold text-emerald-600">
+                      <div className="text-xl font-bold text-forest">
                         {new Intl.NumberFormat('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
@@ -336,20 +337,20 @@ export default function Camera() {
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-center text-slate-600">Foto Capturada</p>
-                    <div className="aspect-[3/4] rounded-lg overflow-hidden border-2 border-emerald-500 relative">
+                    <div className="aspect-[3/4] rounded-lg overflow-hidden border-2 border-forest relative">
                       <img
                         src={capturedImage || ''}
                         alt="Capturada"
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute top-2 right-2 bg-emerald-500 text-white rounded-full p-1">
+                      <div className="absolute top-2 right-2 bg-forest text-white rounded-full p-1">
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
                     </div>
                   </div>
                 </div>
                 <Button
-                  className="w-full h-14 text-lg font-medium bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="w-full h-14 text-lg font-medium bg-forest hover:bg-forest/90 text-white"
                   onClick={handleConfirm}
                   disabled={isConfirming}
                 >

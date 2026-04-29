@@ -27,7 +27,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white">
-            <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
+            <div className="bg-gradient-to-tr from-mint to-mint-light p-2 rounded-lg text-white shadow-sm">
               {user.role === 'gestor' ? <LayoutDashboard size={20} /> : <Camera size={20} />}
             </div>
             <span className="hidden sm:inline">Via Sudeste</span>
@@ -39,7 +39,7 @@ export function Header() {
                 to="/dashboard"
                 className={`flex items-center gap-1.5 transition-colors ${
                   location.pathname === '/dashboard'
-                    ? 'text-blue-600'
+                    ? 'text-forest dark:text-mint-light'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                 }`}
               >
@@ -50,7 +50,7 @@ export function Header() {
                 to="/relatorio"
                 className={`flex items-center gap-1.5 transition-colors ${
                   location.pathname === '/relatorio'
-                    ? 'text-blue-600'
+                    ? 'text-forest dark:text-mint-light'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                 }`}
               >
@@ -78,7 +78,7 @@ export function Header() {
         <div className="flex items-center gap-3 md:gap-4">
           <Badge
             variant="outline"
-            className="border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1 text-sm font-medium shadow-sm"
+            className="border-forest text-forest bg-forest/10 dark:bg-forest/20 px-3 py-1 text-sm font-medium shadow-sm"
           >
             {user.role === 'gestor' ? 'Gestor' : 'Boca de Caixa'}
           </Badge>
