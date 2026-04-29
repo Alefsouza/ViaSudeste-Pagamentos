@@ -30,7 +30,7 @@ export function Header() {
             <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
               {user.role === 'gestor' ? <LayoutDashboard size={20} /> : <Camera size={20} />}
             </div>
-            <span className="hidden sm:inline">VarejoPro</span>
+            <span className="hidden sm:inline">Via Sudeste</span>
           </div>
 
           {user.role === 'gestor' && (
