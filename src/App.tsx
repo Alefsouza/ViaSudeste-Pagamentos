@@ -14,7 +14,7 @@ function ProtectedRoute({
   allowedRole,
 }: {
   children: React.ReactNode
-  allowedRole: 'gestor' | 'boca_de_caixa'
+  allowedRole: 'Administrador' | 'recebedoria'
 }) {
   const { user, loading } = useAuth()
 
@@ -22,7 +22,7 @@ function ProtectedRoute({
 
   if (!user) return <Navigate to="/" replace />
   if (user.role !== allowedRole) {
-    return <Navigate to={user.role === 'gestor' ? '/dashboard' : '/camera'} replace />
+    return <Navigate to={user.role === 'Administrador' ? '/dashboard' : '/camera'} replace />
   }
   return <>{children}</>
 }
@@ -34,7 +34,7 @@ const AppRoutes = () => (
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute allowedRole="gestor">
+          <ProtectedRoute allowedRole="Administrador">
             <Dashboard />
           </ProtectedRoute>
         }
@@ -42,7 +42,7 @@ const AppRoutes = () => (
       <Route
         path="/camera"
         element={
-          <ProtectedRoute allowedRole="boca_de_caixa">
+          <ProtectedRoute allowedRole="recebedoria">
             <Camera />
           </ProtectedRoute>
         }
@@ -50,7 +50,7 @@ const AppRoutes = () => (
       <Route
         path="/relatorio"
         element={
-          <ProtectedRoute allowedRole="gestor">
+          <ProtectedRoute allowedRole="Administrador">
             <RelatorioPagamentos />
           </ProtectedRoute>
         }

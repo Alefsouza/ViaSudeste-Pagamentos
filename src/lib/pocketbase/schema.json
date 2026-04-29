@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-29T20:00:33.951Z",
+  "generatedAt": "2026-04-29T20:19:08.240Z",
   "collections": [
     {
       "name": "users",
@@ -43,7 +43,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["gestor", "boca_de_caixa"]
+          "selectValues": ["Administrador", "recebedoria"]
         }
       ],
       "indexes": [

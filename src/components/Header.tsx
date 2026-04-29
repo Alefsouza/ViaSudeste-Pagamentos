@@ -28,12 +28,12 @@ export function Header() {
         <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white">
             <div className="bg-gradient-to-tr from-mint to-mint-light p-2 rounded-lg text-white shadow-sm">
-              {user.role === 'gestor' ? <LayoutDashboard size={20} /> : <Camera size={20} />}
+              {user.role === 'Administrador' ? <LayoutDashboard size={20} /> : <Camera size={20} />}
             </div>
             <span className="hidden sm:inline">Via Sudeste</span>
           </div>
 
-          {user.role === 'gestor' && (
+          {user.role === 'Administrador' && (
             <nav className="flex items-center gap-3 md:gap-4 text-sm font-medium">
               <Link
                 to="/dashboard"
@@ -80,7 +80,7 @@ export function Header() {
             variant="outline"
             className="border-forest text-forest bg-forest/10 dark:bg-forest/20 px-3 py-1 text-sm font-medium shadow-sm"
           >
-            {user.role === 'gestor' ? 'Gestor' : 'Boca de Caixa'}
+            {user.role === 'Administrador' ? 'Administrador' : 'Recebedoria'}
           </Badge>
           <div className="text-sm font-medium text-slate-600 dark:text-slate-300 hidden md:block">
             {user.name}

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import pb from '@/lib/pocketbase/client'
 
-export type Role = 'gestor' | 'boca_de_caixa'
+export type Role = 'Administrador' | 'recebedoria'
 
 export interface User {
   id: string

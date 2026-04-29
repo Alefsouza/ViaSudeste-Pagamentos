@@ -22,7 +22,7 @@ export default function Index() {
 
   useEffect(() => {
     if (user) {
-      navigate(user.role === 'gestor' ? '/dashboard' : '/camera')
+      navigate(user.role === 'Administrador' ? '/dashboard' : '/camera')
     }
   }, [user, navigate])
 
@@ -60,7 +60,7 @@ export default function Index() {
       await login(email, password)
       const role = pb.authStore.record?.tipo_usuario
       toast({ title: 'Sucesso', description: `Bem-vindo de volta, ${email.split('@')[0]}!` })
-      navigate(role === 'gestor' ? '/dashboard' : '/camera')
+      navigate(role === 'Administrador' ? '/dashboard' : '/camera')
     } catch {
       toast({
         title: 'Erro ao fazer login',
