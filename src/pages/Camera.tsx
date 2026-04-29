@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { getColaboradorByRegistro } from '@/services/colaboradores'
 import { createPagamento } from '@/services/pagamentos'
-import { mockRecognizeFace } from '@/services/reconhecimento-facial'
+import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
 import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -38,6 +38,8 @@ export default function Camera() {
   const { toast } = useToast()
 
   const startCamera = async () => {
+    setCameraStatus('initializing')
+    setCameraError('')
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: true,
@@ -52,9 +54,16 @@ export default function Camera() {
       let msg = 'Erro ao acessar a câmera.'
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         msg =
-          'Permissão de câmera negada. Verifique as configurações do navegador e tente novamente.'
+          "Permissão de câmera negada. Clique em 'Tentar Novamente' e autorize o acesso na caixa de diálogo do navegador"
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'Câmera não encontrada. Verifique se está conectada.'
+        msg = 'Câmera não encontrada. Verifique se está conectada ao dispositivo'
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        msg = 'Câmera em uso por outro aplicativo'
+      } else if (
+        err.name === 'OverconstrainedError' ||
+        err.name === 'ConstraintNotSatisfiedError'
+      ) {
+        msg = 'Câmera não suporta os parâmetros solicitados'
       }
       setCameraError(msg)
       setCameraStatus('error')
@@ -107,7 +116,7 @@ export default function Camera() {
     setRecognitionError(null)
 
     try {
-      const registro = await mockRecognizeFace(base64)
+      const registro = await reconhecimentoFacialService(base64)
       const colab = await getColaboradorByRegistro(registro)
       setColaborador(colab)
     } catch (error) {
@@ -177,13 +186,23 @@ export default function Camera() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="relative rounded-xl overflow-hidden border-2 border-slate-200 dark:border-slate-800 bg-slate-900 aspect-[4/3] flex items-center justify-center">
+              {cameraStatus === 'initializing' && (
+                <div className="absolute inset-0 z-10 bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
+                  <Skeleton className="absolute inset-0 opacity-20" />
+                  <Loader2 className="h-10 w-10 animate-spin text-blue-400 mb-4 relative z-20" />
+                  <p className="text-white font-medium text-lg relative z-20">
+                    Solicitando acesso à câmera...
+                  </p>
+                </div>
+              )}
+
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
                 className={`w-full h-full object-cover transform -scale-x-100 ${
-                  capturedImage ? 'hidden' : 'block'
+                  capturedImage || cameraStatus !== 'active' ? 'hidden' : 'block'
                 }`}
               />
 
@@ -192,14 +211,14 @@ export default function Camera() {
               )}
 
               {cameraStatus === 'error' && (
-                <div className="p-6 text-center text-red-400 flex flex-col items-center">
-                  <AlertCircle className="h-10 w-10 mb-2" />
-                  <p className="font-medium text-lg">{cameraError}</p>
+                <div className="absolute inset-0 bg-slate-900 z-10 flex flex-col items-center justify-center p-6 text-center">
+                  <AlertCircle className="h-12 w-12 mb-4 text-red-500" />
+                  <p className="font-medium text-lg text-white mb-6">{cameraError}</p>
+                  <Button onClick={startCamera} variant="secondary">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Tentar Novamente
+                  </Button>
                 </div>
-              )}
-
-              {cameraStatus === 'initializing' && (
-                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
               )}
 
               {!capturedImage && cameraStatus === 'active' && (

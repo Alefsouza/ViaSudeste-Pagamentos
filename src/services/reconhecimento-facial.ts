@@ -1,6 +1,6 @@
 import { getColaboradores } from './colaboradores'
 
-export const mockRecognizeFace = async (imageBase64: string): Promise<string> => {
+export const reconhecimentoFacialService = async (imageBase64: string): Promise<string> => {
   // TODO: IMPLEMENT REAL API INTEGRATION HERE
   // Em uma implementação real, esta função faria um POST para o serviço de reconhecimento:
   //
