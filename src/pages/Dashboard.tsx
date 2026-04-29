@@ -111,7 +111,7 @@ export default function Dashboard() {
 
   // Calculations
   const totalPago = statsData.reduce((acc, curr) => acc + curr.valor_pago, 0)
-  const uniqueColabs = new Set(statsData.map((c) => c.expand?.colaborador_id?.id)).size
+  const uniqueColabs = new Set(statsData.map((c) => c.colaborador_id).filter(Boolean)).size
   const values = statsData.map((c) => c.valor_pago)
   const maxPago = values.length ? Math.max(...values) : 0
   const minPago = values.length ? Math.min(...values) : 0
@@ -244,7 +244,7 @@ export default function Dashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Colaboradores</CardTitle>
+            <CardTitle className="text-sm font-medium">Qtd. Colaboradores</CardTitle>
             <Users className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>

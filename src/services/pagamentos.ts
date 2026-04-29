@@ -37,7 +37,7 @@ export const getPagamentosAnalytics = async (filters: any) => {
     filter: buildFilter(filters),
     expand: 'colaborador_id',
     fields:
-      'valor_pago,data_pagamento,colaborador_id.filial,colaborador_id.nome,colaborador_id.registro,colaborador_id.id',
+      'id,valor_pago,data_pagamento,colaborador_id,expand.colaborador_id.filial,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.id',
   })
 }
 
