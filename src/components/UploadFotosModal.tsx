@@ -34,6 +34,7 @@ interface FileItem {
   file: File
   status: FileStatus
   error?: string
+  registro?: string
 }
 
 export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) {
@@ -73,49 +74,64 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
         const file = currentFiles[i].file
         const match = file.name.match(/^015(\d{3})(\d+)\.jpe?g$/i)
         if (!match) {
-          throw new Error('Nome fora do padrão: 015[filial][registro].jpg')
+          throw new Error('Nome do arquivo inválido. Use o padrão: 015[filial][registro].jpg')
         }
 
+        const filialCode = match[1]
         const registroRaw = match[2]
         const registroTrimmed = Number(registroRaw).toString()
 
-        let colaborador
-        try {
-          colaborador = await pb
-            .collection('colaboradores')
-            .getFirstListItem(`registro="${registroRaw}"`)
-        } catch {
-          try {
-            colaborador = await pb
-              .collection('colaboradores')
-              .getFirstListItem(`registro="${registroTrimmed}"`)
-          } catch {
-            throw new Error(`Colaborador com registro ${registroTrimmed} não encontrado`)
-          }
-        }
+        currentFiles[i].registro = registroTrimmed
+
+        const filialInt = parseInt(filialCode, 10)
+        const filialName = filialInt === 2 ? 'Sapopemba' : 'Cursino'
 
         const newFilename = `${registroTrimmed}_${Date.now()}.jpg`
         const newFile = new File([file], newFilename, { type: file.type })
+
         const formData = new FormData()
         formData.append('foto', newFile)
+        formData.append('registro', registroTrimmed)
+        formData.append('filial', filialName)
+        formData.append('data_upload', new Date().toISOString())
 
-        await pb.collection('colaboradores').update(colaborador.id, formData)
+        let fotoRecord
+        try {
+          const existing = await pb
+            .collection('fotos_colaboradores')
+            .getFirstListItem(`registro="${registroTrimmed}"`)
+          fotoRecord = await pb.collection('fotos_colaboradores').update(existing.id, formData)
+        } catch {
+          fotoRecord = await pb.collection('fotos_colaboradores').create(formData)
+        }
+
+        const fotoUrl = pb.files.getURL(fotoRecord, fotoRecord.foto)
+        await pb.collection('fotos_colaboradores').update(fotoRecord.id, { foto_url: fotoUrl })
+
+        try {
+          const colaborador = await pb
+            .collection('colaboradores')
+            .getFirstListItem(`registro="${registroTrimmed}"`)
+          await pb.collection('colaboradores').update(colaborador.id, { foto_url: fotoUrl })
+        } catch {
+          // Normal se o colaborador ainda não foi importado, será vinculado futuramente
+        }
 
         currentFiles[i].status = 'success'
         successCount++
+        toast.success(`Foto enviada com sucesso para registro ${registroTrimmed}`)
       } catch (error: any) {
         currentFiles[i].status = 'error'
         currentFiles[i].error =
-          error.response?.message || error.message || 'Erro ao enviar foto. Verifique a conexão.'
+          error.message === 'Nome do arquivo inválido. Use o padrão: 015[filial][registro].jpg'
+            ? error.message
+            : 'Erro ao enviar foto'
         errorCount++
       }
       setFiles([...currentFiles])
     }
 
     setIsProcessing(false)
-    if (successCount > 0) {
-      toast.success(`${successCount} fotos enviadas com sucesso`)
-    }
     if (errorCount > 0) {
       toast.error(`${errorCount} fotos falharam. Verifique os erros.`)
     }
@@ -141,19 +157,19 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
         <DialogHeader>
           <DialogTitle>Upload de Fotos</DialogTitle>
           <DialogDescription>
-            Envie fotos dos colaboradores em lote. Apenas arquivos .jpg ou .jpeg. Padrão esperado:
-            015[filial][registro].jpg (ex: 0150020006962.jpg)
+            Envie fotos dos colaboradores em lote. O sistema irá vincular automaticamente aos
+            registros.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
-          {!isProcessing && (
+          {!isProcessing && files.length === 0 && (
             <div
               className={cn(
                 'border-2 border-dashed rounded-lg p-8 text-center transition-colors duration-200 ease-in-out cursor-pointer',
                 isDragging
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/25 hover:border-primary/50',
+                  ? 'border-forest bg-mint/5'
+                  : 'border-muted-foreground/25 hover:border-forest/50',
               )}
               onDragOver={(e) => {
                 e.preventDefault()
@@ -173,11 +189,11 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
               }}
               onClick={() => fileInputRef.current?.click()}
             >
-              <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-sm font-medium">
-                Arraste e solte fotos aqui ou clique para selecionar
+              <UploadCloud className="mx-auto h-12 w-12 text-forest mb-4" />
+              <p className="text-sm font-medium text-forest">Upload de Fotos</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Apenas .jpg, .jpeg. Padrão: 015[filial][registro].jpg
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Apenas .jpg, .jpeg</p>
               <input
                 type="file"
                 multiple
@@ -192,28 +208,30 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
           {files.length > 0 && (
             <div className="flex flex-col gap-2 flex-1 overflow-hidden">
               <div className="flex items-center justify-between text-sm font-medium">
-                <span>Arquivos ({files.length})</span>
-                {isProcessing && <span>{progress}% Concluído</span>}
+                <span className="text-forest">Arquivos ({files.length})</span>
+                {isProcessing && <span className="text-mint">{progress}% Concluído</span>}
               </div>
 
-              {isProcessing && <Progress value={progress} className="h-2" />}
+              {isProcessing && (
+                <Progress value={progress} className="h-2 bg-mint/20 [&>div]:bg-forest" />
+              )}
 
-              <ScrollArea className="flex-1 border rounded-md">
+              <ScrollArea className="flex-1 border border-mint/20 rounded-md">
                 <div className="p-4 flex flex-col gap-3">
                   {files.map((fileItem) => (
                     <div
                       key={fileItem.id}
-                      className="flex items-start gap-3 bg-muted/50 p-3 rounded-md"
+                      className="flex items-start gap-3 bg-muted/30 border border-border/50 p-3 rounded-md"
                     >
                       <div className="mt-0.5">
                         {fileItem.status === 'pending' && (
                           <FileImage className="h-5 w-5 text-muted-foreground" />
                         )}
                         {fileItem.status === 'uploading' && (
-                          <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                          <Loader2 className="h-5 w-5 text-forest animate-spin" />
                         )}
                         {fileItem.status === 'success' && (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                          <CheckCircle2 className="h-5 w-5 text-mint" />
                         )}
                         {fileItem.status === 'error' && (
                           <XCircle className="h-5 w-5 text-destructive" />
@@ -226,7 +244,7 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
                           {!isProcessing && fileItem.status !== 'success' && (
                             <button
                               onClick={() => removeFile(fileItem.id)}
-                              className="text-muted-foreground hover:text-foreground p-1"
+                              className="text-muted-foreground hover:text-destructive p-1 transition-colors"
                             >
                               <X className="h-4 w-4" />
                             </button>
@@ -240,13 +258,23 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
                         ) : (
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {(fileItem.file.size / 1024).toFixed(1)} KB
-                            {fileItem.status === 'uploading' && ' - Enviando...'}
-                            {fileItem.status === 'success' && ' - Concluído'}
+                            {fileItem.status === 'uploading' && ' - Enviando foto...'}
+                            {fileItem.status === 'success' &&
+                              ` - Vinculado (Reg: ${fileItem.registro})`}
                           </p>
                         )}
                       </div>
                     </div>
                   ))}
+                  {!isProcessing && (
+                    <Button
+                      variant="outline"
+                      className="w-full mt-2 border-dashed border-forest/30 text-forest hover:bg-forest/5"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <UploadCloud className="mr-2 h-4 w-4" /> Adicionar mais fotos
+                    </Button>
+                  )}
                 </div>
               </ScrollArea>
             </div>
@@ -256,18 +284,22 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
         <div className="flex justify-end gap-2 mt-2">
           {!isProcessing && files.length > 0 && (
             <Button variant="outline" onClick={reset}>
-              Limpar
+              Limpar Tudo
             </Button>
           )}
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isProcessing}>
             {isProcessing ? 'Aguarde...' : 'Fechar'}
           </Button>
           {files.length > 0 &&
             files.some((f) => f.status === 'pending' || f.status === 'error') && (
-              <Button onClick={processUploads} disabled={isProcessing}>
+              <Button
+                onClick={processUploads}
+                disabled={isProcessing}
+                className="bg-forest hover:bg-forest/90 text-white"
+              >
                 {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isProcessing
-                  ? 'Enviando fotos...'
+                  ? 'Processando...'
                   : files.some((f) => f.status === 'error')
                     ? 'Tentar novamente'
                     : 'Iniciar Upload'}

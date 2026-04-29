@@ -9,16 +9,22 @@ routerAdd(
 
     const data = body.data
     let count = 0
+    let fotosVinculadas = 0
 
     $app.runInTransaction((txApp) => {
+      const col = txApp.findCollectionByNameOrId('colaboradores')
+
       for (const row of data) {
         const getVal = (key) => {
           const found = Object.keys(row).find((k) => k.toUpperCase().trim() === key)
           return found ? row[found] : ''
         }
 
-        const registro = String(getVal('REGISTRO')).trim()
-        if (!registro) continue
+        const registroRaw = String(getVal('REGISTRO')).trim()
+        if (!registroRaw) continue
+
+        // Remove leading zeros safely for register ID matching
+        const registro = Number(registroRaw).toString()
 
         const nome = String(getVal('NOME')).trim() || 'Colaborador ' + registro
 
@@ -32,19 +38,41 @@ routerAdd(
         else if (filialRaw === '3' || filialRaw === '4') filialName = 'Cursino'
         else continue
 
-        const col = txApp.findCollectionByNameOrId('colaboradores')
-        const record = new Record(col)
-        record.set('registro', registro)
+        let record
+        try {
+          record = txApp.findFirstRecordByData('colaboradores', 'registro', registro)
+        } catch (_) {
+          record = new Record(col)
+          record.set('registro', registro)
+        }
+
         record.set('nome', nome)
         record.set('valor_a_receber', valor)
         record.set('filial', filialName)
+
+        try {
+          const fotoRecord = txApp.findFirstRecordByData(
+            'fotos_colaboradores',
+            'registro',
+            registro,
+          )
+          const fotoUrl = fotoRecord.getString('foto_url')
+          if (fotoUrl && record.getString('foto_url') !== fotoUrl) {
+            record.set('foto_url', fotoUrl)
+            fotosVinculadas++
+          }
+        } catch (_) {}
 
         txApp.save(record)
         count++
       }
     })
 
-    return e.json(200, { message: `${count} colaboradores importados com sucesso`, count })
+    return e.json(200, {
+      message: `${count} colaboradores importados. ${fotosVinculadas} fotos vinculadas automaticamente.`,
+      count,
+      fotosVinculadas,
+    })
   },
   $apis.requireAuth(),
 )
