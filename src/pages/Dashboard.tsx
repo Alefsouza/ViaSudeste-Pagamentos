@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -8,102 +9,128 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts'
-import { Users, TrendingUp, AlertTriangle, Activity } from 'lucide-react'
-
-const salesData = [
-  { time: '08:00', sales: 1200 },
-  { time: '10:00', sales: 2100 },
-  { time: '12:00', sales: 3400 },
-  { time: '14:00', sales: 2800 },
-  { time: '16:00', sales: 4200 },
-  { time: '18:00', sales: 3800 },
-]
-
-const cashierData = [
-  { name: 'Ana', ops: 145 },
-  { name: 'Carlos', ops: 132 },
-  { name: 'Beatriz', ops: 168 },
-  { name: 'João', ops: 110 },
-]
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts'
+import { Users, TrendingUp, DollarSign, Building } from 'lucide-react'
+import { getColaboradores } from '@/services/colaboradores'
+import { getPagamentos } from '@/services/pagamentos'
+import { useRealtime } from '@/hooks/use-realtime'
 
 export default function Dashboard() {
+  const [colaboradores, setColaboradores] = useState<any[]>([])
+  const [pagamentos, setPagamentos] = useState<any[]>([])
+
+  const loadData = async () => {
+    try {
+      const [colabs, pags] = await Promise.all([getColaboradores(), getPagamentos()])
+      setColaboradores(colabs)
+      setPagamentos(pags)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+  useRealtime('colaboradores', loadData)
+  useRealtime('pagamentos', loadData)
+
+  const totalReceber = colaboradores.reduce((acc, c) => acc + c.valor_a_receber, 0)
+  const totalPago = pagamentos.reduce((acc, p) => acc + p.valor_pago, 0)
+  const totalColabs = colaboradores.length
+
+  const filialData = [
+    {
+      name: 'Cursino',
+      valor: colaboradores
+        .filter((c) => c.filial === 'Cursino')
+        .reduce((a, c) => a + c.valor_a_receber, 0),
+    },
+    {
+      name: 'Sapopemba',
+      valor: colaboradores
+        .filter((c) => c.filial === 'Sapopemba')
+        .reduce((a, c) => a + c.valor_a_receber, 0),
+    },
+  ]
+
+  const formatBRL = (val: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+
   return (
     <div className="container mx-auto py-8 px-4 space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
           Painel do Gestor
         </h1>
-        <p className="text-muted-foreground mt-1">Visão geral da operação em tempo real.</p>
+        <p className="text-muted-foreground mt-1">
+          Visão geral financeira e de colaboradores em tempo real.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[
-          { title: 'Vendas Hoje', value: 'R$ 17.500', icon: TrendingUp, color: 'text-emerald-500' },
-          { title: 'Caixas Ativos', value: '12/15', icon: Users, color: 'text-blue-500' },
-          { title: 'Alertas', value: '3', icon: AlertTriangle, color: 'text-amber-500' },
-          { title: 'Taxa de Conversão', value: '68%', icon: Activity, color: 'text-purple-500' },
-        ].map((stat, i) => (
-          <Card key={i} className="animate-fade-in-up" style={{ animationDelay: `${i * 100}ms` }}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              <stat.icon className={`h-4 w-4 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+        <Card className="animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total a Receber</CardTitle>
+            <DollarSign className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatBRL(totalReceber)}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatBRL(totalPago)}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Colaboradores</CardTitle>
+            <Users className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalColabs}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Filiais Ativas</CardTitle>
+            <Building className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">2</div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Vendas por Hora</CardTitle>
+            <CardTitle>Valores a Receber por Filial</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer
-              config={{ sales: { label: 'Vendas', color: 'hsl(var(--primary))' } }}
+              config={{ valor: { label: 'Valor', color: 'hsl(var(--primary))' } }}
               className="h-[300px] w-full"
             >
-              <LineChart data={salesData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={filialData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="time" fontSize={12} tickLine={false} axisLine={false} />
+                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(v) => `R$${v / 1000}k`}
+                  tickFormatter={(v) => `R$ ${v / 1000}k`}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Line
-                  type="monotone"
-                  dataKey="sales"
-                  stroke="var(--color-sales)"
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Operações por Caixa</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{ ops: { label: 'Operações', color: '#10b981' } }}
-              className="h-[300px] w-full"
-            >
-              <BarChart data={cashierData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="ops" fill="var(--color-ops)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="valor" fill="var(--color-valor)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
           </CardContent>
@@ -112,31 +139,25 @@ export default function Dashboard() {
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Atividade Recente</CardTitle>
+          <CardTitle>Últimos Pagamentos</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Operador</TableHead>
-                <TableHead>Ação</TableHead>
-                <TableHead>Terminal</TableHead>
-                <TableHead className="text-right">Horário</TableHead>
+                <TableHead>Colaborador</TableHead>
+                <TableHead>Data do Pagamento</TableHead>
+                <TableHead className="text-right">Valor Pago</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {[
-                { op: 'Ana S.', action: 'Login Realizado', terminal: 'CX-04', time: '14:23' },
-                { op: 'Carlos M.', action: 'Pausa (Almoço)', terminal: 'CX-02', time: '14:15' },
-                { op: 'Beatriz L.', action: 'Login Realizado', terminal: 'CX-07', time: '13:50' },
-              ].map((row, i) => (
-                <TableRow key={i}>
-                  <TableCell className="font-medium text-slate-900 dark:text-slate-100">
-                    {row.op}
+              {pagamentos.slice(0, 5).map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">{p.expand?.colaborador_id?.nome}</TableCell>
+                  <TableCell>{new Date(p.data_pagamento).toLocaleDateString('pt-BR')}</TableCell>
+                  <TableCell className="text-right text-emerald-600 font-medium">
+                    {formatBRL(p.valor_pago)}
                   </TableCell>
-                  <TableCell>{row.action}</TableCell>
-                  <TableCell>{row.terminal}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">{row.time}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
