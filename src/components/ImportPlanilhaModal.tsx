@@ -66,13 +66,53 @@ export function ImportPlanilhaModal({
     if (!file) return
 
     setLoading(true)
-    const reader = new FileReader()
-    reader.onload = async (event) => {
+
+    const processFile = async () => {
       try {
-        const base64 = event.target?.result?.toString().split(',')[1]
+        const XLSX = (window as any).XLSX
+        if (!XLSX) {
+          throw new Error('Biblioteca de leitura de planilhas não carregada.')
+        }
+
+        const data = await file.arrayBuffer()
+        const workbook = XLSX.read(data, { type: 'array' })
+        const firstSheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[firstSheetName]
+
+        if (!worksheet || !worksheet['!ref']) {
+          throw new Error('Planilha vazia.')
+        }
+
+        const range = XLSX.utils.decode_range(worksheet['!ref'])
+        const headers: string[] = []
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell = worksheet[XLSX.utils.encode_cell({ c: C, r: range.s.r })]
+          if (cell && cell.v) headers.push(String(cell.v).toUpperCase().trim())
+        }
+
+        const requiredCols = [
+          'REGISTRO',
+          'DATA',
+          'IDTIPOPGTO',
+          'INICIO',
+          'TERMINO',
+          'HORAS',
+          'VALOR',
+          'FILIAL',
+        ]
+        const hasAllCols = requiredCols.every((col) => headers.includes(col))
+
+        if (!hasAllCols) {
+          throw new Error(
+            'Arquivo inválido. Verifique se tem as colunas: REGISTRO, DATA, IDTIPOPGTO, INICIO, TERMINO, HORAS, VALOR, FILIAL',
+          )
+        }
+
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' })
+
         const res = await pb.send('/backend/v1/import/colaboradores', {
           method: 'POST',
-          body: JSON.stringify({ fileBase64: base64 }),
+          body: JSON.stringify({ data: jsonData }),
         })
 
         toast.success(res.message || 'Colaboradores importados com sucesso')
@@ -93,12 +133,18 @@ export function ImportPlanilhaModal({
       }
     }
 
-    reader.onerror = () => {
-      toast.error('Erro ao ler o arquivo localmente.')
-      setLoading(false)
+    if (!(window as any).XLSX) {
+      const script = document.createElement('script')
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+      script.onload = processFile
+      script.onerror = () => {
+        toast.error('Erro ao carregar dependência para leitura de planilhas.')
+        setLoading(false)
+      }
+      document.body.appendChild(script)
+    } else {
+      processFile()
     }
-
-    reader.readAsDataURL(file)
   }
 
   return (

@@ -1,56 +1,13 @@
-// @deps xlsx@0.18.5
 routerAdd(
   'POST',
   '/backend/v1/import/colaboradores',
   (e) => {
-    const { read, utils } = require('xlsx')
-
     const body = e.requestInfo().body
-    if (!body || !body.fileBase64) {
-      return e.badRequestError('Nenhum arquivo enviado.')
+    if (!body || !body.data || !Array.isArray(body.data)) {
+      return e.badRequestError('Nenhum dado enviado.')
     }
 
-    let workbook
-    try {
-      workbook = read(body.fileBase64, { type: 'base64' })
-    } catch (err) {
-      return e.badRequestError(
-        'Não foi possível ler o arquivo. Certifique-se de que é um Excel válido.',
-      )
-    }
-
-    const firstSheetName = workbook.SheetNames[0]
-    const worksheet = workbook.Sheets[firstSheetName]
-    if (!worksheet || !worksheet['!ref']) {
-      return e.badRequestError('Planilha vazia.')
-    }
-
-    const range = utils.decode_range(worksheet['!ref'])
-    const headers = []
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const cell = worksheet[utils.encode_cell({ c: C, r: range.s.r })]
-      if (cell && cell.v) headers.push(String(cell.v).toUpperCase().trim())
-    }
-
-    const requiredCols = [
-      'REGISTRO',
-      'DATA',
-      'IDTIPOPGTO',
-      'INICIO',
-      'TERMINO',
-      'HORAS',
-      'VALOR',
-      'FILIAL',
-    ]
-    const hasAllCols = requiredCols.every((col) => headers.includes(col))
-
-    if (!hasAllCols) {
-      return e.badRequestError(
-        'Arquivo inválido. Verifique se tem as colunas: REGISTRO, DATA, IDTIPOPGTO, INICIO, TERMINO, HORAS, VALOR, FILIAL',
-      )
-    }
-
-    const data = utils.sheet_to_json(worksheet, { raw: false, defval: '' })
+    const data = body.data
     let count = 0
 
     $app.runInTransaction((txApp) => {
