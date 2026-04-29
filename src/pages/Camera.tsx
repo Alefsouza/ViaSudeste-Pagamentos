@@ -71,15 +71,14 @@ export default function Camera() {
         streamPromise.then((s) => s.getTracks().forEach((t) => t.stop())).catch(() => {})
       }
 
-      let msg = 'Erro ao acessar a câmera. Verifique as permissões do navegador'
+      let msg = 'Falha ao acessar a câmera devido a um erro inesperado.'
       let type: CameraErrorType = 'unknown'
 
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        msg =
-          "Você negou o acesso à câmera. Clique em 'Tentar Novamente' e autorize quando o navegador pedir"
+        msg = "Câmera bloqueada. Clique em 'Permitir' nas configurações do navegador"
         type = 'denied'
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'Nenhuma câmera foi encontrada. Verifique se está conectada ao dispositivo'
+        msg = 'Câmera não encontrada. Verifique se está conectada ao dispositivo'
         type = 'not_found'
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
         msg = 'A câmera está sendo usada por outro aplicativo. Feche-o e tente novamente'
@@ -126,6 +125,7 @@ export default function Camera() {
 
     const base64 = canvas.toDataURL('image/jpeg', 0.8)
     setCapturedImage(base64)
+    stopCamera()
 
     canvas.toBlob(
       (blob) => {
@@ -192,7 +192,7 @@ export default function Camera() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="relative rounded-xl overflow-hidden border-2 border-slate-200 dark:border-slate-800 bg-slate-900 aspect-[4/3] flex items-center justify-center">
-              {cameraStatus === 'initializing' && (
+              {cameraStatus === 'initializing' && !capturedImage && (
                 <div className="absolute inset-0 z-10 bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
                   <Skeleton className="absolute inset-0 opacity-20" />
                   <Loader2 className="h-10 w-10 animate-spin text-mint mb-4 relative z-20" />
@@ -242,7 +242,7 @@ export default function Camera() {
             </div>
             {!capturedImage ? (
               <Button
-                className="w-full h-14 text-lg font-medium"
+                className="w-full h-14 text-lg font-medium bg-forest hover:bg-forest/90 text-white"
                 size="lg"
                 disabled={cameraStatus !== 'active'}
                 onClick={handleCapture}
@@ -252,11 +252,17 @@ export default function Camera() {
             ) : (
               <Button
                 variant="outline"
-                className="w-full h-12"
-                onClick={() => setCapturedImage(null)}
+                className="w-full h-12 border-forest text-forest hover:bg-forest/10"
+                onClick={() => {
+                  setCapturedImage(null)
+                  setCapturedFile(null)
+                  setColaborador(null)
+                  setRecognitionError(null)
+                  startCamera()
+                }}
                 disabled={isConfirming || isRecognizing}
               >
-                <RefreshCw className="h-5 w-5 mr-2" /> Tentar Novamente
+                <RefreshCw className="h-5 w-5 mr-2" /> Descartar
               </Button>
             )}
           </CardContent>
