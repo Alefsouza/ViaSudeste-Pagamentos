@@ -85,15 +85,7 @@ export function Header() {
           <div className="text-sm font-medium text-slate-600 dark:text-slate-300 hidden md:block">
             {user.name}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleLogout}
-            className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-            title="Sair"
-          >
-            <LogOut size={20} />
-          </Button>
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
