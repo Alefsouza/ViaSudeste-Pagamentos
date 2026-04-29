@@ -29,25 +29,61 @@ export default function Camera() {
   const [colaborador, setColaborador] = useState<any>(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [isConfirming, setIsConfirming] = useState(false)
+  const [isInitializingCamera, setIsInitializingCamera] = useState(true)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     let stream: MediaStream | null = null
+    let isMounted = true
 
     const startCamera = async () => {
+      if (!videoRef.current) return
+
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        })
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
+        setIsInitializingCamera(true)
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          })
+        } catch (initialErr: any) {
+          if (
+            initialErr.name === 'OverconstrainedError' ||
+            initialErr.name === 'ConstraintNotSatisfiedError'
+          ) {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'user' },
+            })
+          } else {
+            throw initialErr
+          }
         }
-      } catch (err) {
-        console.error('Camera access denied', err)
-        setErrorMsg('Erro ao acessar a câmera. Verifique as permissões do seu navegador.')
+
+        if (isMounted && videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.onloadedmetadata = () => {
+            if (isMounted) setIsInitializingCamera(false)
+          }
+        } else if (stream) {
+          stream.getTracks().forEach((track) => track.stop())
+        }
+      } catch (err: any) {
+        console.error('Camera initialization error', err)
+        if (!isMounted) return
+
+        const errorName = err?.name || ''
+        if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
+          setErrorMsg('Câmera em uso por outro aplicativo')
+        } else if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+          setErrorMsg('Permissão de câmera negada')
+        } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
+          setErrorMsg('Hardware de vídeo não encontrado')
+        } else {
+          setErrorMsg('Erro ao inicializar câmera')
+        }
         setStatus('error')
+        setIsInitializingCamera(false)
       }
     }
 
@@ -56,6 +92,7 @@ export default function Camera() {
     }
 
     return () => {
+      isMounted = false
       if (stream) {
         stream.getTracks().forEach((track) => track.stop())
       }
@@ -151,9 +188,14 @@ export default function Camera() {
                   autoPlay
                   playsInline
                   muted
-                  className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]"
+                  className={`absolute inset-0 w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-300 ${isInitializingCamera ? 'opacity-0' : 'opacity-100'}`}
                 />
-                <div className="absolute inset-0 border-[6px] border-transparent border-t-emerald-500/50 border-b-emerald-500/50 rounded-2xl pointer-events-none opacity-50" />
+                {isInitializingCamera && (
+                  <Skeleton className="absolute inset-0 w-full h-full rounded-2xl" />
+                )}
+                {!isInitializingCamera && (
+                  <div className="absolute inset-0 border-[6px] border-transparent border-t-emerald-500/50 border-b-emerald-500/50 rounded-2xl pointer-events-none opacity-50" />
+                )}
               </>
             )}
 
@@ -188,7 +230,8 @@ export default function Camera() {
           {status === 'idle' && (
             <Button
               size="lg"
-              className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 transition-all active:scale-[0.98]"
+              disabled={isInitializingCamera}
+              className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-50"
               onClick={capturePhoto}
             >
               <CameraIcon className="mr-2 h-6 w-6" />
