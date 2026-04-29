@@ -40,3 +40,5 @@ export const getPagamentosAnalytics = async (filters: any) => {
       'valor_pago,data_pagamento,colaborador_id.filial,colaborador_id.nome,colaborador_id.registro,colaborador_id.id',
   })
 }
+
+export const getPagamentosStats = getPagamentosAnalytics
