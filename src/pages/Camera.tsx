@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Camera as CameraIcon,
   CheckCircle2,
@@ -10,13 +11,13 @@ import {
   XCircle,
   RefreshCw,
   User,
-  Image as ImageIcon,
 } from 'lucide-react'
 import { getColaboradorByRegistro } from '@/services/colaboradores'
 import { createPagamento } from '@/services/pagamentos'
 import { mockRecognizeFace } from '@/services/reconhecimento-facial'
 import { useToast } from '@/hooks/use-toast'
 import pb from '@/lib/pocketbase/client'
+import { getErrorMessage } from '@/lib/pocketbase/errors'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
@@ -28,6 +29,7 @@ export default function Camera() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [colaborador, setColaborador] = useState<any>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [confirmErrorMsg, setConfirmErrorMsg] = useState('')
   const [isConfirming, setIsConfirming] = useState(false)
   const [isInitializingCamera, setIsInitializingCamera] = useState(true)
 
@@ -87,9 +89,7 @@ export default function Camera() {
       }
     }
 
-    if (status === 'idle') {
-      startCamera()
-    }
+    startCamera()
 
     return () => {
       isMounted = false
@@ -97,7 +97,7 @@ export default function Camera() {
         stream.getTracks().forEach((track) => track.stop())
       }
     }
-  }, [status])
+  }, [])
 
   const capturePhoto = async () => {
     if (!videoRef.current || !canvasRef.current) return
@@ -118,6 +118,7 @@ export default function Camera() {
 
   const processRecognition = async (imageBase64: string) => {
     setStatus('loading')
+    setConfirmErrorMsg('')
     try {
       const registro = await mockRecognizeFace(imageBase64)
       const colab = await getColaboradorByRegistro(registro)
@@ -133,25 +134,47 @@ export default function Camera() {
   const handleConfirmPayment = async () => {
     if (!colaborador) return
     setIsConfirming(true)
+    setConfirmErrorMsg('')
+
     try {
+      let fotoConfirmacao: File | undefined = undefined
+
+      if (videoRef.current && canvasRef.current) {
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          const blob = await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, 'image/jpeg', 0.8),
+          )
+          if (blob) {
+            fotoConfirmacao = new File([blob], `confirmacao_${colaborador.id}_${Date.now()}.jpg`, {
+              type: 'image/jpeg',
+            })
+          }
+        }
+      }
+
       await createPagamento({
         colaborador_id: colaborador.id,
         valor_pago: colaborador.valor_a_receber,
         data_pagamento: new Date().toISOString(),
+        foto_confirmacao: fotoConfirmacao,
       })
 
       toast({
         title: 'Pagamento Confirmado',
-        description: `O pagamento para ${colaborador.nome} foi registrado com sucesso.`,
+        description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(colaborador.valor_a_receber)}`,
       })
 
       resetFlow()
-    } catch (err) {
-      toast({
-        title: 'Erro ao confirmar',
-        description: 'Não foi possível registrar o pagamento.',
-        variant: 'destructive',
-      })
+    } catch (err: any) {
+      const errMsg = getErrorMessage(err)
+      setConfirmErrorMsg(`Erro ao confirmar pagamento: ${errMsg}`)
     } finally {
       setIsConfirming(false)
     }
@@ -161,6 +184,7 @@ export default function Camera() {
     setCapturedImage(null)
     setColaborador(null)
     setErrorMsg('')
+    setConfirmErrorMsg('')
     setStatus('idle')
   }
 
@@ -181,22 +205,20 @@ export default function Camera() {
         {/* Left Column: Camera / Skeletons / Captured Image */}
         <div className="flex-1 flex flex-col gap-4">
           <div className="relative w-full aspect-video bg-slate-950 rounded-2xl overflow-hidden shadow-xl border border-slate-800 flex items-center justify-center">
-            {status === 'idle' && (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`absolute inset-0 w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-300 ${isInitializingCamera ? 'opacity-0' : 'opacity-100'}`}
-                />
-                {isInitializingCamera && (
-                  <Skeleton className="absolute inset-0 w-full h-full rounded-2xl" />
-                )}
-                {!isInitializingCamera && (
-                  <div className="absolute inset-0 border-[6px] border-transparent border-t-emerald-500/50 border-b-emerald-500/50 rounded-2xl pointer-events-none opacity-50" />
-                )}
-              </>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`absolute inset-0 w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-300 ${isInitializingCamera ? 'opacity-0' : 'opacity-100'}`}
+            />
+
+            {isInitializingCamera && (
+              <Skeleton className="absolute inset-0 w-full h-full rounded-2xl" />
+            )}
+
+            {!isInitializingCamera && status === 'idle' && (
+              <div className="absolute inset-0 border-[6px] border-transparent border-t-emerald-500/50 border-b-emerald-500/50 rounded-2xl pointer-events-none opacity-50" />
             )}
 
             {status === 'loading' && (
@@ -208,15 +230,15 @@ export default function Camera() {
               </div>
             )}
 
-            {(status === 'success' || status === 'error') && capturedImage && (
+            {status === 'error' && !errorMsg.includes('inicializar') && capturedImage && (
               <img
                 src={capturedImage}
                 alt="Captured"
-                className={`absolute inset-0 w-full h-full object-cover transform scale-x-[-1] transition-all duration-500 ${status === 'error' ? 'grayscale opacity-50' : ''}`}
+                className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1] grayscale opacity-50 transition-all duration-500"
               />
             )}
 
-            {status === 'error' && !capturedImage && (
+            {status === 'error' && errorMsg.includes('inicializar') && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 z-10">
                 <XCircle size={64} className="mb-4 text-red-500" />
                 <p className="text-lg font-medium text-slate-400">Sem sinal de vídeo</p>
@@ -239,7 +261,7 @@ export default function Camera() {
             </Button>
           )}
 
-          {status === 'error' && (
+          {status === 'error' && !confirmErrorMsg && (
             <Button
               size="lg"
               variant="destructive"
@@ -337,6 +359,13 @@ export default function Camera() {
                 </CardContent>
               </Card>
 
+              {confirmErrorMsg && (
+                <Alert variant="destructive" className="animate-fade-in">
+                  <AlertTitle>Erro na Confirmação</AlertTitle>
+                  <AlertDescription>{confirmErrorMsg}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="flex gap-4">
                 <Button
                   size="lg"
@@ -349,32 +378,27 @@ export default function Camera() {
                 </Button>
                 <Button
                   size="lg"
-                  className="flex-1 h-14 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className={`flex-1 h-14 text-white transition-all ${
+                    confirmErrorMsg
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
                   onClick={handleConfirmPayment}
-                  disabled={isConfirming || colaborador.valor_a_receber <= 0}
+                  disabled={isConfirming || (!confirmErrorMsg && colaborador.valor_a_receber <= 0)}
                 >
                   {isConfirming ? (
-                    <RefreshCw className="h-5 w-5 animate-spin" />
+                    <>
+                      <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                      Confirmando...
+                    </>
+                  ) : confirmErrorMsg ? (
+                    'Tentar Novamente'
                   ) : (
                     'Confirmar Pagamento'
                   )}
                 </Button>
               </div>
             </div>
-          )}
-
-          {status === 'error' && (
-            <Card className="border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20">
-              <CardHeader>
-                <CardTitle className="text-red-700 dark:text-red-400 flex items-center gap-2">
-                  <XCircle className="h-5 w-5" />
-                  Falha na Identificação
-                </CardTitle>
-                <CardDescription className="text-red-600/80 dark:text-red-400/80">
-                  {errorMsg}
-                </CardDescription>
-              </CardHeader>
-            </Card>
           )}
         </div>
       </div>

@@ -7,4 +7,5 @@ export const createPagamento = (data: {
   colaborador_id: string
   valor_pago: number
   data_pagamento: string
+  foto_confirmacao?: File
 }) => pb.collection('pagamentos').create(data)
