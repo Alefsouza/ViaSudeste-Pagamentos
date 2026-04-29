@@ -20,6 +20,7 @@ import { createPagamento } from '@/services/pagamentos'
 import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
 import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 type CameraErrorType = 'denied' | 'not_found' | 'in_use' | 'unsupported' | 'unknown' | 'timeout'
 
@@ -337,7 +338,11 @@ export default function Camera() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <User className="h-12 w-12 opacity-50" />
+                        <Avatar className="w-full h-full rounded-none">
+                          <AvatarFallback className="rounded-none bg-slate-100">
+                            <User className="h-12 w-12 text-slate-400" />
+                          </AvatarFallback>
+                        </Avatar>
                       )}
                     </div>
                   </div>
