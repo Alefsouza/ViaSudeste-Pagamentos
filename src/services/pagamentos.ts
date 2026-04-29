@@ -7,8 +7,13 @@ export const createPagamento = (data: {
   colaborador_id: string
   valor_pago: number
   data_pagamento: string
+  hora_pagamento?: string
   foto_confirmacao?: File
+  foto_confirmacao_url?: string
 }) => pb.collection('pagamentos').create(data)
+
+export const updatePagamento = (id: string, data: Partial<{ foto_confirmacao_url: string }>) =>
+  pb.collection('pagamentos').update(id, data)
 
 const buildFilter = (filters: any) => {
   const parts: string[] = []

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-29T20:19:08.240Z",
+  "generatedAt": "2026-04-29T21:15:10.365Z",
   "collections": [
     {
       "name": "users",
@@ -100,6 +100,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "foto_confirmacao_url",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -153,6 +159,18 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "hora_pagamento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "foto_confirmacao_url",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
