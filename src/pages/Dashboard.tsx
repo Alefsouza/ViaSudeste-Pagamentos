@@ -10,14 +10,17 @@ import {
 } from '@/components/ui/table'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts'
-import { Users, TrendingUp, DollarSign, Building } from 'lucide-react'
+import { Users, TrendingUp, DollarSign, Building, Camera } from 'lucide-react'
 import { getColaboradores } from '@/services/colaboradores'
+import { Button } from '@/components/ui/button'
+import { UploadFotosModal } from '@/components/UploadFotosModal'
 import { getPagamentos } from '@/services/pagamentos'
 import { useRealtime } from '@/hooks/use-realtime'
 
 export default function Dashboard() {
   const [colaboradores, setColaboradores] = useState<any[]>([])
   const [pagamentos, setPagamentos] = useState<any[]>([])
+  const [uploadModalOpen, setUploadModalOpen] = useState(false)
 
   const loadData = async () => {
     try {
@@ -59,14 +62,22 @@ export default function Dashboard() {
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Painel do Gestor
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Visão geral financeira e de colaboradores em tempo real.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Painel do Gestor
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Visão geral financeira e de colaboradores em tempo real.
+          </p>
+        </div>
+        <Button onClick={() => setUploadModalOpen(true)}>
+          <Camera className="mr-2 h-4 w-4" />
+          Upload de Fotos
+        </Button>
       </div>
+
+      <UploadFotosModal open={uploadModalOpen} onOpenChange={setUploadModalOpen} />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="animate-fade-in-up" style={{ animationDelay: '0ms' }}>
