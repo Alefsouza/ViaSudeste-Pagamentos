@@ -65,12 +65,18 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
   const barConfig = { total: { label: 'Total Pago', color: 'hsl(var(--chart-1))' } }
 
   const content = (
-    <div className="hidden print:block p-8 bg-white text-black w-full">
+    <div
+      className="hidden print:block p-8 bg-white text-black w-full"
+      style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+    >
       <style>{`
         @media print {
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white; margin: 0; }
+          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           @page { size: A4; margin: 10mm; }
           #root { display: none !important; }
+          .recharts-wrapper, .recharts-surface { width: 300px !important; height: 300px !important; }
+          .chart-container { width: 300px !important; height: 300px !important; }
         }
       `}</style>
       <div className="mb-6 border-b pb-4 border-slate-200">
@@ -121,11 +127,14 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
           </div>
 
           <div className="grid grid-cols-2 gap-8 mb-6">
-            <div className="border border-slate-200 p-4 rounded-lg">
+            <div className="border border-slate-200 p-4 rounded-lg print:break-inside-avoid">
               <h3 className="text-lg font-semibold mb-4 text-center">Distribuição por Filial</h3>
-              <div className="flex justify-center">
-                <ChartContainer config={pieConfig} className="w-[300px] h-[300px]">
-                  <PieChart width={300} height={300}>
+              <div className="flex justify-center print:block mx-auto w-[300px] h-[300px] print:w-[300px] print:h-[300px]">
+                <ChartContainer
+                  config={pieConfig}
+                  className="chart-container w-[300px] h-[300px] print:w-[300px] print:h-[300px] mx-auto"
+                >
+                  <PieChart width={300} height={300} style={{ width: '300px', height: '300px' }}>
                     <Pie
                       data={pieData}
                       dataKey="value"
@@ -146,13 +155,17 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
                 </ChartContainer>
               </div>
             </div>
-            <div className="border border-slate-200 p-4 rounded-lg">
+            <div className="border border-slate-200 p-4 rounded-lg print:break-inside-avoid">
               <h3 className="text-lg font-semibold mb-4 text-center">Total Pago por Dia</h3>
-              <div className="flex justify-center">
-                <ChartContainer config={barConfig} className="w-[300px] h-[300px]">
+              <div className="flex justify-center print:block mx-auto w-[300px] h-[300px] print:w-[300px] print:h-[300px]">
+                <ChartContainer
+                  config={barConfig}
+                  className="chart-container w-[300px] h-[300px] print:w-[300px] print:h-[300px] mx-auto"
+                >
                   <BarChart
                     width={300}
                     height={300}
+                    style={{ width: '300px', height: '300px' }}
                     data={barData}
                     margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
                   >

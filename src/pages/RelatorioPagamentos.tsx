@@ -133,7 +133,7 @@ export default function RelatorioPagamentos() {
           title: 'Relatório gerado com sucesso',
           description: 'O documento está pronto para impressão/salvamento.',
         })
-      }, 500)
+      }, 1000)
     } catch (err: any) {
       setIsGenerating(false)
       toast({
