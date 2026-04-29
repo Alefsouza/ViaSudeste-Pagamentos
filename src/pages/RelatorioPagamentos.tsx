@@ -67,7 +67,7 @@ export default function RelatorioPagamentos() {
   const [filial, setFilial] = useState('Todas')
 
   const [reportModalOpen, setReportModalOpen] = useState(false)
-  const [reportType, setReportType] = useState<'table' | 'full'>('table')
+  const [reportType, setReportType] = useState<'table' | 'charts'>('table')
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<any[] | null>(null)
 
@@ -118,7 +118,8 @@ export default function RelatorioPagamentos() {
   }, [page, debouncedSearch, startDate, endDate, filial])
   useRealtime('pagamentos', loadData)
 
-  const handleGeneratePDF = async () => {
+  const handleGeneratePDF = async (type: 'table' | 'charts') => {
+    setReportType(type)
     setIsGenerating(true)
     try {
       const filters = { search: debouncedSearch, startDate, endDate, filial }
@@ -455,35 +456,48 @@ export default function RelatorioPagamentos() {
                 Escolha o formato do relatório. O documento usará os filtros atualmente aplicados.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <RadioGroup value={reportType} onValueChange={(val: any) => setReportType(val)}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="table" id="r-table" />
-                  <Label htmlFor="r-table">Apenas Tabela</Label>
-                </div>
-                <div className="flex items-center space-x-2 mt-4">
-                  <RadioGroupItem value="full" id="r-full" />
-                  <Label htmlFor="r-full">Tabela + Gráficos</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            <DialogFooter className="sm:justify-end gap-2">
+            <div className="py-4 flex flex-col gap-3">
               <Button
                 variant="outline"
-                onClick={() => setReportModalOpen(false)}
+                className="w-full justify-start h-16 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 dark:hover:bg-blue-950/30 dark:hover:border-blue-900"
+                onClick={() => handleGeneratePDF('table')}
                 disabled={isGenerating}
               >
-                Cancelar
-              </Button>
-              <Button onClick={handleGeneratePDF} disabled={isGenerating}>
-                {isGenerating ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {isGenerating && reportType === 'table' ? (
+                  <Loader2 className="mr-4 h-6 w-6 animate-spin text-blue-600 shrink-0" />
                 ) : (
-                  <Download className="mr-2 h-4 w-4" />
+                  <FileDigit className="mr-4 h-6 w-6 text-blue-600 shrink-0" />
                 )}
-                Gerar PDF
+                <div className="text-left flex flex-col justify-center">
+                  <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                    Apenas Tabela
+                  </div>
+                  <div className="text-xs font-normal text-muted-foreground">
+                    Listagem detalhada de pagamentos
+                  </div>
+                </div>
               </Button>
-            </DialogFooter>
+              <Button
+                variant="outline"
+                className="w-full justify-start h-16 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-950/30 dark:hover:border-emerald-900"
+                onClick={() => handleGeneratePDF('charts')}
+                disabled={isGenerating}
+              >
+                {isGenerating && reportType === 'charts' ? (
+                  <Loader2 className="mr-4 h-6 w-6 animate-spin text-emerald-600 shrink-0" />
+                ) : (
+                  <Download className="mr-4 h-6 w-6 text-emerald-600 shrink-0" />
+                )}
+                <div className="text-left flex flex-col justify-center">
+                  <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                    Apenas Gráficos
+                  </div>
+                  <div className="text-xs font-normal text-muted-foreground">
+                    Resumo e gráficos analíticos
+                  </div>
+                </div>
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

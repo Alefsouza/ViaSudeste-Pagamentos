@@ -10,7 +10,7 @@ import {
 
 interface PrintableReportProps {
   data: any[]
-  type: 'table' | 'full'
+  type: 'table' | 'charts'
   filters: { startDate: string; endDate: string; filial: string }
 }
 
@@ -101,7 +101,7 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
         </div>
       </div>
 
-      {type === 'full' && (
+      {type === 'charts' && (
         <div className="mb-8 page-break-inside-avoid">
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="border border-slate-200 p-4 rounded-lg bg-slate-50">
@@ -187,49 +187,51 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
         </div>
       )}
 
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Detalhamento dos Pagamentos</h3>
-        <table className="w-full text-sm text-left border-collapse border border-slate-300">
-          <thead className="bg-slate-100 border-b border-slate-300">
-            <tr>
-              <th className="p-2 border border-slate-300">Nome</th>
-              <th className="p-2 border border-slate-300">Registro</th>
-              <th className="p-2 border border-slate-300">Filial</th>
-              <th className="p-2 border border-slate-300 text-center">Data</th>
-              <th className="p-2 border border-slate-300 text-center">Hora</th>
-              <th className="p-2 border border-slate-300 text-right">Valor Pago</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((item: any) => {
-              const { date, time } = formatDateTime(item.data_pagamento)
-              const colab = item.expand?.colaborador_id
-              return (
-                <tr key={item.id} className="border-b border-slate-200">
-                  <td className="p-2 border border-slate-200">{colab?.nome}</td>
-                  <td className="p-2 border border-slate-200">{colab?.registro}</td>
-                  <td className="p-2 border border-slate-200">{colab?.filial}</td>
-                  <td className="p-2 border border-slate-200 text-center">{date}</td>
-                  <td className="p-2 border border-slate-200 text-center">{time}</td>
-                  <td className="p-2 border border-slate-200 text-right">
-                    {formatBRL(item.valor_pago)}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-          <tfoot className="bg-slate-50 font-bold border-t-2 border-slate-300">
-            <tr>
-              <td colSpan={5} className="p-2 border border-slate-300 text-right">
-                Total de pagamentos: {count}
-              </td>
-              <td className="p-2 border border-slate-300 text-right text-emerald-600">
-                {formatBRL(totalPago)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      {type === 'table' && (
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Detalhamento dos Pagamentos</h3>
+          <table className="w-full text-sm text-left border-collapse border border-slate-300">
+            <thead className="bg-slate-100 border-b border-slate-300">
+              <tr>
+                <th className="p-2 border border-slate-300">Nome</th>
+                <th className="p-2 border border-slate-300">Registro</th>
+                <th className="p-2 border border-slate-300">Filial</th>
+                <th className="p-2 border border-slate-300 text-center">Data</th>
+                <th className="p-2 border border-slate-300 text-center">Hora</th>
+                <th className="p-2 border border-slate-300 text-right">Valor Pago</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item: any) => {
+                const { date, time } = formatDateTime(item.data_pagamento)
+                const colab = item.expand?.colaborador_id
+                return (
+                  <tr key={item.id} className="border-b border-slate-200">
+                    <td className="p-2 border border-slate-200">{colab?.nome}</td>
+                    <td className="p-2 border border-slate-200">{colab?.registro}</td>
+                    <td className="p-2 border border-slate-200">{colab?.filial}</td>
+                    <td className="p-2 border border-slate-200 text-center">{date}</td>
+                    <td className="p-2 border border-slate-200 text-center">{time}</td>
+                    <td className="p-2 border border-slate-200 text-right">
+                      {formatBRL(item.valor_pago)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot className="bg-slate-50 font-bold border-t-2 border-slate-300">
+              <tr>
+                <td colSpan={5} className="p-2 border border-slate-300 text-right">
+                  Total de pagamentos: {count}
+                </td>
+                <td className="p-2 border border-slate-300 text-right text-emerald-600">
+                  {formatBRL(totalPago)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   )
 
