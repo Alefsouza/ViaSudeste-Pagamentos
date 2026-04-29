@@ -1,12 +1,13 @@
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { LogOut, LayoutDashboard, Camera } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { LogOut, LayoutDashboard, Camera, FileText } from 'lucide-react'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 
 export function Header() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   if (!user) return null
 
@@ -18,14 +19,43 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white">
-          <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
-            {user.role === 'gestor' ? <LayoutDashboard size={20} /> : <Camera size={20} />}
+        <div className="flex items-center gap-4 md:gap-8">
+          <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white">
+            <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
+              {user.role === 'gestor' ? <LayoutDashboard size={20} /> : <Camera size={20} />}
+            </div>
+            <span className="hidden sm:inline">VarejoPro</span>
           </div>
-          VarejoPro
+
+          {user.role === 'gestor' && (
+            <nav className="flex items-center gap-3 md:gap-4 text-sm font-medium">
+              <Link
+                to="/dashboard"
+                className={`flex items-center gap-1.5 transition-colors ${
+                  location.pathname === '/dashboard'
+                    ? 'text-blue-600'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                <LayoutDashboard size={16} />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Link>
+              <Link
+                to="/relatorio"
+                className={`flex items-center gap-1.5 transition-colors ${
+                  location.pathname === '/relatorio'
+                    ? 'text-blue-600'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                <FileText size={16} />
+                <span className="hidden sm:inline">Relatórios</span>
+              </Link>
+            </nav>
+          )}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-4">
           <Badge
             variant="outline"
             className="border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1 text-sm font-medium shadow-sm"

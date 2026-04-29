@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from '@/hooks/use-auth'
 import Index from './pages/Index'
 import Dashboard from './pages/Dashboard'
 import Camera from './pages/Camera'
+import RelatorioPagamentos from './pages/RelatorioPagamentos'
 import Layout from './components/Layout'
 
 function ProtectedRoute({
@@ -43,6 +44,14 @@ const AppRoutes = () => (
         element={
           <ProtectedRoute allowedRole="boca_de_caixa">
             <Camera />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/relatorio"
+        element={
+          <ProtectedRoute allowedRole="gestor">
+            <RelatorioPagamentos />
           </ProtectedRoute>
         }
       />

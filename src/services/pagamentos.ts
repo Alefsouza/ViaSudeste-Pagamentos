@@ -9,3 +9,37 @@ export const createPagamento = (data: {
   data_pagamento: string
   foto_confirmacao?: File
 }) => pb.collection('pagamentos').create(data)
+
+const buildFilter = (filters: any) => {
+  const parts: string[] = []
+  if (filters.startDate) parts.push(`data_pagamento >= '${filters.startDate} 00:00:00'`)
+  if (filters.endDate) parts.push(`data_pagamento <= '${filters.endDate} 23:59:59'`)
+  if (filters.filial && filters.filial !== 'Todas')
+    parts.push(`colaborador_id.filial = '${filters.filial}'`)
+  if (filters.search) {
+    parts.push(
+      `(colaborador_id.nome ~ '${filters.search}' || colaborador_id.registro ~ '${filters.search}')`,
+    )
+  }
+  return parts.join(' && ')
+}
+
+export const getPagamentosPaginated = async (page: number, perPage: number, filters: any) => {
+  return pb.collection('pagamentos').getList(page, perPage, {
+    filter: buildFilter(filters),
+    expand: 'colaborador_id',
+    sort: '-data_pagamento',
+  })
+}
+
+export const getPagamentosStats = async (filters: any) => {
+  const result = await pb.collection('pagamentos').getFullList({
+    filter: buildFilter(filters),
+    expand: 'colaborador_id',
+    fields: 'valor_pago,colaborador_id.filial,colaborador_id.nome,colaborador_id.registro',
+  })
+  return {
+    count: result.length,
+    total: result.reduce((acc, curr) => acc + curr.valor_pago, 0),
+  }
+}
