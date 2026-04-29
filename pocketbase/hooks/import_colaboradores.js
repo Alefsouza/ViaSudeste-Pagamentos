@@ -20,6 +20,8 @@ routerAdd(
         const registro = String(getVal('REGISTRO')).trim()
         if (!registro) continue
 
+        const nome = String(getVal('NOME')).trim() || 'Colaborador ' + registro
+
         let valorStr = String(getVal('VALOR')).replace(',', '.')
         let valor = parseFloat(valorStr)
         if (isNaN(valor)) valor = 0
@@ -33,13 +35,14 @@ routerAdd(
         let record
         try {
           record = txApp.findFirstRecordByData('colaboradores', 'registro', registro)
+          record.set('nome', nome)
           record.set('valor_a_receber', valor)
           record.set('filial', filialName)
         } catch (_) {
           const col = txApp.findCollectionByNameOrId('colaboradores')
           record = new Record(col)
           record.set('registro', registro)
-          record.set('nome', 'Colaborador ' + registro)
+          record.set('nome', nome)
           record.set('valor_a_receber', valor)
           record.set('filial', filialName)
         }

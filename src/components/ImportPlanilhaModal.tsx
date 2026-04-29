@@ -92,6 +92,7 @@ export function ImportPlanilhaModal({
 
         const requiredCols = [
           'REGISTRO',
+          'NOME',
           'DATA',
           'IDTIPOPGTO',
           'INICIO',
@@ -104,7 +105,7 @@ export function ImportPlanilhaModal({
 
         if (!hasAllCols) {
           throw new Error(
-            'Arquivo inválido. Verifique se tem as colunas: REGISTRO, DATA, IDTIPOPGTO, INICIO, TERMINO, HORAS, VALOR, FILIAL',
+            'Arquivo inválido. Verifique se tem as colunas: REGISTRO, NOME, DATA, IDTIPOPGTO, INICIO, TERMINO, HORAS, VALOR, FILIAL',
           )
         }
 
