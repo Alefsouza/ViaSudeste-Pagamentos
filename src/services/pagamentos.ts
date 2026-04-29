@@ -41,4 +41,14 @@ export const getPagamentosAnalytics = async (filters: any) => {
   })
 }
 
-export const getPagamentosStats = getPagamentosAnalytics
+export const getPagamentosStats = async (filters: any) => {
+  const records = await pb.collection('pagamentos').getFullList({
+    filter: buildFilter(filters),
+    fields: 'valor_pago',
+  })
+
+  return {
+    count: records.length,
+    total: records.reduce((acc, record) => acc + (record.valor_pago || 0), 0),
+  }
+}

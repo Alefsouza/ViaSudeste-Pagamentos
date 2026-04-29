@@ -179,13 +179,23 @@ export default function RelatorioPagamentos() {
           <h2 className="text-sm font-semibold text-blue-900 dark:text-blue-100 uppercase tracking-wider">
             Resumo do Período
           </h2>
-          <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-            Total de pagamentos: <span className="font-bold">{stats.count}</span>
-          </p>
+          {loading ? (
+            <Skeleton className="h-5 w-64 mt-1 bg-blue-200/50 dark:bg-blue-800/50" />
+          ) : (
+            <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+              Total de pagamentos: <span className="font-bold">{stats.count}</span>{' '}
+              <span className="mx-1 opacity-50">|</span> Total pago:{' '}
+              <span className="font-bold">{formatBRL(stats.total)}</span>
+            </p>
+          )}
         </div>
-        <div className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-2 sm:mt-0">
-          Total pago: {formatBRL(stats.total)}
-        </div>
+        {loading ? (
+          <Skeleton className="h-8 w-40 mt-2 sm:mt-0 bg-blue-200/50 dark:bg-blue-800/50" />
+        ) : (
+          <div className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-2 sm:mt-0">
+            {formatBRL(stats.total)}
+          </div>
+        )}
       </div>
 
       {error ? (
