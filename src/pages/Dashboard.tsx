@@ -9,68 +9,156 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts'
-import { Users, TrendingUp, DollarSign, Building, Camera, Upload } from 'lucide-react'
-import { getColaboradores } from '@/services/colaboradores'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts'
+import {
+  Users,
+  TrendingUp,
+  DollarSign,
+  AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  Search,
+  Inbox,
+  Upload,
+  Camera,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { getPagamentosPaginated, getPagamentosAnalytics } from '@/services/pagamentos'
+import { useRealtime } from '@/hooks/use-realtime'
+import { format, subDays } from 'date-fns'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { UploadFotosModal } from '@/components/UploadFotosModal'
 import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
-import { getPagamentos } from '@/services/pagamentos'
-import { useRealtime } from '@/hooks/use-realtime'
 
 export default function Dashboard() {
-  const [colaboradores, setColaboradores] = useState<any[]>([])
-  const [pagamentos, setPagamentos] = useState<any[]>([])
+  const [filters, setFilters] = useState({
+    startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd'),
+    filial: 'Todas',
+    search: '',
+  })
+  const [debouncedFilters, setDebouncedFilters] = useState(filters)
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [statsData, setStatsData] = useState<any[]>([])
+  const [tableData, setTableData] = useState<any>(null)
+
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilters((prev) => {
+        if (JSON.stringify(prev) !== JSON.stringify(filters)) {
+          setPage(1)
+          return filters
+        }
+        return prev
+      })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [filters])
+
   const loadData = async () => {
+    setLoading(true)
+    setError(false)
     try {
-      const [colabs, pags] = await Promise.all([getColaboradores(), getPagamentos()])
-      setColaboradores(colabs)
-      setPagamentos(pags)
+      const [stats, paginated] = await Promise.all([
+        getPagamentosAnalytics(debouncedFilters),
+        getPagamentosPaginated(page, 20, debouncedFilters),
+      ])
+      setStatsData(stats)
+      setTableData(paginated)
     } catch (e) {
-      console.error(e)
+      setError(true)
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
     loadData()
-  }, [])
-  useRealtime('colaboradores', loadData)
+  }, [debouncedFilters, page])
+
   useRealtime('pagamentos', loadData)
+  useRealtime('colaboradores', loadData)
 
-  const totalReceber = colaboradores.reduce((acc, c) => acc + c.valor_a_receber, 0)
-  const totalPago = pagamentos.reduce((acc, p) => acc + p.valor_pago, 0)
-  const totalColabs = colaboradores.length
-
-  const filialData = [
-    {
-      name: 'Cursino',
-      valor: colaboradores
-        .filter((c) => c.filial === 'Cursino')
-        .reduce((a, c) => a + c.valor_a_receber, 0),
-    },
-    {
-      name: 'Sapopemba',
-      valor: colaboradores
-        .filter((c) => c.filial === 'Sapopemba')
-        .reduce((a, c) => a + c.valor_a_receber, 0),
-    },
-  ]
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 space-y-4 h-full">
+        <AlertCircle className="h-12 w-12 text-rose-500" />
+        <p className="text-lg font-medium">Erro ao carregar dados</p>
+        <Button onClick={loadData} variant="outline">
+          Tentar novamente
+        </Button>
+      </div>
+    )
+  }
 
   const formatBRL = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
+  // Calculations
+  const totalPago = statsData.reduce((acc, curr) => acc + curr.valor_pago, 0)
+  const uniqueColabs = new Set(statsData.map((c) => c.expand?.colaborador_id?.id)).size
+  const values = statsData.map((c) => c.valor_pago)
+  const maxPago = values.length ? Math.max(...values) : 0
+  const minPago = values.length ? Math.min(...values) : 0
+  const avgPago = values.length ? totalPago / values.length : 0
+
+  // Chart Data Preparation
+  const pieDataMap = statsData.reduce(
+    (acc, curr) => {
+      const filial = curr.expand?.colaborador_id?.filial || 'Outra'
+      acc[filial] = (acc[filial] || 0) + curr.valor_pago
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+
+  const pieData = Object.entries(pieDataMap).map(([name, value]) => ({ name, value }))
+
+  const dailyDataMap = statsData.reduce(
+    (acc, curr) => {
+      if (!curr.data_pagamento) return acc
+      const dateObj = new Date(curr.data_pagamento)
+      const date = format(dateObj, 'yyyy-MM-dd')
+      acc[date] = (acc[date] || 0) + curr.valor_pago
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+
+  const dailyData = Object.entries(dailyDataMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, total]) => ({
+      date,
+      formattedDate: format(new Date(date + 'T00:00:00'), 'dd/MM'),
+      total,
+    }))
+
+  const isEmpty = statsData.length === 0 && !loading
+
   return (
-    <div className="container mx-auto py-8 px-4 space-y-8">
+    <div className="container mx-auto py-8 px-4 space-y-8 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
             Painel do Gestor
           </h1>
           <p className="text-muted-foreground mt-1">
-            Visão geral financeira e de colaboradores em tempo real.
+            Analise a distribuição de pagamentos e monitore as filiais.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -85,105 +173,324 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Kept existing modals */}
       <UploadFotosModal open={uploadModalOpen} onOpenChange={setUploadModalOpen} />
       <ImportPlanilhaModal open={importModalOpen} onOpenChange={setImportModalOpen} />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="animate-fade-in-up" style={{ animationDelay: '0ms' }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total a Receber</CardTitle>
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="space-y-2">
+            <Label>Data Inicial</Label>
+            <Input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Data Final</Label>
+            <Input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Filial</Label>
+            <Select
+              value={filters.filial}
+              onValueChange={(val) => setFilters({ ...filters, filial: val })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todas">Ambas</SelectItem>
+                <SelectItem value="Cursino">Cursino</SelectItem>
+                <SelectItem value="Sapopemba">Sapopemba</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Buscar Colaborador</Label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Nome ou registro..."
+                className="pl-8"
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary Cards */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
             <DollarSign className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(totalReceber)}</div>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold">{formatBRL(totalPago)}</div>
+            )}
           </CardContent>
         </Card>
-
-        <Card className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(totalPago)}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Colaboradores</CardTitle>
-            <Users className="h-4 w-4 text-amber-500" />
+            <Users className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalColabs}</div>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold">{uniqueColabs}</div>
+            )}
           </CardContent>
         </Card>
-
-        <Card className="animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Filiais Ativas</CardTitle>
-            <Building className="h-4 w-4 text-purple-500" />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Maior Valor</CardTitle>
+            <ArrowUp className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2</div>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold">{formatBRL(maxPago)}</div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Menor Valor</CardTitle>
+            <ArrowDown className="h-4 w-4 text-rose-500" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold">{formatBRL(minPago)}</div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Média Paga</CardTitle>
+            <TrendingUp className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold">{formatBRL(avgPago)}</div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Valores a Receber por Filial</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{ valor: { label: 'Valor', color: 'hsl(var(--primary))' } }}
-              className="h-[300px] w-full"
-            >
-              <BarChart data={filialData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `R$ ${v / 1000}k`}
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="valor" fill="var(--color-valor)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
+      {isEmpty ? (
+        <Card className="flex flex-col items-center justify-center p-12">
+          <Inbox className="h-12 w-12 text-muted-foreground mb-4" />
+          <p className="text-lg font-medium text-muted-foreground">Nenhum dado encontrado</p>
         </Card>
-      </div>
+      ) : (
+        <>
+          {/* Charts */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Pago por Dia</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <ChartContainer
+                    config={{ total: { label: 'Total Pago', color: 'hsl(var(--primary))' } }}
+                    className="h-[300px] w-full"
+                  >
+                    <BarChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="formattedDate"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="total" fill="var(--color-total)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>Últimos Pagamentos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Colaborador</TableHead>
-                <TableHead>Data do Pagamento</TableHead>
-                <TableHead className="text-right">Valor Pago</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pagamentos.slice(0, 5).map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.expand?.colaborador_id?.nome}</TableCell>
-                  <TableCell>{new Date(p.data_pagamento).toLocaleDateString('pt-BR')}</TableCell>
-                  <TableCell className="text-right text-emerald-600 font-medium">
-                    {formatBRL(p.valor_pago)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuição por Filial</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <ChartContainer
+                    config={{
+                      Cursino: { label: 'Cursino', color: 'hsl(var(--chart-1))' },
+                      Sapopemba: { label: 'Sapopemba', color: 'hsl(var(--chart-2))' },
+                      Outra: { label: 'Outra', color: 'hsl(var(--muted))' },
+                    }}
+                    className="h-[300px] w-full"
+                  >
+                    <PieChart>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                        nameKey="name"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={`var(--color-${entry.name})`} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Transações de Pagamentos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : (
+                <>
+                  {/* Desktop View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Colaborador</TableHead>
+                          <TableHead>Registro</TableHead>
+                          <TableHead>Filial</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Hora</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tableData?.items?.map((p: any) => (
+                          <TableRow key={p.id}>
+                            <TableCell className="font-medium">
+                              {p.expand?.colaborador_id?.nome}
+                            </TableCell>
+                            <TableCell>{p.expand?.colaborador_id?.registro}</TableCell>
+                            <TableCell>{p.expand?.colaborador_id?.filial}</TableCell>
+                            <TableCell className="text-right text-emerald-600 font-medium">
+                              {formatBRL(p.valor_pago)}
+                            </TableCell>
+                            <TableCell>
+                              {p.data_pagamento
+                                ? format(new Date(p.data_pagamento), 'dd/MM/yyyy')
+                                : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {p.data_pagamento ? format(new Date(p.data_pagamento), 'HH:mm') : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile View */}
+                  <div className="md:hidden space-y-4">
+                    {tableData?.items?.map((p: any) => (
+                      <Card key={p.id} className="shadow-sm">
+                        <CardContent className="p-4 flex flex-col gap-2">
+                          <div className="flex justify-between font-bold">
+                            <span className="truncate">{p.expand?.colaborador_id?.nome}</span>
+                            <span className="text-emerald-600">{formatBRL(p.valor_pago)}</span>
+                          </div>
+                          <div className="text-sm text-muted-foreground flex justify-between">
+                            <span>Reg: {p.expand?.colaborador_id?.registro}</span>
+                            <span>{p.expand?.colaborador_id?.filial}</span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {p.data_pagamento
+                              ? format(new Date(p.data_pagamento), 'dd/MM/yyyy HH:mm')
+                              : '-'}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Pagination */}
+                  {tableData?.totalPages > 1 && (
+                    <div className="mt-4 flex justify-end">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <Button
+                              variant="ghost"
+                              onClick={() => setPage((p) => Math.max(1, p - 1))}
+                              disabled={page === 1}
+                            >
+                              Anterior
+                            </Button>
+                          </PaginationItem>
+                          <PaginationItem>
+                            <span className="text-sm text-muted-foreground px-4">
+                              Página {page} de {tableData.totalPages}
+                            </span>
+                          </PaginationItem>
+                          <PaginationItem>
+                            <Button
+                              variant="ghost"
+                              onClick={() => setPage((p) => Math.min(tableData.totalPages, p + 1))}
+                              disabled={page === tableData.totalPages}
+                            >
+                              Próxima
+                            </Button>
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
 }

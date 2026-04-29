@@ -32,14 +32,11 @@ export const getPagamentosPaginated = async (page: number, perPage: number, filt
   })
 }
 
-export const getPagamentosStats = async (filters: any) => {
-  const result = await pb.collection('pagamentos').getFullList({
+export const getPagamentosAnalytics = async (filters: any) => {
+  return pb.collection('pagamentos').getFullList({
     filter: buildFilter(filters),
     expand: 'colaborador_id',
-    fields: 'valor_pago,colaborador_id.filial,colaborador_id.nome,colaborador_id.registro',
+    fields:
+      'valor_pago,data_pagamento,colaborador_id.filial,colaborador_id.nome,colaborador_id.registro,colaborador_id.id',
   })
-  return {
-    count: result.length,
-    total: result.reduce((acc, curr) => acc + curr.valor_pago, 0),
-  }
 }
