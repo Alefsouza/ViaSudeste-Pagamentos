@@ -3,11 +3,18 @@ routerAdd(
   '/backend/v1/facial-recognition',
   (e) => {
     const body = e.requestInfo().body || {}
-    const fotoDoBanco = body.fotoDoBanco
-    const fotoCapturada = body.fotoCapturada
+    const fotoPredeterminada = body.fotoPredeterminada || body.fotoDoBanco
+    const fotoCaptured = body.fotoCaptured || body.fotoCapturada
 
-    if (!fotoDoBanco || !fotoCapturada) {
+    if (!fotoPredeterminada || !fotoCaptured) {
       return e.badRequestError('Missing images')
+    }
+
+    if (
+      (!fotoPredeterminada.startsWith('data:image/') && !fotoPredeterminada.startsWith('http')) ||
+      (!fotoCaptured.startsWith('data:image/') && !fotoCaptured.startsWith('http'))
+    ) {
+      return e.badRequestError('Invalid image format')
     }
 
     const userId = e.auth.id
@@ -34,7 +41,11 @@ routerAdd(
     logRecord.set('status', 0)
     $app.save(logRecord)
 
-    const apiKey = $secrets.get('OPENAI_API_KEY')
+    const apiKey =
+      $secrets.get('API_OPENIA_KEY') ||
+      $secrets.get('API_OPENAI') ||
+      $secrets.get('OPENAI_API_KEY') ||
+      $secrets.get('API_OPENIA')
     if (!apiKey) {
       logRecord.set('status', 401)
       $app.save(logRecord)
@@ -51,8 +62,8 @@ routerAdd(
               type: 'text',
               text: "Analise estas duas fotos de rosto. Sao o mesmo rosto? Responda APENAS com 'SIM' ou 'NAO'. Nao explique, nao adicione nada mais. Apenas 'SIM' ou 'NAO'.",
             },
-            { type: 'image_url', image_url: { url: fotoDoBanco } },
-            { type: 'image_url', image_url: { url: fotoCapturada } },
+            { type: 'image_url', image_url: { url: fotoPredeterminada } },
+            { type: 'image_url', image_url: { url: fotoCaptured } },
           ],
         },
       ],

@@ -12,15 +12,15 @@ export class FacialRecognitionError extends Error {
 }
 
 export const reconhecimentoFacialService = async (
-  fotoDoBanco: string,
-  fotoCapturada: string,
+  fotoPredeterminada: string,
+  fotoCaptured: string,
 ): Promise<boolean> => {
   try {
     const response = await pb.send<{ match: boolean }>('/backend/v1/facial-recognition', {
       method: 'POST',
       body: JSON.stringify({
-        fotoDoBanco,
-        fotoCapturada,
+        fotoPredeterminada,
+        fotoCaptured,
       }),
     })
     return response.match

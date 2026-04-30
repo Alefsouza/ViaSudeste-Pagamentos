@@ -31,7 +31,7 @@ export default function Camera() {
   const [registro, setRegistro] = useState('')
   const [viewState, setViewState] = useState<ViewState>('EMPTY')
   const [colaborador, setColaborador] = useState<any>(null)
-  const [fotoDoBanco, setFotoDoBanco] = useState<string | null>(null)
+  const [fotoPredeterminada, setFotoPredeterminada] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -85,7 +85,7 @@ export default function Camera() {
     setViewState('SEARCHING')
     setErrorMsg(null)
     setColaborador(null)
-    setFotoDoBanco(null)
+    setFotoPredeterminada(null)
 
     try {
       const result = await getColaboradorByRegistro(registro)
@@ -95,7 +95,7 @@ export default function Camera() {
       }
 
       setColaborador(result.colab)
-      setFotoDoBanco(result.fotoUrl)
+      setFotoPredeterminada(result.fotoUrl)
       setViewState('CAPTURING')
     } catch (err) {
       setViewState('SEARCH_FAILED')
@@ -103,7 +103,7 @@ export default function Camera() {
   }
 
   const handleCapture = async () => {
-    if (!videoRef.current || !canvasRef.current || !fotoDoBanco) return
+    if (!videoRef.current || !canvasRef.current || !fotoPredeterminada) return
 
     const video = videoRef.current
     const canvas = canvasRef.current
@@ -114,9 +114,9 @@ export default function Camera() {
     canvas.height = video.videoHeight
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-    const fotoCapturada = canvas.toDataURL('image/jpeg', 0.8)
+    const fotoCaptured = canvas.toDataURL('image/jpeg', 0.8)
 
-    const sizeInBytes = Math.round((fotoCapturada.length * 3) / 4)
+    const sizeInBytes = Math.round((fotoCaptured.length * 3) / 4)
     if (sizeInBytes > 2 * 1024 * 1024) {
       setViewState('RECOGNITION_FAILED')
       setErrorMsg('Erro ao processar foto. Tente capturar novamente')
@@ -127,7 +127,7 @@ export default function Camera() {
     setErrorMsg(null)
 
     try {
-      const success = await reconhecimentoFacialService(fotoDoBanco, fotoCapturada)
+      const success = await reconhecimentoFacialService(fotoPredeterminada, fotoCaptured)
       if (success) {
         setViewState('RECOGNITION_SUCCESS')
         setErrorMsg(null)
@@ -240,7 +240,7 @@ export default function Camera() {
   const handleReset = () => {
     setRegistro('')
     setColaborador(null)
-    setFotoDoBanco(null)
+    setFotoPredeterminada(null)
     setErrorMsg(null)
     setViewState('EMPTY')
   }
@@ -344,10 +344,10 @@ export default function Camera() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-4">
-                  {fotoDoBanco ? (
+                  {fotoPredeterminada ? (
                     <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-100 dark:border-slate-800 shrink-0">
                       <img
-                        src={fotoDoBanco}
+                        src={fotoPredeterminada}
                         alt="Foto do banco"
                         className="w-full h-full object-cover"
                       />
