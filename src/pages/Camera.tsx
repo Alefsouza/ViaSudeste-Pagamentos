@@ -137,14 +137,20 @@ export default function Camera() {
       }
     } catch (err: any) {
       setViewState('RECOGNITION_FAILED')
-      if (err.status === 401) {
-        setErrorMsg('Chave da OpenAI invalida. Verifique Secrets')
+      if (
+        err.message &&
+        err.message !== 'Unknown error' &&
+        err.message !== 'Something went wrong.'
+      ) {
+        setErrorMsg(err.message)
+      } else if (err.status === 401) {
+        setErrorMsg('Autenticacao falhou. Verifique API_AZURE em Secrets')
       } else if (err.status === 429) {
         setErrorMsg('Limite de requisicoes atingido. Tente novamente em alguns segundos')
       } else if (err.status === 504) {
         setErrorMsg('Timeout ao processar reconhecimento. Tente novamente')
       } else if (err.status === 500) {
-        setErrorMsg('Servico da OpenAI indisponivel. Tente novamente')
+        setErrorMsg('Servico da Azure indisponivel. Tente novamente')
       } else {
         setErrorMsg('Erro ao processar foto. Tente capturar novamente')
       }
