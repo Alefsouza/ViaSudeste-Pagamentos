@@ -101,13 +101,12 @@ export function ImportPlanilhaModal({
           'HORAS',
           'VALOR',
           'FILIAL',
-          'NOME',
         ]
         const hasAllCols = requiredCols.every((col) => headers.includes(col))
 
         if (!hasAllCols) {
           throw new Error(
-            'Arquivo inválido. Verifique se tem as colunas: REGISTRO, DATA, IDTIPOPGTO, INICIO, TERMINO, HORAS, VALOR, FILIAL, NOME',
+            'Arquivo invalido. Verifique se tem as colunas: REGISTRO, DATA, IDTIPOPGTO, INICIO, TERMINO, HORAS, VALOR, FILIAL',
           )
         }
 
@@ -118,12 +117,22 @@ export function ImportPlanilhaModal({
           body: JSON.stringify({ data: jsonData }),
         })
 
-        toast.success(res.message || 'Colaboradores importados com sucesso')
-        onOpenChange(false)
-        setFile(null)
+        if (res.errors && res.errors.length > 0) {
+          res.errors.forEach((err: string) => toast.error(err))
+        }
+
+        if (res.count > 0) {
+          toast.success(`${res.count} colaboradores importados com sucesso`)
+          onOpenChange(false)
+          setFile(null)
+        } else if (!res.errors || res.errors.length === 0) {
+          toast.success('0 colaboradores importados com sucesso')
+          onOpenChange(false)
+          setFile(null)
+        }
       } catch (error: any) {
         const errorMsg = error.response?.message || error.message || 'Erro desconhecido'
-        const isValidationError = errorMsg.includes('Arquivo inválido. Verifique se tem as colunas')
+        const isValidationError = errorMsg.includes('Arquivo invalido. Verifique se tem as colunas')
 
         toast.error(isValidationError ? errorMsg : `Erro ao importar: ${errorMsg}`, {
           action: {
@@ -234,7 +243,7 @@ export function ImportPlanilhaModal({
                     >
                       {loading ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importando...
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importando planilha...
                         </>
                       ) : (
                         'Sim, importar'
