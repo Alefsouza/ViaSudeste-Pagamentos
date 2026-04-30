@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T11:16:16.607Z",
+  "generatedAt": "2026-04-30T11:35:07.022Z",
   "collections": [
     {
       "name": "users",
@@ -235,6 +235,53 @@
       "indexes": [
         "CREATE UNIQUE INDEX idx_fotos_colaboradores_registro ON fotos_colaboradores (registro)"
       ]
+    },
+    {
+      "name": "api_audit_logs",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "endpoint",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
     }
   ]
 }

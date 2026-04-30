@@ -5,7 +5,17 @@ export const getColaboradores = () => pb.collection('colaboradores').getFullList
 export const updateColaborador = (id: string, data: Partial<{ foto_confirmacao_url: string }>) =>
   pb.collection('colaboradores').update(id, data)
 
+const colabCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
 export const getColaboradorByRegistro = async (registro: string) => {
+  const now = Date.now()
+  const cached = colabCache.get(registro)
+
+  if (cached && now - cached.timestamp < CACHE_TTL) {
+    return cached.data
+  }
+
   const colabPromise = pb
     .collection('colaboradores')
     .getFirstListItem(`registro="${registro}" && foto_confirmacao_url=""`)
@@ -30,5 +40,8 @@ export const getColaboradorByRegistro = async (registro: string) => {
     }
   }
 
-  return { colab, fotoUrl, hasFotoRecord: !!fotoRecord }
+  const result = { colab, fotoUrl, hasFotoRecord: !!fotoRecord }
+  colabCache.set(registro, { data: result, timestamp: now })
+
+  return result
 }

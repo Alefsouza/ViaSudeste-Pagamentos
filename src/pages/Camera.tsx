@@ -116,22 +116,38 @@ export default function Camera() {
 
     const fotoCapturada = canvas.toDataURL('image/jpeg', 0.8)
 
+    const sizeInBytes = Math.round((fotoCapturada.length * 3) / 4)
+    if (sizeInBytes > 2 * 1024 * 1024) {
+      setViewState('RECOGNITION_FAILED')
+      setErrorMsg('Erro ao processar foto. Tente capturar novamente')
+      return
+    }
+
     setViewState('PROCESSING')
+    setErrorMsg(null)
 
     try {
       const success = await reconhecimentoFacialService(fotoDoBanco, fotoCapturada)
       if (success) {
         setViewState('RECOGNITION_SUCCESS')
+        setErrorMsg(null)
       } else {
         setViewState('RECOGNITION_FAILED')
+        setErrorMsg('Rosto não corresponde ao registro informado')
       }
-    } catch (err) {
+    } catch (err: any) {
       setViewState('RECOGNITION_FAILED')
-      toast({
-        title: 'Erro',
-        description: 'Falha no serviço de reconhecimento',
-        variant: 'destructive',
-      })
+      if (err.status === 401) {
+        setErrorMsg('Chave da OpenAI invalida. Verifique Secrets')
+      } else if (err.status === 429) {
+        setErrorMsg('Limite de requisicoes atingido. Tente novamente em alguns segundos')
+      } else if (err.status === 504) {
+        setErrorMsg('Timeout ao processar reconhecimento. Tente novamente')
+      } else if (err.status === 500) {
+        setErrorMsg('Servico da OpenAI indisponivel. Tente novamente')
+      } else {
+        setErrorMsg('Erro ao processar foto. Tente capturar novamente')
+      }
     }
   }
 
@@ -439,7 +455,7 @@ export default function Camera() {
                   </div>
                   <h3 className="text-xl font-bold mb-2">Reconhecimento Falhou</h3>
                   <p className="text-slate-300 mb-8 max-w-md">
-                    Rosto não corresponde ao registro informado. Tente novamente.
+                    {errorMsg || 'Rosto não corresponde ao registro informado. Tente novamente.'}
                   </p>
 
                   <Button
