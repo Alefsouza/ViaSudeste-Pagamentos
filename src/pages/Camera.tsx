@@ -144,13 +144,15 @@ export default function Camera() {
       ) {
         setErrorMsg(err.message)
       } else if (err.status === 401) {
-        setErrorMsg('Autenticacao falhou. Verifique API_AZURE em Secrets')
+        setErrorMsg('Credenciais da AWS invalidas. Verifique Secrets')
+      } else if (err.status === 403) {
+        setErrorMsg('Regiao da AWS invalida. Verifique Secrets')
       } else if (err.status === 429) {
         setErrorMsg('Limite de requisicoes atingido. Tente novamente em alguns segundos')
       } else if (err.status === 504) {
         setErrorMsg('Timeout ao processar reconhecimento. Tente novamente')
       } else if (err.status === 500) {
-        setErrorMsg('Servico da Azure indisponivel. Tente novamente')
+        setErrorMsg('Servico da AWS indisponivel. Tente novamente')
       } else {
         setErrorMsg('Erro ao processar foto. Tente capturar novamente')
       }
@@ -461,14 +463,17 @@ export default function Camera() {
                   </div>
                   <h3 className="text-xl font-bold mb-2">Reconhecimento Falhou</h3>
                   <p className="text-slate-300 mb-8 max-w-md">
-                    {errorMsg || 'Rosto não corresponde ao registro informado. Tente novamente.'}
+                    {errorMsg || 'Rosto nao corresponde ao registro informado'}
                   </p>
 
                   <Button
                     size="lg"
                     variant="outline"
                     className="w-full max-w-sm bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white"
-                    onClick={() => setViewState('CAPTURING')}
+                    onClick={() => {
+                      setViewState('CAPTURING')
+                      setErrorMsg(null)
+                    }}
                   >
                     <RefreshCcw className="mr-2 h-4 w-4" />
                     Tentar Novamente
