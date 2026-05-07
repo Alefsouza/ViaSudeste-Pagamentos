@@ -105,18 +105,21 @@ export default function Camera() {
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current || !fotoPredeterminada) return
 
-    const startTotal = performance.now()
+    const clickTime = performance.now()
     let captureTime = 0,
       compressTime = 0,
       base64Time = 0,
-      awsTime = 0
-    let startAws = 0
+      awsTime = 0,
+      totalTime = 0
+    let captureEndTime = 0,
+      compressEndTime = 0,
+      base64EndTime = 0,
+      awsEndTime = 0
 
     setViewState('PROCESSING')
     setErrorMsg(null)
 
     setTimeout(async () => {
-      const startCapture = performance.now()
       try {
         const video = videoRef.current
         const canvas = canvasRef.current
@@ -133,23 +136,35 @@ export default function Camera() {
         const startY = (video.videoHeight - size) / 2
 
         context.drawImage(video, startX, startY, size, size, 0, 0, 360, 360)
-        captureTime = performance.now() - startCapture
+        captureEndTime = performance.now()
+        captureTime = captureEndTime - clickTime
 
-        const startCompress = performance.now()
-        const fotoCaptured = canvas.toDataURL('image/jpeg', 0.6)
-        const compressTotal = performance.now() - startCompress
-        compressTime = compressTotal * 0.7
-        base64Time = compressTotal * 0.3
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, 'image/jpeg', 0.6),
+        )
+        if (!blob) throw new Error('Falha na compressão da imagem')
 
-        startAws = performance.now()
+        compressEndTime = performance.now()
+        compressTime = compressEndTime - captureEndTime
+
+        const fotoCaptured = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(blob)
+        })
+        base64EndTime = performance.now()
+        base64Time = base64EndTime - compressEndTime
+
         const success = await reconhecimentoFacialService(
           fotoPredeterminada,
           fotoCaptured,
           colaborador?.registro,
         )
-        awsTime = performance.now() - startAws
+        awsEndTime = performance.now()
+        awsTime = awsEndTime - base64EndTime
 
-        const totalTime = performance.now() - startTotal
+        totalTime = awsEndTime - clickTime
         console.log(
           `Captura: ${captureTime.toFixed(0)}ms | Compressao: ${compressTime.toFixed(0)}ms | Base64: ${base64Time.toFixed(0)}ms | AWS: ${awsTime.toFixed(0)}ms | Total: ${totalTime.toFixed(0)}ms`,
         )
@@ -162,8 +177,17 @@ export default function Camera() {
           setErrorMsg('Rosto não corresponde ao registro informado')
         }
       } catch (err: any) {
-        if (startAws > 0) awsTime = performance.now() - startAws
-        const totalTime = performance.now() - startTotal
+        const errorEndTime = performance.now()
+        if (!captureEndTime) captureEndTime = errorEndTime
+        if (!compressEndTime) compressEndTime = captureEndTime
+        if (!base64EndTime) base64EndTime = compressEndTime
+
+        captureTime = captureEndTime - clickTime
+        compressTime = compressEndTime - captureEndTime
+        base64Time = base64EndTime - compressEndTime
+        awsTime = errorEndTime - base64EndTime
+        totalTime = errorEndTime - clickTime
+
         console.log(
           `Captura: ${captureTime.toFixed(0)}ms | Compressao: ${compressTime.toFixed(0)}ms | Base64: ${base64Time.toFixed(0)}ms | AWS: ${awsTime.toFixed(0)}ms | Total: ${totalTime.toFixed(0)}ms`,
         )
