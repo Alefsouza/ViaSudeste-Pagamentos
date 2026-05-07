@@ -153,6 +153,7 @@ routerAdd(
     const body = e.requestInfo().body || {}
     const fotoPredeterminada = body.fotoPredeterminada || body.fotoDoBanco
     const fotoCaptured = body.fotoCaptured || body.fotoCapturada
+    const registro = body.registro
 
     if (!fotoPredeterminada || !fotoCaptured) {
       return e.badRequestError('Missing images')
@@ -224,26 +225,42 @@ routerAdd(
     }
 
     let sourceB64 = fotoPredeterminada
-    if (sourceB64.startsWith('http://') || sourceB64.startsWith('https://')) {
-      try {
-        const fetchRes = $http.send({ url: sourceB64, method: 'GET', timeout: 5 })
-        if (fetchRes.statusCode === 200 && fetchRes.body) {
-          sourceB64 = bytesToBase64(fetchRes.body)
-        } else {
+    let targetB64 = fotoCaptured.includes(',') ? fotoCaptured.split(',')[1] : fotoCaptured
+
+    const cacheKey = registro || fotoPredeterminada
+    globalThis.__photoCache = globalThis.__photoCache || {}
+    const now = Date.now()
+
+    for (const key in globalThis.__photoCache) {
+      if (now - globalThis.__photoCache[key].time > 300000) {
+        delete globalThis.__photoCache[key]
+      }
+    }
+
+    if (globalThis.__photoCache[cacheKey]) {
+      sourceB64 = globalThis.__photoCache[cacheKey].data
+    } else {
+      if (sourceB64.startsWith('http://') || sourceB64.startsWith('https://')) {
+        try {
+          const fetchRes = $http.send({ url: sourceB64, method: 'GET', timeout: 5 })
+          if (fetchRes.statusCode === 200 && fetchRes.body) {
+            sourceB64 = bytesToBase64(fetchRes.body)
+            globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
+          } else {
+            logRecord.set('status', 400)
+            $app.save(logRecord)
+            return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
+          }
+        } catch (err) {
           logRecord.set('status', 400)
           $app.save(logRecord)
           return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
         }
-      } catch (err) {
-        logRecord.set('status', 400)
-        $app.save(logRecord)
-        return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
+      } else {
+        sourceB64 = sourceB64.includes(',') ? sourceB64.split(',')[1] : sourceB64
+        globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
       }
-    } else {
-      sourceB64 = sourceB64.includes(',') ? sourceB64.split(',')[1] : sourceB64
     }
-
-    let targetB64 = fotoCaptured.includes(',') ? fotoCaptured.split(',')[1] : fotoCaptured
 
     sourceB64 = sourceB64.replace(/\s+/g, '')
     targetB64 = targetB64.replace(/\s+/g, '')
@@ -333,7 +350,7 @@ routerAdd(
           method: 'POST',
           headers: reqData.headers,
           body: requestBody,
-          timeout: 10,
+          timeout: 8,
         })
 
         statusCode = res.statusCode

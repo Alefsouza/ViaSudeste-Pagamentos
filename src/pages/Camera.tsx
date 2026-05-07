@@ -105,58 +105,71 @@ export default function Camera() {
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current || !fotoPredeterminada) return
 
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    const context = canvas.getContext('2d')
-    if (!context) return
-
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    const fotoCaptured = canvas.toDataURL('image/jpeg', 0.8)
-
-    const sizeInBytes = Math.round((fotoCaptured.length * 3) / 4)
-    if (sizeInBytes > 2 * 1024 * 1024) {
-      setViewState('RECOGNITION_FAILED')
-      setErrorMsg('Erro ao processar foto. Tente capturar novamente')
-      return
-    }
-
     setViewState('PROCESSING')
     setErrorMsg(null)
 
-    try {
-      const success = await reconhecimentoFacialService(fotoPredeterminada, fotoCaptured)
-      if (success) {
-        setViewState('RECOGNITION_SUCCESS')
-        setErrorMsg(null)
-      } else {
+    setTimeout(async () => {
+      try {
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        if (!video || !canvas) return
+
+        const context = canvas.getContext('2d')
+        if (!context) return
+
+        canvas.width = 480
+        canvas.height = 480
+
+        const size = Math.min(video.videoWidth, video.videoHeight)
+        const startX = (video.videoWidth - size) / 2
+        const startY = (video.videoHeight - size) / 2
+
+        context.drawImage(video, startX, startY, size, size, 0, 0, 480, 480)
+
+        const fotoCaptured = canvas.toDataURL('image/jpeg', 0.7)
+
+        const sizeInBytes = Math.round((fotoCaptured.length * 3) / 4)
+        if (sizeInBytes > 2 * 1024 * 1024) {
+          setViewState('RECOGNITION_FAILED')
+          setErrorMsg('Erro ao processar foto. Tente capturar novamente')
+          return
+        }
+
+        const success = await reconhecimentoFacialService(
+          fotoPredeterminada,
+          fotoCaptured,
+          colaborador?.registro,
+        )
+        if (success) {
+          setViewState('RECOGNITION_SUCCESS')
+          setErrorMsg(null)
+        } else {
+          setViewState('RECOGNITION_FAILED')
+          setErrorMsg('Rosto não corresponde ao registro informado')
+        }
+      } catch (err: any) {
         setViewState('RECOGNITION_FAILED')
-        setErrorMsg('Rosto não corresponde ao registro informado')
+        if (
+          err.message &&
+          err.message !== 'Unknown error' &&
+          err.message !== 'Something went wrong.'
+        ) {
+          setErrorMsg(err.message)
+        } else if (err.status === 401) {
+          setErrorMsg('Credenciais da AWS invalidas. Verifique Secrets')
+        } else if (err.status === 403) {
+          setErrorMsg('Regiao da AWS invalida. Verifique Secrets')
+        } else if (err.status === 429) {
+          setErrorMsg('Limite de requisicoes atingido. Tente novamente em alguns segundos')
+        } else if (err.status === 504) {
+          setErrorMsg('Timeout ao processar reconhecimento. Tente novamente')
+        } else if (err.status === 500) {
+          setErrorMsg('Servico da AWS indisponivel. Tente novamente')
+        } else {
+          setErrorMsg('Erro ao processar foto. Tente capturar novamente')
+        }
       }
-    } catch (err: any) {
-      setViewState('RECOGNITION_FAILED')
-      if (
-        err.message &&
-        err.message !== 'Unknown error' &&
-        err.message !== 'Something went wrong.'
-      ) {
-        setErrorMsg(err.message)
-      } else if (err.status === 401) {
-        setErrorMsg('Credenciais da AWS invalidas. Verifique Secrets')
-      } else if (err.status === 403) {
-        setErrorMsg('Regiao da AWS invalida. Verifique Secrets')
-      } else if (err.status === 429) {
-        setErrorMsg('Limite de requisicoes atingido. Tente novamente em alguns segundos')
-      } else if (err.status === 504) {
-        setErrorMsg('Timeout ao processar reconhecimento. Tente novamente')
-      } else if (err.status === 500) {
-        setErrorMsg('Servico da AWS indisponivel. Tente novamente')
-      } else {
-        setErrorMsg('Erro ao processar foto. Tente capturar novamente')
-      }
-    }
+    }, 10)
   }
 
   const formatCurrency = (value: number) => {
