@@ -260,6 +260,7 @@ routerAdd(
     targetB64 = targetB64.replace(/\s+/g, '')
 
     const sizeInBytes = Math.round((targetB64.length * 3) / 4)
+    console.log(`Tamanho da imagem: ${Math.round(sizeInBytes / 1024)}kb`)
     if (sizeInBytes > 5 * 1024 * 1024) {
       logRecord.set('status', 400)
       $app.save(logRecord)
@@ -338,6 +339,9 @@ routerAdd(
     try {
       const reqData = signAWSRequest(region, accessKey, secretKey, requestBody, amzTarget)
 
+      console.log('Iniciando chamada AWS Rekognition...')
+      const startTime = Date.now()
+
       const res = $http.send({
         url: reqData.url,
         method: 'POST',
@@ -347,22 +351,39 @@ routerAdd(
       })
 
       statusCode = res.statusCode
+      const duration = Date.now() - startTime
 
       if (statusCode === 400) {
         badRequest = true
+        console.log(
+          `Erro AWS: [{ "status": ${statusCode}, "response": ${JSON.stringify(res.json || {})} }]`,
+        )
       } else if (statusCode === 403 || statusCode === 401) {
         authFailed = true
+        console.log(
+          `Erro AWS: [{ "status": ${statusCode}, "response": ${JSON.stringify(res.json || {})} }]`,
+        )
+      } else if (statusCode !== 200) {
+        console.log(
+          `Erro AWS: [{ "status": ${statusCode}, "response": ${JSON.stringify(res.json || {})} }]`,
+        )
       } else if (statusCode === 200) {
         const data = res.json || {}
         const faceMatches = data.FaceMatches || []
         success = true
-        if (faceMatches.length > 0 && faceMatches[0].Similarity >= 80) {
-          match = true
+        let similarity = 'N/A'
+        if (faceMatches.length > 0) {
+          similarity = faceMatches[0].Similarity
+          if (similarity >= 80) {
+            match = true
+          }
         }
+        console.log(`Resposta AWS: [${statusCode}, ${duration}ms, ${similarity}]`)
       }
     } catch (err) {
       statusCode = 504
       timeout = true
+      console.log(`Erro AWS: [${String(err)}]`)
       $app.logger().error('AWS API Error', 'error', String(err))
     }
 
