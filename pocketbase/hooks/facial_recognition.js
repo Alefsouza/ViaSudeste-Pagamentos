@@ -186,18 +186,12 @@ routerAdd(
 
     const accessKey = $secrets.get('AWS_API_KEY')
     const secretKey = $secrets.get('AWS_API_SECRET')
-    const region = $secrets.get('AWS_REGIAO')
+    const region = 'sa-east-1'
 
     if (!accessKey || !secretKey) {
       logRecord.set('status', 401)
       $app.save(logRecord)
       return e.json(401, { message: 'Credenciais da AWS invalidas. Verifique Secrets' })
-    }
-
-    if (!region) {
-      logRecord.set('status', 403)
-      $app.save(logRecord)
-      return e.json(403, { message: 'Regiao da AWS invalida. Verifique Secrets' })
     }
 
     function bytesToBase64(bytes) {
@@ -341,43 +335,35 @@ routerAdd(
     let authFailed = false
     let badRequest = false
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const reqData = signAWSRequest(region, accessKey, secretKey, requestBody, amzTarget)
+    try {
+      const reqData = signAWSRequest(region, accessKey, secretKey, requestBody, amzTarget)
 
-        const res = $http.send({
-          url: reqData.url,
-          method: 'POST',
-          headers: reqData.headers,
-          body: requestBody,
-          timeout: 8,
-        })
+      const res = $http.send({
+        url: reqData.url,
+        method: 'POST',
+        headers: reqData.headers,
+        body: requestBody,
+        timeout: 5,
+      })
 
-        statusCode = res.statusCode
+      statusCode = res.statusCode
 
-        if (statusCode === 400) {
-          badRequest = true
-          break
+      if (statusCode === 400) {
+        badRequest = true
+      } else if (statusCode === 403 || statusCode === 401) {
+        authFailed = true
+      } else if (statusCode === 200) {
+        const data = res.json || {}
+        const faceMatches = data.FaceMatches || []
+        success = true
+        if (faceMatches.length > 0 && faceMatches[0].Similarity >= 80) {
+          match = true
         }
-        if (statusCode === 403 || statusCode === 401) {
-          authFailed = true
-          break
-        }
-
-        if (statusCode === 200) {
-          const data = res.json || {}
-          const faceMatches = data.FaceMatches || []
-          success = true
-          if (faceMatches.length > 0 && faceMatches[0].Similarity >= 80) {
-            match = true
-          }
-          break
-        }
-      } catch (err) {
-        statusCode = 504
-        timeout = true
-        $app.logger().error('AWS API Error', 'error', String(err))
       }
+    } catch (err) {
+      statusCode = 504
+      timeout = true
+      $app.logger().error('AWS API Error', 'error', String(err))
     }
 
     logRecord.set('status', statusCode)

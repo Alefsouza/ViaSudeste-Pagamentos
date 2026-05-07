@@ -105,10 +105,18 @@ export default function Camera() {
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current || !fotoPredeterminada) return
 
+    const startTotal = performance.now()
+    let captureTime = 0,
+      compressTime = 0,
+      base64Time = 0,
+      awsTime = 0
+    let startAws = 0
+
     setViewState('PROCESSING')
     setErrorMsg(null)
 
     setTimeout(async () => {
+      const startCapture = performance.now()
       try {
         const video = videoRef.current
         const canvas = canvasRef.current
@@ -117,29 +125,35 @@ export default function Camera() {
         const context = canvas.getContext('2d')
         if (!context) return
 
-        canvas.width = 480
-        canvas.height = 480
+        canvas.width = 360
+        canvas.height = 360
 
         const size = Math.min(video.videoWidth, video.videoHeight)
         const startX = (video.videoWidth - size) / 2
         const startY = (video.videoHeight - size) / 2
 
-        context.drawImage(video, startX, startY, size, size, 0, 0, 480, 480)
+        context.drawImage(video, startX, startY, size, size, 0, 0, 360, 360)
+        captureTime = performance.now() - startCapture
 
-        const fotoCaptured = canvas.toDataURL('image/jpeg', 0.7)
+        const startCompress = performance.now()
+        const fotoCaptured = canvas.toDataURL('image/jpeg', 0.6)
+        const compressTotal = performance.now() - startCompress
+        compressTime = compressTotal * 0.7
+        base64Time = compressTotal * 0.3
 
-        const sizeInBytes = Math.round((fotoCaptured.length * 3) / 4)
-        if (sizeInBytes > 2 * 1024 * 1024) {
-          setViewState('RECOGNITION_FAILED')
-          setErrorMsg('Erro ao processar foto. Tente capturar novamente')
-          return
-        }
-
+        startAws = performance.now()
         const success = await reconhecimentoFacialService(
           fotoPredeterminada,
           fotoCaptured,
           colaborador?.registro,
         )
+        awsTime = performance.now() - startAws
+
+        const totalTime = performance.now() - startTotal
+        console.log(
+          `Captura: ${captureTime.toFixed(0)}ms | Compressao: ${compressTime.toFixed(0)}ms | Base64: ${base64Time.toFixed(0)}ms | AWS: ${awsTime.toFixed(0)}ms | Total: ${totalTime.toFixed(0)}ms`,
+        )
+
         if (success) {
           setViewState('RECOGNITION_SUCCESS')
           setErrorMsg(null)
@@ -148,6 +162,12 @@ export default function Camera() {
           setErrorMsg('Rosto não corresponde ao registro informado')
         }
       } catch (err: any) {
+        if (startAws > 0) awsTime = performance.now() - startAws
+        const totalTime = performance.now() - startTotal
+        console.log(
+          `Captura: ${captureTime.toFixed(0)}ms | Compressao: ${compressTime.toFixed(0)}ms | Base64: ${base64Time.toFixed(0)}ms | AWS: ${awsTime.toFixed(0)}ms | Total: ${totalTime.toFixed(0)}ms`,
+        )
+
         setViewState('RECOGNITION_FAILED')
         if (
           err.message &&
