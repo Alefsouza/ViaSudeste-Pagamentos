@@ -32,6 +32,7 @@ export default function Camera() {
   const [viewState, setViewState] = useState<ViewState>('EMPTY')
   const [colaborador, setColaborador] = useState<any>(null)
   const [fotoPredeterminada, setFotoPredeterminada] = useState<string | null>(null)
+  const [fotoCapturada, setFotoCapturada] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -86,6 +87,7 @@ export default function Camera() {
     setErrorMsg(null)
     setColaborador(null)
     setFotoPredeterminada(null)
+    setFotoCapturada(null)
 
     try {
       const result = await getColaboradorByRegistro(registro)
@@ -140,7 +142,7 @@ export default function Camera() {
         captureTime = captureEndTime - clickTime
 
         const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, 'image/jpeg', 0.6),
+          canvas.toBlob(resolve, 'image/jpeg', 0.5),
         )
         if (!blob) throw new Error('Falha na compressão da imagem')
 
@@ -153,6 +155,7 @@ export default function Camera() {
           reader.onerror = reject
           reader.readAsDataURL(blob)
         })
+        setFotoCapturada(fotoCaptured)
         base64EndTime = performance.now()
         base64Time = base64EndTime - compressEndTime
 
@@ -223,34 +226,33 @@ export default function Camera() {
   const handleConfirmPayment = async () => {
     if (!colaborador) return
 
+    if (!fotoCapturada) {
+      toast({
+        title: 'Erro',
+        description: 'Nenhuma foto capturada encontrada. Tente novamente',
+        variant: 'destructive',
+      })
+      setViewState('RECOGNITION_SUCCESS')
+      return
+    }
+
     setViewState('CONFIRMING_PAYMENT')
     let file: File | undefined
 
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current
-      const canvas = canvasRef.current
-      const context = canvas.getContext('2d')
-      if (context) {
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, 'image/jpeg', 0.8),
-        )
-
-        if (blob) {
-          const timestamp = Date.now()
-          const fileName = `${colaborador.registro}_${timestamp}.jpg`
-          file = new File([blob], fileName, { type: 'image/jpeg' })
-        }
-      }
+    try {
+      const response = await fetch(fotoCapturada)
+      const blob = await response.blob()
+      const timestamp = Date.now()
+      const fileName = `${colaborador.registro}_${timestamp}.jpg`
+      file = new File([blob], fileName, { type: 'image/jpeg' })
+    } catch (error) {
+      console.error('Erro ao converter foto capturada:', error)
     }
 
     if (!file) {
       toast({
         title: 'Erro',
-        description: 'Erro ao salvar foto. Tente novamente',
+        description: 'Erro ao processar foto capturada. Tente novamente',
         variant: 'destructive',
       })
       setViewState('RECOGNITION_SUCCESS')
@@ -262,6 +264,7 @@ export default function Camera() {
     const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
 
     try {
+      console.log('Iniciando upload de foto de comprovação...')
       const pagamentoRecord = await createPagamento({
         colaborador_id: colaborador.id,
         valor_pago: colaborador.valor_a_receber,
@@ -271,6 +274,7 @@ export default function Camera() {
       })
 
       const fileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)
+      console.log(`URL gerada: ${fileUrl}`)
       await updatePagamento(pagamentoRecord.id, { foto_confirmacao_url: fileUrl })
 
       try {
@@ -278,13 +282,14 @@ export default function Camera() {
       } catch (err) {
         toast({
           title: 'Aviso',
-          description: 'Pagamento confirmado, mas erro ao salvar foto. Contate o suporte',
+          description: 'Pagamento confirmado, mas erro ao atualizar colaborador. Contate o suporte',
           variant: 'destructive',
         })
         handleReset()
         return
       }
 
+      console.log('Pagamento atualizado com sucesso')
       toast({
         title: 'Sucesso',
         description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(
@@ -293,6 +298,7 @@ export default function Camera() {
       })
       handleReset()
     } catch (err) {
+      console.error(err)
       toast({
         title: 'Erro',
         description: 'Erro ao confirmar pagamento. Tente novamente',
@@ -306,6 +312,7 @@ export default function Camera() {
     setRegistro('')
     setColaborador(null)
     setFotoPredeterminada(null)
+    setFotoCapturada(null)
     setErrorMsg(null)
     setViewState('EMPTY')
   }
