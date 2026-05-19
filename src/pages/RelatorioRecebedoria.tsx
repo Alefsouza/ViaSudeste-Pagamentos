@@ -385,11 +385,7 @@ export default function RelatorioRecebedoria() {
                             >
                               <TableCell className="font-medium pl-8">{item.registro}</TableCell>
                               <TableCell>{item.nome}</TableCell>
-                              <TableCell>
-                                {item.updated
-                                  ? `${new Date(item.updated).toLocaleDateString('pt-BR')} às ${new Date(item.updated).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                                  : '-'}
-                              </TableCell>
+                              <TableCell>{item.data_pagamento || '-'}</TableCell>
                               <TableCell className="text-right font-medium">
                                 {formatBRL(item.valor_a_receber || item.valor)}
                               </TableCell>
@@ -489,9 +485,7 @@ export default function RelatorioRecebedoria() {
                             </div>
                             <div className="flex justify-between items-center pt-3 border-t">
                               <div className="text-xs text-slate-500">
-                                {item.updated
-                                  ? `${new Date(item.updated).toLocaleDateString('pt-BR')} às ${new Date(item.updated).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                                  : '-'}
+                                {item.data_pagamento || '-'}
                               </div>
                               <div className="flex gap-2">
                                 <Button
@@ -577,11 +571,7 @@ export default function RelatorioRecebedoria() {
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Data e Hora
                   </span>
-                  <p className="font-medium">
-                    {detailsModal.updated
-                      ? `${new Date(detailsModal.updated).toLocaleDateString('pt-BR')} às ${new Date(detailsModal.updated).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                      : '-'}
-                  </p>
+                  <p className="font-medium">{detailsModal.data_pagamento || '-'}</p>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
