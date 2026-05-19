@@ -8,6 +8,87 @@ export const updateColaborador = (id: string, data: Partial<{ foto_confirmacao_u
 const colabCache = new Map<string, { data: any; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
+export const getColaboradoresPaginated = async (page: number, perPage: number, filters: any) => {
+  const { search, startDate, endDate, filial } = filters
+  let filterStr = []
+
+  if (search) {
+    filterStr.push(`(nome~"${search}" || registro~"${search}")`)
+  }
+  if (filial && filial !== 'Todas') {
+    filterStr.push(`filial="${filial}"`)
+  }
+  if (startDate) {
+    filterStr.push(`created >= "${startDate} 00:00:00"`)
+  }
+  if (endDate) {
+    filterStr.push(`created <= "${endDate} 23:59:59"`)
+  }
+
+  const finalFilter = filterStr.join(' && ')
+
+  return pb.collection('colaboradores').getList(page, perPage, {
+    filter: finalFilter,
+    sort: '-created',
+  })
+}
+
+export const getColaboradoresStats = async (filters: any) => {
+  const { search, startDate, endDate, filial } = filters
+  let filterStr = []
+
+  if (search) {
+    filterStr.push(`(nome~"${search}" || registro~"${search}")`)
+  }
+  if (filial && filial !== 'Todas') {
+    filterStr.push(`filial="${filial}"`)
+  }
+  if (startDate) {
+    filterStr.push(`created >= "${startDate} 00:00:00"`)
+  }
+  if (endDate) {
+    filterStr.push(`created <= "${endDate} 23:59:59"`)
+  }
+
+  const finalFilter = filterStr.join(' && ')
+
+  const records = await pb.collection('colaboradores').getFullList({
+    filter: finalFilter,
+    fields: 'valor_a_receber,valor',
+  })
+
+  const total = records.reduce((acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0), 0)
+  return {
+    count: records.length,
+    total,
+  }
+}
+
+export const getColaboradoresAnalytics = async (filters: any) => {
+  const { search, startDate, endDate, filial } = filters
+  let filterStr = []
+
+  if (search) {
+    filterStr.push(`(nome~"${search}" || registro~"${search}")`)
+  }
+  if (filial && filial !== 'Todas') {
+    filterStr.push(`filial="${filial}"`)
+  }
+  if (startDate) {
+    filterStr.push(`created >= "${startDate} 00:00:00"`)
+  }
+  if (endDate) {
+    filterStr.push(`created <= "${endDate} 23:59:59"`)
+  }
+
+  const finalFilter = filterStr.join(' && ')
+
+  return pb.collection('colaboradores').getFullList({
+    filter: finalFilter,
+    sort: '-created',
+  })
+}
+
 export const getColaboradorByRegistro = async (registro: string) => {
   const now = Date.now()
   const cached = colabCache.get(registro)

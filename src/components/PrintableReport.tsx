@@ -25,16 +25,21 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
     }
   }
 
-  const totalPago = data.reduce((sum, item) => sum + item.valor_pago, 0)
+  const totalPago = data.reduce((sum, item) => sum + (item.valor_a_receber || item.valor || 0), 0)
   const count = data.length
-  const uniqueCols = new Set(data.map((item) => item.colaborador_id)).size
-  const maxVal = count ? Math.max(...data.map((item) => item.valor_pago)) : 0
-  const minVal = count ? Math.min(...data.map((item) => item.valor_pago)) : 0
+  const uniqueCols = new Set(data.map((item) => item.registro)).size
+  const maxVal = count
+    ? Math.max(...data.map((item) => item.valor_a_receber || item.valor || 0))
+    : 0
+  const minVal = count
+    ? Math.min(...data.map((item) => item.valor_a_receber || item.valor || 0))
+    : 0
   const avgVal = count ? totalPago / count : 0
 
   const byFilial = data.reduce((acc: any, item: any) => {
-    const f = item.expand?.colaborador_id?.filial || 'Desconhecida'
-    acc[f] = (acc[f] || 0) + item.valor_pago
+    const f = item.filial || 'Desconhecida'
+    const valor = item.valor_a_receber || item.valor || 0
+    acc[f] = (acc[f] || 0) + valor
     return acc
   }, {})
 
@@ -50,8 +55,9 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
   }, {})
 
   const byDay = data.reduce((acc: any, item: any) => {
-    const date = item.data_pagamento.split(' ')[0]
-    acc[date] = (acc[date] || 0) + item.valor_pago
+    const dateStr = item.created.split(' ')[0]
+    const valor = item.valor_a_receber || item.valor || 0
+    acc[dateStr] = (acc[dateStr] || 0) + valor
     return acc
   }, {})
 
@@ -203,18 +209,21 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
             </thead>
             <tbody>
               {data.map((item: any) => {
-                const { date, time } = formatDateTime(item.data_pagamento)
-                const colab = item.expand?.colaborador_id
+                const date = item.data || item.created.split(' ')[0]
+                const time =
+                  item.inicio && item.termino
+                    ? `${item.inicio} - ${item.termino}`
+                    : item.inicio || item.termino || '-'
+                const valor = item.valor_a_receber || item.valor || 0
+
                 return (
                   <tr key={item.id} className="border-b border-slate-200">
-                    <td className="p-2 border border-slate-200">{colab?.nome}</td>
-                    <td className="p-2 border border-slate-200">{colab?.registro}</td>
-                    <td className="p-2 border border-slate-200">{colab?.filial}</td>
+                    <td className="p-2 border border-slate-200">{item.nome}</td>
+                    <td className="p-2 border border-slate-200">{item.registro}</td>
+                    <td className="p-2 border border-slate-200">{item.filial}</td>
                     <td className="p-2 border border-slate-200 text-center">{date}</td>
                     <td className="p-2 border border-slate-200 text-center">{time}</td>
-                    <td className="p-2 border border-slate-200 text-right">
-                      {formatBRL(item.valor_pago)}
-                    </td>
+                    <td className="p-2 border border-slate-200 text-right">{formatBRL(valor)}</td>
                   </tr>
                 )
               })}

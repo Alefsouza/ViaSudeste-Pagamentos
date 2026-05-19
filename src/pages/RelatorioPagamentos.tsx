@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import {
-  getPagamentosPaginated,
-  getPagamentosStats,
-  getPagamentosAnalytics,
-} from '@/services/pagamentos'
+  getColaboradoresPaginated,
+  getColaboradoresStats,
+  getColaboradoresAnalytics,
+} from '@/services/colaboradores'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useToast } from '@/hooks/use-toast'
@@ -102,8 +102,8 @@ export default function RelatorioPagamentos() {
     try {
       const filters = { search: debouncedSearch, startDate, endDate, filial }
       const [newStats, paginated] = await Promise.all([
-        getPagamentosStats(filters),
-        getPagamentosPaginated(page, 20, filters),
+        getColaboradoresStats(filters),
+        getColaboradoresPaginated(page, 20, filters),
       ])
       setStats(newStats)
       setData(paginated.items)
@@ -124,14 +124,14 @@ export default function RelatorioPagamentos() {
   useEffect(() => {
     loadData()
   }, [page, debouncedSearch, startDate, endDate, filial])
-  useRealtime('pagamentos', loadData)
+  useRealtime('colaboradores', loadData)
 
   const handleGeneratePDF = async (type: 'table' | 'charts') => {
     setReportType(type)
     setIsGenerating(true)
     try {
       const filters = { search: debouncedSearch, startDate, endDate, filial }
-      const allData = await getPagamentosAnalytics(filters)
+      const allData = await getColaboradoresAnalytics(filters)
       setReportData(allData)
       setReportModalOpen(false)
       setIsGenerating(false)
@@ -343,43 +343,38 @@ export default function RelatorioPagamentos() {
                     </TableRow>
                   ) : (
                     data.map((item) => {
-                      const { date, time } = formatDateTime(
-                        item.data_pagamento,
-                        item.hora_pagamento,
-                      )
-                      const colab = item.expand?.colaborador_id
+                      const date = item.data || item.created.split(' ')[0]
+                      const time =
+                        item.inicio && item.termino
+                          ? `${item.inicio} - ${item.termino}`
+                          : item.inicio || item.termino || '-'
+                      const valor = item.valor_a_receber || item.valor || 0
+                      const status = item.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
+
                       return (
                         <TableRow
                           key={item.id}
                           className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                         >
-                          <TableCell>{colab?.registro}</TableCell>
-                          <TableCell className="font-medium">{colab?.nome}</TableCell>
-                          <TableCell>{colab?.filial}</TableCell>
+                          <TableCell>{item.registro}</TableCell>
+                          <TableCell className="font-medium">{item.nome}</TableCell>
+                          <TableCell>{item.filial}</TableCell>
                           <TableCell>
-                            {date} {time !== '-' && `às ${time}`}
+                            {date} {time !== '-' && `(${time})`}
                           </TableCell>
                           <TableCell className="text-right font-medium text-emerald-600">
-                            {formatBRL(item.valor_pago)}
+                            {formatBRL(valor)}
                           </TableCell>
                           <TableCell className="text-left">
                             {getTipoPagamento(item.idtipopgto)}
                           </TableCell>
-                          <TableCell className="text-center">
-                            {getStatusBadge(item.status)}
-                          </TableCell>
+                          <TableCell className="text-center">{getStatusBadge(status)}</TableCell>
                           <TableCell className="text-center">
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={!item.foto_confirmacao}
-                              onClick={() =>
-                                setSelectedPhoto(
-                                  item.foto_confirmacao
-                                    ? pb.files.getUrl(item, item.foto_confirmacao)
-                                    : null,
-                                )
-                              }
+                              disabled={!item.foto_confirmacao_url}
+                              onClick={() => setSelectedPhoto(item.foto_confirmacao_url)}
                               className="text-slate-600"
                             >
                               <ImageIcon className="h-4 w-4 mr-2" /> Foto
@@ -408,25 +403,29 @@ export default function RelatorioPagamentos() {
                 </div>
               ) : (
                 data.map((item) => {
-                  const { date, time } = formatDateTime(item.data_pagamento)
-                  const colab = item.expand?.colaborador_id
+                  const date = item.data || item.created.split(' ')[0]
+                  const time =
+                    item.inicio && item.termino
+                      ? `${item.inicio} - ${item.termino}`
+                      : item.inicio || item.termino || '-'
+                  const valor = item.valor_a_receber || item.valor || 0
+                  const status = item.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
+
                   return (
                     <Card key={item.id} className="overflow-hidden shadow-sm">
                       <CardContent className="p-4 space-y-3">
                         <div className="flex justify-between items-start">
                           <div>
                             <div className="font-semibold text-base text-slate-900 dark:text-slate-100">
-                              {colab?.nome}
+                              {item.nome}
                             </div>
                             <div className="flex items-center text-xs text-muted-foreground mt-1">
-                              <FileDigit className="h-3 w-3 mr-1" /> {colab?.registro}
+                              <FileDigit className="h-3 w-3 mr-1" /> {item.registro}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-bold text-emerald-600">
-                              {formatBRL(item.valor_pago)}
-                            </div>
-                            <div className="mt-1">{getStatusBadge(item.status)}</div>
+                            <div className="font-bold text-emerald-600">{formatBRL(valor)}</div>
+                            <div className="mt-1">{getStatusBadge(status)}</div>
                           </div>
                         </div>
                         <div className="flex flex-col gap-1 text-xs text-slate-500">
@@ -436,21 +435,15 @@ export default function RelatorioPagamentos() {
                         </div>
                         <div className="flex justify-between items-center pt-3 border-t">
                           <div className="text-xs text-slate-500">
-                            {date} {time !== '-' && `às ${time}`}
+                            {date} {time !== '-' && `(${time})`}
                           </div>
                           <div className="flex gap-2">
                             <Button
                               variant="outline"
                               size="icon"
                               className="h-8 w-8"
-                              disabled={!item.foto_confirmacao}
-                              onClick={() =>
-                                setSelectedPhoto(
-                                  item.foto_confirmacao
-                                    ? pb.files.getUrl(item, item.foto_confirmacao)
-                                    : null,
-                                )
-                              }
+                              disabled={!item.foto_confirmacao_url}
+                              onClick={() => setSelectedPhoto(item.foto_confirmacao_url)}
                             >
                               <ImageIcon className="h-4 w-4" />
                             </Button>
@@ -528,28 +521,20 @@ export default function RelatorioPagamentos() {
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                       Registro
                     </span>
-                    <p className="font-medium">{detailsModal.expand?.colaborador_id?.registro}</p>
+                    <p className="font-medium">{detailsModal.registro}</p>
                   </div>
                   <div>
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                       Nome
                     </span>
-                    <p className="font-medium">{detailsModal.expand?.colaborador_id?.nome}</p>
+                    <p className="font-medium">{detailsModal.nome}</p>
                   </div>
                   <div>
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
-                      Data e Hora
+                      Data
                     </span>
                     <p className="font-medium">
-                      {
-                        formatDateTime(detailsModal.data_pagamento, detailsModal.hora_pagamento)
-                          .date
-                      }{' '}
-                      às{' '}
-                      {
-                        formatDateTime(detailsModal.data_pagamento, detailsModal.hora_pagamento)
-                          .time
-                      }
+                      {detailsModal.data || detailsModal.created.split(' ')[0]}
                     </p>
                   </div>
                   <div>
@@ -557,7 +542,7 @@ export default function RelatorioPagamentos() {
                       Valor
                     </span>
                     <p className="font-medium text-emerald-600 dark:text-emerald-400">
-                      {formatBRL(detailsModal.valor_pago)}
+                      {formatBRL(detailsModal.valor_a_receber || detailsModal.valor || 0)}
                     </p>
                   </div>
                   <div>
@@ -588,30 +573,30 @@ export default function RelatorioPagamentos() {
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                       Status
                     </span>
-                    <div>{getStatusBadge(detailsModal.status)}</div>
+                    <div>
+                      {getStatusBadge(
+                        detailsModal.foto_confirmacao_url ? 'Confirmado' : 'Pendente',
+                      )}
+                    </div>
                   </div>
                   <div>
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                       Filial
                     </span>
-                    <p className="font-medium">{detailsModal.expand?.colaborador_id?.filial}</p>
+                    <p className="font-medium">{detailsModal.filial}</p>
                   </div>
                 </div>
-                {detailsModal.foto_confirmacao && (
+                {detailsModal.foto_confirmacao_url && (
                   <div className="mt-4">
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-2">
                       Foto de Comprovação
                     </span>
                     <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border inline-block">
                       <img
-                        src={pb.files.getUrl(detailsModal, detailsModal.foto_confirmacao)}
+                        src={detailsModal.foto_confirmacao_url}
                         alt="Comprovante"
                         className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                        onClick={() =>
-                          setSelectedPhoto(
-                            pb.files.getUrl(detailsModal, detailsModal.foto_confirmacao),
-                          )
-                        }
+                        onClick={() => setSelectedPhoto(detailsModal.foto_confirmacao_url)}
                       />
                     </div>
                   </div>
