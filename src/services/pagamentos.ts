@@ -57,3 +57,23 @@ export const getPagamentosStats = async (filters: any) => {
     total: records.reduce((acc, record) => acc + (record.valor_pago || 0), 0),
   }
 }
+
+export const getRecebedoriaPagamentosPaginated = async (
+  page: number,
+  perPage: number,
+  filters: any,
+  userId: string,
+) => {
+  const parts: string[] = [`user_id = '${userId}'`]
+
+  if (filters.startDate) parts.push(`data_pagamento >= '${filters.startDate} 00:00:00'`)
+  if (filters.endDate) parts.push(`data_pagamento <= '${filters.endDate} 23:59:59'`)
+  if (filters.colaboradorId) parts.push(`colaborador_id = '${filters.colaboradorId}'`)
+  if (filters.status && filters.status !== 'Todos') parts.push(`status = '${filters.status}'`)
+
+  return pb.collection('pagamentos').getList(page, perPage, {
+    filter: parts.join(' && '),
+    expand: 'colaborador_id,user_id',
+    sort: '-data_pagamento',
+  })
+}

@@ -7,6 +7,7 @@ import Index from './pages/Index'
 import Dashboard from './pages/Dashboard'
 import Camera from './pages/Camera'
 import RelatorioPagamentos from './pages/RelatorioPagamentos'
+import RelatorioRecebedoria from './pages/RelatorioRecebedoria'
 import Layout from './components/Layout'
 
 function ProtectedRoute({
@@ -44,6 +45,14 @@ const AppRoutes = () => (
         element={
           <ProtectedRoute allowedRole="recebedoria">
             <Camera />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/relatorio-recebedoria"
+        element={
+          <ProtectedRoute allowedRole="recebedoria">
+            <RelatorioRecebedoria />
           </ProtectedRoute>
         }
       />
