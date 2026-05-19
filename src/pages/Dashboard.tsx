@@ -134,9 +134,15 @@ export default function Dashboard() {
 
   const dailyDataMap = statsData.reduce(
     (acc, curr) => {
-      const dStr =
-        formatDataString(curr.data) ||
-        (curr.created ? format(new Date(curr.created), 'dd/MM/yyyy') : '')
+      let dStr = ''
+      if (curr.data_pagamento) {
+        dStr = curr.data_pagamento.split(',')[0].trim()
+      } else {
+        dStr =
+          formatDataString(curr.data) ||
+          (curr.created ? format(new Date(curr.created), 'dd/MM/yyyy') : '')
+      }
+
       if (!dStr || dStr === '-') return acc
 
       let dateKey = dStr
@@ -458,8 +464,7 @@ export default function Dashboard() {
                           <TableHead>Filial</TableHead>
                           <TableHead className="text-right">Valor</TableHead>
                           <TableHead>Tipo de Pagamento</TableHead>
-                          <TableHead>Data</TableHead>
-                          <TableHead>Hora</TableHead>
+                          <TableHead>Data de Pagamento</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -471,7 +476,7 @@ export default function Dashboard() {
                             <React.Fragment key={nome}>
                               <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 <TableCell
-                                  colSpan={7}
+                                  colSpan={6}
                                   className="font-semibold text-slate-700 dark:text-slate-300"
                                 >
                                   {nome} - {totalLines}{' '}
@@ -487,20 +492,7 @@ export default function Dashboard() {
                                     {formatBRL(p.valor_a_receber || p.valor)}
                                   </TableCell>
                                   <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-                                  <TableCell>
-                                    {p.data
-                                      ? formatDataString(p.data)
-                                      : p.created
-                                        ? format(new Date(p.created), 'dd/MM/yyyy')
-                                        : '-'}
-                                  </TableCell>
-                                  <TableCell>
-                                    {p.inicio
-                                      ? formatHoraString(p.inicio)
-                                      : p.created
-                                        ? format(new Date(p.created), 'HH:mm')
-                                        : '--:--'}
-                                  </TableCell>
+                                  <TableCell>{p.data_pagamento || 'Pendente'}</TableCell>
                                 </TableRow>
                               ))}
                             </React.Fragment>
@@ -539,20 +531,8 @@ export default function Dashboard() {
                                   <span>{getTipoPagamento(p.idtipopgto)}</span>
                                 </div>
                                 <div className="text-sm text-muted-foreground flex justify-between">
-                                  <span>
-                                    {p.data
-                                      ? formatDataString(p.data)
-                                      : p.created
-                                        ? format(new Date(p.created), 'dd/MM/yyyy')
-                                        : '-'}
-                                  </span>
-                                  <span>
-                                    {p.inicio
-                                      ? formatHoraString(p.inicio)
-                                      : p.created
-                                        ? format(new Date(p.created), 'HH:mm')
-                                        : '--:--'}
-                                  </span>
+                                  <span>Data de Pagamento:</span>
+                                  <span>{p.data_pagamento || 'Pendente'}</span>
                                 </div>
                               </CardContent>
                             </Card>
