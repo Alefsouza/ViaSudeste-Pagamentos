@@ -2,12 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import pb from '@/lib/pocketbase/client'
 import { getColaboradorByRegistro, updateColaborador } from '@/services/colaboradores'
 import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
-import {
-  createPagamento,
-  updatePagamento,
-  updatePagamentoCompleto,
-  getPagamentoByRegistro,
-} from '@/services/pagamentos'
+import { createPagamento, updatePagamento } from '@/services/pagamentos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -290,53 +285,63 @@ export default function Camera() {
     const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
 
     try {
-      const pagDetails = await getPagamentoByRegistro(colaborador.registro).catch(() => null)
-      const parsedHoras =
-        typeof colaborador.horas === 'string' ? parseFloat(colaborador.horas) : colaborador.horas
-      const validHoras =
-        typeof parsedHoras === 'number' && !isNaN(parsedHoras) ? parsedHoras : undefined
+      let firstFileUrl = ''
 
-      const parsedIdTipoPgto =
-        typeof colaborador.idtipopgto === 'string'
-          ? parseInt(colaborador.idtipopgto, 10)
-          : colaborador.idtipopgto
-      const validIdTipoPgto =
-        typeof parsedIdTipoPgto === 'number' && !isNaN(parsedIdTipoPgto)
-          ? parsedIdTipoPgto
-          : undefined
+      const recordsToProcess =
+        colaborador.records && colaborador.records.length > 0 ? colaborador.records : [colaborador]
 
-      const dataToSave = {
-        colaborador_id: colaborador.id,
-        valor_pago: colaborador.valor || colaborador.valor_a_receber,
-        data_pagamento,
-        hora_pagamento,
-        foto_confirmacao: file,
-        user_id: user?.id,
-        status: 'Confirmado',
-        inicio: colaborador.inicio,
-        termino: colaborador.termino,
-        horas: validHoras,
-        idtipopgto: validIdTipoPgto,
-        tipo_pagamento: getTipoPagamentoDesc(colaborador.idtipopgto),
+      for (let i = 0; i < recordsToProcess.length; i++) {
+        const record = recordsToProcess[i]
+
+        const parsedHoras =
+          typeof record.horas === 'string' ? parseFloat(record.horas) : record.horas
+        const validHoras =
+          typeof parsedHoras === 'number' && !isNaN(parsedHoras) ? parsedHoras : undefined
+
+        const parsedIdTipoPgto =
+          typeof record.idtipopgto === 'string'
+            ? parseInt(record.idtipopgto, 10)
+            : record.idtipopgto
+        const validIdTipoPgto =
+          typeof parsedIdTipoPgto === 'number' && !isNaN(parsedIdTipoPgto)
+            ? parsedIdTipoPgto
+            : undefined
+
+        const dataToSave: any = {
+          colaborador_id: record.id,
+          valor_pago: record.valor_a_receber || record.valor || 0,
+          data_pagamento,
+          hora_pagamento,
+          user_id: user?.id,
+          status: 'Confirmado',
+          inicio: record.inicio,
+          termino: record.termino,
+          horas: validHoras,
+          idtipopgto: validIdTipoPgto,
+          tipo_pagamento: getTipoPagamentoDesc(record.idtipopgto),
+        }
+
+        if (i === 0) {
+          dataToSave.foto_confirmacao = file
+        } else if (firstFileUrl) {
+          dataToSave.foto_confirmacao_url = firstFileUrl
+        }
+
+        const pagamentoRecord = await createPagamento(dataToSave)
+
+        if (i === 0) {
+          firstFileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)
+          await updatePagamento(pagamentoRecord.id, { foto_confirmacao_url: firstFileUrl })
+        }
       }
-
-      let pagamentoRecord
-      if (pagDetails && pagDetails.status === 'Pendente') {
-        pagamentoRecord = await updatePagamentoCompleto(pagDetails.id, dataToSave)
-      } else {
-        pagamentoRecord = await createPagamento(dataToSave)
-      }
-
-      const fileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)
-      await updatePagamento(pagamentoRecord.id, { foto_confirmacao_url: fileUrl })
 
       try {
         if (colaborador.all_records_ids && Array.isArray(colaborador.all_records_ids)) {
           for (const id of colaborador.all_records_ids) {
-            await updateColaborador(id, { foto_confirmacao_url: fileUrl })
+            await updateColaborador(id, { foto_confirmacao_url: firstFileUrl })
           }
         } else {
-          await updateColaborador(colaborador.id, { foto_confirmacao_url: fileUrl })
+          await updateColaborador(colaborador.id, { foto_confirmacao_url: firstFileUrl })
         }
       } catch (err) {
         toast({
@@ -351,7 +356,7 @@ export default function Camera() {
       toast({
         title: 'Sucesso',
         description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(
-          colaborador.valor_a_receber,
+          colaborador.valor_a_receber || colaborador.valor || 0,
         )}`,
       })
       handleReset()
