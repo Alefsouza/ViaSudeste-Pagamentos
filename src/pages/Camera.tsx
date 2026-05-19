@@ -2,7 +2,12 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import pb from '@/lib/pocketbase/client'
 import { getColaboradorByRegistro, updateColaborador } from '@/services/colaboradores'
 import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
-import { createPagamento, updatePagamento } from '@/services/pagamentos'
+import {
+  createPagamento,
+  updatePagamento,
+  updatePagamentoCompleto,
+  getPagamentoByRegistro,
+} from '@/services/pagamentos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -35,6 +40,7 @@ export default function Camera() {
   const [fotoPredeterminada, setFotoPredeterminada] = useState<string | null>(null)
   const [fotoCapturada, setFotoCapturada] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [pagamentoDetails, setPagamentoDetails] = useState<any>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -90,6 +96,7 @@ export default function Camera() {
     setColaborador(null)
     setFotoPredeterminada(null)
     setFotoCapturada(null)
+    setPagamentoDetails(null)
 
     try {
       const result = await getColaboradorByRegistro(registro)
@@ -98,11 +105,49 @@ export default function Camera() {
         return
       }
 
+      const pagDetails = await getPagamentoByRegistro(registro)
+      setPagamentoDetails(pagDetails)
+
       setColaborador(result.colab)
       setFotoPredeterminada(result.fotoUrl)
       setViewState('CAPTURING')
     } catch (err) {
       setViewState('SEARCH_FAILED')
+    }
+  }
+
+  const formatTime = (timeStr?: string) => {
+    if (!timeStr) return '--:--'
+    if (timeStr.includes('T') || timeStr.includes(' ')) {
+      const date = new Date(timeStr)
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        })
+      }
+    }
+    const parts = timeStr.split(':')
+    if (parts.length >= 2) return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
+    return timeStr
+  }
+
+  const formatHoras = (horas?: number) => {
+    if (horas === undefined || horas === null) return '--'
+    return horas.toFixed(2).padStart(5, '0')
+  }
+
+  const getTipoPagamentoDesc = (idtipopgto?: number) => {
+    switch (idtipopgto) {
+      case 1:
+        return 'Hora Extra'
+      case 3:
+        return 'Férias Trabalhada'
+      case 4:
+        return 'Vale Refeição'
+      default:
+        return 'Tipo desconhecido'
     }
   }
 
@@ -267,15 +312,22 @@ export default function Camera() {
 
     try {
       console.log('Iniciando upload de foto de comprovação...')
-      const pagamentoRecord = await createPagamento({
+      const dataToSave = {
         colaborador_id: colaborador.id,
-        valor_pago: colaborador.valor_a_receber,
+        valor_pago: pagamentoDetails?.valor_pago || colaborador.valor_a_receber,
         data_pagamento,
         hora_pagamento,
         foto_confirmacao: file,
         user_id: user?.id,
         status: 'Confirmado',
-      })
+      }
+
+      let pagamentoRecord
+      if (pagamentoDetails && pagamentoDetails.status === 'Pendente') {
+        pagamentoRecord = await updatePagamentoCompleto(pagamentoDetails.id, dataToSave)
+      } else {
+        pagamentoRecord = await createPagamento(dataToSave)
+      }
 
       const fileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)
       console.log(`URL gerada: ${fileUrl}`)
@@ -317,6 +369,7 @@ export default function Camera() {
     setColaborador(null)
     setFotoPredeterminada(null)
     setFotoCapturada(null)
+    setPagamentoDetails(null)
     setErrorMsg(null)
     setViewState('EMPTY')
   }
@@ -493,28 +546,76 @@ export default function Camera() {
                 </div>
               ) : viewState === 'RECOGNITION_SUCCESS' ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-300 bg-black/60 backdrop-blur-sm text-white">
-                  <div className="w-20 h-20 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mb-6">
-                    <CheckCircle2 className="h-10 w-10" />
+                  <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mb-4">
+                    <CheckCircle2 className="h-8 w-8" />
                   </div>
-                  <h3 className="text-2xl font-bold mb-2">Identidade Verificada</h3>
-                  <p className="text-slate-300 mb-8">O rosto corresponde ao registro informado.</p>
+                  <h3 className="text-2xl font-bold mb-2">Identidade Confirmada</h3>
+                  <p className="text-slate-300 mb-6">O rosto corresponde ao registro informado.</p>
 
-                  <div className="bg-black/40 w-full max-w-sm rounded-xl p-6 mb-8 border border-white/10">
-                    <p className="text-sm text-slate-400 uppercase tracking-wider font-medium mb-1">
-                      Valor a Receber
-                    </p>
-                    <p className="text-4xl font-bold text-white">
-                      {formatCurrency(colaborador?.valor_a_receber || 0)}
-                    </p>
+                  <div className="bg-black/50 w-full max-w-md rounded-xl p-6 mb-6 border border-white/10 text-left space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
+                          Início
+                        </p>
+                        <p className="text-lg font-semibold text-white">
+                          {formatTime(pagamentoDetails?.inicio)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
+                          Término
+                        </p>
+                        <p className="text-lg font-semibold text-white">
+                          {formatTime(pagamentoDetails?.termino)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
+                          Total de Horas
+                        </p>
+                        <p className="text-lg font-semibold text-white">
+                          {formatHoras(pagamentoDetails?.horas)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
+                          Tipo
+                        </p>
+                        <p className="text-lg font-semibold text-white">
+                          {getTipoPagamentoDesc(pagamentoDetails?.idtipopgto)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-white/10">
+                      <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
+                        Valor a Receber
+                      </p>
+                      <p className="text-3xl font-bold text-green-400">
+                        {formatCurrency(
+                          pagamentoDetails?.valor_pago || colaborador?.valor_a_receber || 0,
+                        )}
+                      </p>
+                    </div>
                   </div>
 
-                  <Button
-                    size="lg"
-                    className="w-full max-w-sm bg-green-600 hover:bg-green-700 text-white border-0"
-                    onClick={handleConfirmPayment}
-                  >
-                    Confirmar Pagamento
-                  </Button>
+                  <div className="flex gap-4 w-full max-w-md">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="flex-1 bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white"
+                      onClick={handleReset}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="lg"
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white border-0"
+                      onClick={handleConfirmPayment}
+                    >
+                      Confirmar Pagamento
+                    </Button>
+                  </div>
                 </div>
               ) : viewState === 'CONFIRMING_PAYMENT' ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-white bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">

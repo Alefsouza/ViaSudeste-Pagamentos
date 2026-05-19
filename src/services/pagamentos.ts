@@ -17,6 +17,28 @@ export const createPagamento = (data: {
 export const updatePagamento = (id: string, data: Partial<{ foto_confirmacao_url: string }>) =>
   pb.collection('pagamentos').update(id, data)
 
+export const updatePagamentoCompleto = (id: string, data: any) =>
+  pb.collection('pagamentos').update(id, data)
+
+export const getPagamentoByRegistro = async (registro: string) => {
+  try {
+    const records = await pb.collection('pagamentos').getList(1, 1, {
+      filter: `colaborador_id.registro = '${registro}' && status = 'Pendente'`,
+      sort: '-created',
+    })
+    if (records.items.length === 0) {
+      const allRecords = await pb.collection('pagamentos').getList(1, 1, {
+        filter: `colaborador_id.registro = '${registro}'`,
+        sort: '-created',
+      })
+      return allRecords.items[0] || null
+    }
+    return records.items[0] || null
+  } catch (err) {
+    return null
+  }
+}
+
 const buildFilter = (filters: any) => {
   const parts: string[] = []
   if (filters.startDate) parts.push(`data_pagamento >= '${filters.startDate} 00:00:00'`)
