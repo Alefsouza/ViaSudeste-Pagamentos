@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-19T15:59:11.665Z",
+  "generatedAt": "2026-05-19T16:21:17.972Z",
   "collections": [
     {
       "name": "users",
@@ -77,13 +77,13 @@
         {
           "name": "valor_a_receber",
           "type": "number",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
           "name": "filial",
           "type": "select",
-          "required": true,
+          "required": false,
           "system": false,
           "selectValues": ["Cursino", "Sapopemba"]
         },
@@ -106,6 +106,48 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "data",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "idtipopgto",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inicio",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "termino",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "horas",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "filial_id",
+          "type": "number",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -124,7 +166,7 @@
         {
           "name": "colaborador_id",
           "type": "relation",
-          "required": true,
+          "required": false,
           "system": false,
           "collectionRef": "colaboradores"
         },
@@ -213,6 +255,24 @@
         {
           "name": "termino",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "registro",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "filial",
+          "type": "number",
           "required": false,
           "system": false
         }
