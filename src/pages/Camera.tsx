@@ -84,7 +84,6 @@ export default function Camera() {
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
-    if (!registro.trim()) return
 
     setViewState('SEARCHING')
     setErrorMsg(null)
@@ -109,9 +108,9 @@ export default function Camera() {
       setColaborador(result.colab)
       setFotoPredeterminada(result.fotoUrl)
       setViewState('CAPTURING')
-    } catch (err) {
+    } catch (err: any) {
       setViewState('SEARCH_FAILED')
-      setErrorMsg('Colaborador não encontrado')
+      setErrorMsg(err.message || 'Colaborador não encontrado')
     }
   }
 
@@ -537,11 +536,7 @@ export default function Camera() {
                       <Button
                         type="submit"
                         className="w-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 h-10"
-                        disabled={
-                          !registro.trim() ||
-                          viewState === 'SEARCHING' ||
-                          viewState === 'PROCESSING'
-                        }
+                        disabled={viewState === 'SEARCHING' || viewState === 'PROCESSING'}
                       >
                         {viewState === 'SEARCHING' ? (
                           <>
