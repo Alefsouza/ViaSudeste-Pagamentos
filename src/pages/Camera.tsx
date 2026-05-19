@@ -322,11 +322,17 @@ export default function Camera() {
       await updatePagamento(pagamentoRecord.id, { foto_confirmacao_url: fileUrl })
 
       try {
-        await updateColaborador(colaborador.id, { foto_confirmacao_url: fileUrl })
+        if (colaborador.all_records_ids && Array.isArray(colaborador.all_records_ids)) {
+          for (const id of colaborador.all_records_ids) {
+            await updateColaborador(id, { foto_confirmacao_url: fileUrl })
+          }
+        } else {
+          await updateColaborador(colaborador.id, { foto_confirmacao_url: fileUrl })
+        }
       } catch (err) {
         toast({
           title: 'Aviso',
-          description: 'Pagamento confirmado, mas erro ao atualizar colaborador.',
+          description: 'Pagamento confirmado, mas erro ao atualizar colaborador(es).',
           variant: 'destructive',
         })
         handleReset()

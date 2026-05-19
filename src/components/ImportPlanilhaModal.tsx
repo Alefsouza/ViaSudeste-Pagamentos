@@ -165,16 +165,9 @@ export function ImportPlanilhaModal({
             : String(rawData || '')
 
           let rawFilial = row['FILIAL'] !== undefined ? String(row['FILIAL']).trim() : ''
-          let filialParsed = rawFilial
-          if (rawFilial === '2') {
-            filialParsed = 'Sapopemba'
-          } else if (rawFilial === '3' || rawFilial === '4') {
-            filialParsed = 'Cursino'
-          } else if (
-            rawFilial.toLowerCase() === 'sapopemba' ||
-            rawFilial.toLowerCase() === 'cursino'
-          ) {
-            filialParsed = rawFilial.charAt(0).toUpperCase() + rawFilial.slice(1).toLowerCase()
+          let filialNumber = 0
+          if (!isNaN(Number(rawFilial)) && rawFilial !== '') {
+            filialNumber = Number(rawFilial)
           }
 
           return {
@@ -187,7 +180,7 @@ export function ImportPlanilhaModal({
             horas: formatHoras(row['HORAS']),
             valor_a_receber:
               Number(parseFloat(String(row['VALOR'] || 0).replace(',', '.')).toFixed(2)) || 0,
-            filial: filialParsed,
+            filial: filialNumber,
           }
         })
 
@@ -243,7 +236,7 @@ export function ImportPlanilhaModal({
         }
       }}
     >
-      <DialogContent className="sm:max-w-2xl w-11/12 overflow-hidden">
+      <DialogContent className="sm:max-w-3xl w-11/12 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-center">Importar Planilha</DialogTitle>
           <DialogDescription className="text-center">

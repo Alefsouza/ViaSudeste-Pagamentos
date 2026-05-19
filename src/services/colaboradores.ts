@@ -16,20 +16,38 @@ export const getColaboradorByRegistro = async (registro: string) => {
     return cached.data
   }
 
-  const colabPromise = pb
+  const firstColab = await pb
     .collection('colaboradores')
     .getFirstListItem(`registro="${registro}" && foto_confirmacao_url=""`)
     .catch(() => null)
 
-  const fotoPromise = pb
+  let colab = null
+  if (firstColab) {
+    const allRecords = await pb
+      .collection('colaboradores')
+      .getFullList({ filter: `nome="${firstColab.nome}" && foto_confirmacao_url=""` })
+      .catch(() => [firstColab])
+
+    const totalValor = allRecords.reduce((acc, curr) => {
+      const v = curr.valor_a_receber || curr.valor || 0
+      return acc + v
+    }, 0)
+
+    colab = {
+      ...firstColab,
+      valor_a_receber: totalValor,
+      valor: totalValor,
+      all_records_ids: allRecords.map((r) => r.id),
+    }
+  }
+
+  const fotoRecord = await pb
     .collection('fotos_colaboradores')
     .getFirstListItem(`registro="${registro}"`)
     .catch((error) => {
       console.error('Erro ao buscar foto do colaborador:', error)
       return null
     })
-
-  const [colab, fotoRecord] = await Promise.all([colabPromise, fotoPromise])
 
   let fotoUrl = null
   if (fotoRecord) {
