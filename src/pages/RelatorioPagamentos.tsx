@@ -343,13 +343,9 @@ export default function RelatorioPagamentos() {
                     </TableRow>
                   ) : (
                     data.map((item) => {
-                      const date = item.data || item.created.split(' ')[0]
-                      const time =
-                        item.inicio && item.termino
-                          ? `${item.inicio} - ${item.termino}`
-                          : item.inicio || item.termino || '-'
                       const valor = item.valor_a_receber || item.valor || 0
                       const status = item.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
+                      const dataPagamento = item.data_pagamento || '-'
 
                       return (
                         <TableRow
@@ -359,9 +355,7 @@ export default function RelatorioPagamentos() {
                           <TableCell>{item.registro}</TableCell>
                           <TableCell className="font-medium">{item.nome}</TableCell>
                           <TableCell>{item.filial}</TableCell>
-                          <TableCell>
-                            {date} {time !== '-' && `(${time})`}
-                          </TableCell>
+                          <TableCell>{dataPagamento}</TableCell>
                           <TableCell className="text-right font-medium text-emerald-600">
                             {formatBRL(valor)}
                           </TableCell>
@@ -403,13 +397,9 @@ export default function RelatorioPagamentos() {
                 </div>
               ) : (
                 data.map((item) => {
-                  const date = item.data || item.created.split(' ')[0]
-                  const time =
-                    item.inicio && item.termino
-                      ? `${item.inicio} - ${item.termino}`
-                      : item.inicio || item.termino || '-'
                   const valor = item.valor_a_receber || item.valor || 0
                   const status = item.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
+                  const dataPagamento = item.data_pagamento || '-'
 
                   return (
                     <Card key={item.id} className="overflow-hidden shadow-sm">
@@ -434,9 +424,7 @@ export default function RelatorioPagamentos() {
                           </span>
                         </div>
                         <div className="flex justify-between items-center pt-3 border-t">
-                          <div className="text-xs text-slate-500">
-                            {date} {time !== '-' && `(${time})`}
-                          </div>
+                          <div className="text-xs text-slate-500">{dataPagamento}</div>
                           <div className="flex gap-2">
                             <Button
                               variant="outline"
@@ -533,9 +521,7 @@ export default function RelatorioPagamentos() {
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                       Data
                     </span>
-                    <p className="font-medium">
-                      {detailsModal.data || detailsModal.created.split(' ')[0]}
-                    </p>
+                    <p className="font-medium">{detailsModal.data_pagamento || '-'}</p>
                   </div>
                   <div>
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
