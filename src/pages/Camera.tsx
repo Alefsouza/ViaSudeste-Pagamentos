@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
+import { cn } from '@/lib/utils'
 
 type ViewState =
   | 'EMPTY'
@@ -96,34 +97,26 @@ export default function Camera() {
     setFotoPredeterminada(null)
     setFotoCapturada(null)
 
-    console.log(`Buscando colaborador com registro: ${registro}`)
-
     try {
       const result = await getColaboradorByRegistro(registro)
       if (!result || !result.colab) {
         setViewState('SEARCH_FAILED')
-        setErrorMsg('Colaborador nao encontrado')
+        setErrorMsg('Colaborador não encontrado')
         return
       }
 
       if (!result.hasFotoRecord || !result.fotoUrl) {
         setViewState('SEARCH_FAILED')
-        setErrorMsg('Foto do colaborador nao encontrada')
+        setErrorMsg('Foto do colaborador não encontrada')
         return
       }
-
-      console.log(`Colaborador encontrado: ${result.colab.nome}, ${result.colab.registro}`)
-      console.log(
-        `Dados: inicio=${result.colab.inicio}, termino=${result.colab.termino}, horas=${result.colab.horas}, idtipopgto=${result.colab.idtipopgto}`,
-      )
-      console.log(`Dados buscados de colaboradores:`, result.colab)
 
       setColaborador(result.colab)
       setFotoPredeterminada(result.fotoUrl)
       setViewState('CAPTURING')
     } catch (err) {
       setViewState('SEARCH_FAILED')
-      setErrorMsg('Colaborador nao encontrado')
+      setErrorMsg('Colaborador não encontrado')
     }
   }
 
@@ -160,9 +153,9 @@ export default function Camera() {
       case 1:
         return 'Hora Extra'
       case 3:
-        return 'Ferias Trabalhada'
+        return 'Férias Trabalhada'
       case 4:
-        return 'Vale Refeicao'
+        return 'Vale Refeição'
       default:
         return 'Tipo desconhecido'
     }
@@ -170,17 +163,6 @@ export default function Camera() {
 
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current || !fotoPredeterminada) return
-
-    const clickTime = performance.now()
-    let captureTime = 0,
-      compressTime = 0,
-      base64Time = 0,
-      awsTime = 0,
-      totalTime = 0
-    let captureEndTime = 0,
-      compressEndTime = 0,
-      base64EndTime = 0,
-      awsEndTime = 0
 
     setViewState('PROCESSING')
     setErrorMsg(null)
@@ -202,16 +184,11 @@ export default function Camera() {
         const startY = (video.videoHeight - size) / 2
 
         context.drawImage(video, startX, startY, size, size, 0, 0, 360, 360)
-        captureEndTime = performance.now()
-        captureTime = captureEndTime - clickTime
 
         const blob = await new Promise<Blob | null>((resolve) =>
           canvas.toBlob(resolve, 'image/jpeg', 0.5),
         )
         if (!blob) throw new Error('Falha na compressão da imagem')
-
-        compressEndTime = performance.now()
-        compressTime = compressEndTime - captureEndTime
 
         const fotoCaptured = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
@@ -220,46 +197,21 @@ export default function Camera() {
           reader.readAsDataURL(blob)
         })
         setFotoCapturada(fotoCaptured)
-        base64EndTime = performance.now()
-        base64Time = base64EndTime - compressEndTime
 
         const success = await reconhecimentoFacialService(
           fotoPredeterminada,
           fotoCaptured,
           colaborador?.registro,
         )
-        awsEndTime = performance.now()
-        awsTime = awsEndTime - base64EndTime
-
-        totalTime = awsEndTime - clickTime
-        console.log(
-          `Captura: ${captureTime.toFixed(0)}ms | Compressao: ${compressTime.toFixed(0)}ms | Base64: ${base64Time.toFixed(0)}ms | AWS: ${awsTime.toFixed(0)}ms | Total: ${totalTime.toFixed(0)}ms`,
-        )
 
         if (success) {
-          console.log('Exibindo card com informacoes do colaborador')
           setViewState('RECOGNITION_SUCCESS')
           setErrorMsg(null)
         } else {
           setViewState('RECOGNITION_FAILED')
-          setErrorMsg('Rosto nao corresponde ao registro informado')
+          setErrorMsg('Rosto não corresponde ao registro informado')
         }
       } catch (err: any) {
-        const errorEndTime = performance.now()
-        if (!captureEndTime) captureEndTime = errorEndTime
-        if (!compressEndTime) compressEndTime = captureEndTime
-        if (!base64EndTime) base64EndTime = compressEndTime
-
-        captureTime = captureEndTime - clickTime
-        compressTime = compressEndTime - captureEndTime
-        base64Time = base64EndTime - compressEndTime
-        awsTime = errorEndTime - base64EndTime
-        totalTime = errorEndTime - clickTime
-
-        console.log(
-          `Captura: ${captureTime.toFixed(0)}ms | Compressao: ${compressTime.toFixed(0)}ms | Base64: ${base64Time.toFixed(0)}ms | AWS: ${awsTime.toFixed(0)}ms | Total: ${totalTime.toFixed(0)}ms`,
-        )
-
         setViewState('RECOGNITION_FAILED')
         if (
           err.message &&
@@ -268,15 +220,15 @@ export default function Camera() {
         ) {
           setErrorMsg(err.message)
         } else if (err.status === 401) {
-          setErrorMsg('Credenciais da AWS invalidas. Verifique Secrets')
+          setErrorMsg('Credenciais da AWS inválidas. Verifique Secrets')
         } else if (err.status === 403) {
-          setErrorMsg('Regiao da AWS invalida. Verifique Secrets')
+          setErrorMsg('Região da AWS inválida. Verifique Secrets')
         } else if (err.status === 429) {
-          setErrorMsg('Limite de requisicoes atingido. Tente novamente em alguns segundos')
+          setErrorMsg('Limite de requisições atingido. Tente novamente')
         } else if (err.status === 504) {
           setErrorMsg('Timeout ao processar reconhecimento. Tente novamente')
         } else if (err.status === 500) {
-          setErrorMsg('Servico da AWS indisponivel. Tente novamente')
+          setErrorMsg('Serviço da AWS indisponível. Tente novamente')
         } else {
           setErrorMsg('Erro ao processar foto. Tente capturar novamente')
         }
@@ -329,7 +281,6 @@ export default function Camera() {
     const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
 
     try {
-      console.log('Iniciando upload de foto de comprovação...')
       const pagDetails = await getPagamentoByRegistro(colaborador.registro).catch(() => null)
       const dataToSave = {
         colaborador_id: colaborador.id,
@@ -349,7 +300,6 @@ export default function Camera() {
       }
 
       const fileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)
-      console.log(`URL gerada: ${fileUrl}`)
       await updatePagamento(pagamentoRecord.id, { foto_confirmacao_url: fileUrl })
 
       try {
@@ -357,14 +307,13 @@ export default function Camera() {
       } catch (err) {
         toast({
           title: 'Aviso',
-          description: 'Pagamento confirmado, mas erro ao atualizar colaborador. Contate o suporte',
+          description: 'Pagamento confirmado, mas erro ao atualizar colaborador.',
           variant: 'destructive',
         })
         handleReset()
         return
       }
 
-      console.log('Pagamento atualizado com sucesso')
       toast({
         title: 'Sucesso',
         description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(
@@ -393,323 +342,316 @@ export default function Camera() {
   }
 
   return (
-    <div className="container max-w-4xl mx-auto p-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+    <div className="container max-w-5xl mx-auto p-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
           Pagamento de Boca de Caixa
         </h1>
-        <p className="text-slate-500 mt-2">
+        <p className="text-sm text-slate-500 mt-1">
           Identifique o colaborador e realize a verificação facial.
         </p>
       </div>
 
-      <div className="grid md:grid-cols-12 gap-8">
-        <div className="md:col-span-5 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Busca de Funcionário</CardTitle>
-              <CardDescription>
-                Insira o número de registro para localizar o colaborador.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSearch} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="registro">Registro do Funcionário</Label>
-                  <Input
-                    id="registro"
-                    placeholder="Ex: 12345"
-                    value={registro}
-                    onChange={(e) => setRegistro(e.target.value)}
-                    disabled={
-                      viewState !== 'EMPTY' &&
-                      viewState !== 'SEARCH_FAILED' &&
-                      viewState !== 'RECOGNITION_FAILED' &&
-                      viewState !== 'RECOGNITION_SUCCESS'
-                    }
-                  />
-                </div>
-                {(viewState === 'SEARCH_FAILED' || errorMsg) && (
-                  <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>
-                      {viewState === 'SEARCH_FAILED' && !errorMsg
-                        ? 'Colaborador nao encontrado'
-                        : errorMsg}
-                    </span>
-                  </div>
-                )}
-                {viewState === 'SEARCH_FAILED' ? (
-                  <Button type="button" className="w-full" onClick={handleReset}>
-                    Tentar Novamente
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={
-                      !registro.trim() ||
-                      viewState === 'SEARCHING' ||
-                      viewState === 'PROCESSING' ||
-                      viewState === 'CONFIRMING_PAYMENT'
-                    }
-                  >
-                    {viewState === 'SEARCHING' ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Buscando colaborador...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="mr-2 h-4 w-4" />
-                        Buscar
-                      </>
-                    )}
-                  </Button>
-                )}
-                {viewState !== 'EMPTY' &&
-                  viewState !== 'SEARCHING' &&
-                  viewState !== 'SEARCH_FAILED' && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full mt-2"
-                      onClick={handleReset}
-                      disabled={viewState === 'CONFIRMING_PAYMENT'}
-                    >
-                      Nova Busca
-                    </Button>
-                  )}{' '}
-              </form>
-            </CardContent>
-          </Card>
+      <div className="grid md:grid-cols-12 gap-4 h-auto md:h-[513px]">
+        {/* Left Column */}
+        <div className="md:col-span-5 h-full">
+          {viewState === 'RECOGNITION_SUCCESS' || viewState === 'CONFIRMING_PAYMENT' ? (
+            <Card className="h-full flex flex-col border-slate-200 dark:border-slate-800 shadow-sm rounded-xl">
+              <CardContent className="p-6 flex flex-col h-full">
+                <div className="flex-1">
+                  <h3 className="text-[18px] font-bold text-slate-900 dark:text-white mb-1">
+                    Identidade Confirmada
+                  </h3>
+                  <p className="text-[12px] text-slate-500 mb-6">
+                    O rosto corresponde ao registro informado.
+                  </p>
 
-          {colaborador && (
-            <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg">Perfil do Colaborador</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-4">
-                  {fotoPredeterminada ? (
-                    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-100 dark:border-slate-800 shrink-0">
-                      <img
-                        src={fotoPredeterminada}
-                        alt="Foto do banco"
-                        className="w-full h-full object-cover"
-                      />
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
+                          Hora de Início
+                        </p>
+                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white">
+                          {formatTime(colaborador?.inicio)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
+                          Total de Horas
+                        </p>
+                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white">
+                          {formatHoras(colaborador?.horas)}
+                        </p>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                      <CameraIcon className="h-6 w-6 text-slate-400" />
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
+                          Hora de Término
+                        </p>
+                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white">
+                          {formatTime(colaborador?.termino)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
+                          Tipo de Pagamento
+                        </p>
+                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white">
+                          {getTipoPagamentoDesc(colaborador?.idtipopgto)}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-900 dark:text-slate-50 truncate">
-                      {colaborador.nome}
-                    </p>
-                    <p className="text-sm text-slate-500">Garagem: {colaborador.filial}</p>
-                    <p className="text-sm text-slate-500">Reg: {colaborador.registro}</p>
                   </div>
+
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
+                      Valor a Receber
+                    </p>
+                    <p className="text-[24px] font-bold text-green-600 dark:text-green-500">
+                      {formatCurrency(colaborador?.valor || colaborador?.valor_a_receber || 0)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 w-full mt-6">
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-[40px] text-slate-700 dark:text-slate-300"
+                    onClick={handleReset}
+                    disabled={viewState === 'CONFIRMING_PAYMENT'}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="flex-1 h-[40px] bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900"
+                    onClick={handleConfirmPayment}
+                    disabled={viewState === 'CONFIRMING_PAYMENT'}
+                  >
+                    Confirmar Pagamento
+                  </Button>
                 </div>
               </CardContent>
             </Card>
+          ) : (
+            <div className="flex flex-col gap-4 h-full">
+              <Card className="shrink-0 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg">Busca de Funcionário</CardTitle>
+                  <CardDescription>Insira o número de registro para localizar.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSearch} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="registro" className="text-slate-700 dark:text-slate-300">
+                        Registro
+                      </Label>
+                      <Input
+                        id="registro"
+                        placeholder="Ex: 12345"
+                        value={registro}
+                        onChange={(e) => setRegistro(e.target.value)}
+                        className="border-slate-200 dark:border-slate-800"
+                        disabled={
+                          viewState !== 'EMPTY' &&
+                          viewState !== 'SEARCH_FAILED' &&
+                          viewState !== 'RECOGNITION_FAILED'
+                        }
+                      />
+                    </div>
+                    {(viewState === 'SEARCH_FAILED' || errorMsg) && (
+                      <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/10 dark:text-red-400 p-3 rounded-md">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>
+                          {viewState === 'SEARCH_FAILED' && !errorMsg
+                            ? 'Colaborador não encontrado'
+                            : errorMsg}
+                        </span>
+                      </div>
+                    )}
+                    {viewState === 'SEARCH_FAILED' ? (
+                      <Button
+                        type="button"
+                        className="w-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 h-10"
+                        onClick={handleReset}
+                      >
+                        Tentar Novamente
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        className="w-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 h-10"
+                        disabled={
+                          !registro.trim() ||
+                          viewState === 'SEARCHING' ||
+                          viewState === 'PROCESSING'
+                        }
+                      >
+                        {viewState === 'SEARCHING' ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Buscando...
+                          </>
+                        ) : (
+                          <>
+                            <Search className="mr-2 h-4 w-4" />
+                            Buscar
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {viewState !== 'EMPTY' &&
+                      viewState !== 'SEARCHING' &&
+                      viewState !== 'SEARCH_FAILED' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full h-10 mt-2 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800"
+                          onClick={handleReset}
+                          disabled={viewState === 'PROCESSING'}
+                        >
+                          Nova Busca
+                        </Button>
+                      )}
+                  </form>
+                </CardContent>
+              </Card>
+
+              {colaborador && (
+                <Card className="shrink-0 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl animate-in fade-in duration-300">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-md">Perfil</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-4">
+                      {fotoPredeterminada ? (
+                        <div className="w-14 h-14 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800 shrink-0">
+                          <img
+                            src={fotoPredeterminada}
+                            alt="Foto"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                          <CameraIcon className="h-5 w-5 text-slate-400" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-slate-900 dark:text-white truncate">
+                          {colaborador.nome}
+                        </p>
+                        <p className="text-sm text-slate-500">Reg: {colaborador.registro}</p>
+                        <p className="text-sm text-slate-500">{colaborador.filial}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
         </div>
 
-        <div className="md:col-span-7">
-          <Card className="h-[513px] flex flex-col overflow-hidden relative">
-            {isCameraActive && (
-              <div className="absolute inset-0 bg-black z-0">
-                {!streamActive && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-white animate-spin" />
-                  </div>
-                )}
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`w-full h-full object-cover transition-opacity duration-300 ${
-                    viewState === 'CAPTURING' ? 'opacity-100' : 'opacity-40'
-                  }`}
-                />
-                <canvas ref={canvasRef} className="hidden" />
+        {/* Right Column - Camera */}
+        <div className="md:col-span-7 h-full min-h-[400px] md:min-h-0">
+          <Card className="h-full relative overflow-hidden border-slate-200 dark:border-slate-800 shadow-sm rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+            {isCameraActive && !streamActive && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-100 dark:bg-slate-900">
+                <Loader2 className="h-8 w-8 text-slate-400 animate-spin" />
               </div>
             )}
 
-            <div className="relative z-10 flex-1 flex flex-col overflow-y-auto">
-              {viewState === 'EMPTY' ||
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={cn(
+                'absolute inset-0 w-full h-full object-cover transition-opacity duration-300',
+                isCameraActive ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+            <canvas ref={canvasRef} className="hidden" />
+
+            {(!isCameraActive ||
+              viewState === 'EMPTY' ||
               viewState === 'SEARCHING' ||
-              viewState === 'SEARCH_FAILED' ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 bg-white dark:bg-slate-950">
-                  {' '}
-                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
-                    <CameraIcon className="h-8 w-8 text-slate-400" />
-                  </div>
-                  <p>
-                    A câmera será ativada automaticamente
-                    <br />
-                    após a busca do colaborador.
-                  </p>
-                </div>
-              ) : viewState === 'PROCESSING' ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-white bg-black/60 backdrop-blur-sm">
-                  <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">
-                    Processando reconhecimento facial...
-                  </h3>
-                  <p className="text-slate-300">Aguarde enquanto verificamos a identidade.</p>
-                </div>
-              ) : viewState === 'RECOGNITION_SUCCESS' ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-4 animate-in zoom-in-95 duration-300 bg-black/80 backdrop-blur-sm text-white overflow-y-auto">
-                  <div className="w-full max-w-[600px] flex flex-col">
-                    <div className="flex flex-col md:flex-row gap-4 h-auto items-stretch">
-                      <div className="flex-1 bg-slate-950 rounded-xl p-4 border border-slate-800 text-left shadow-2xl flex flex-col">
-                        <div className="mb-4">
-                          <h3 className="text-[18px] font-bold text-white flex items-center gap-2">
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                            Identidade Confirmada
-                          </h3>
-                          <p className="text-[12px] text-slate-300 mt-1">
-                            O rosto corresponde ao registro informado.
-                          </p>
-                        </div>
+              viewState === 'SEARCH_FAILED') && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-500">
+                <CameraIcon className="h-8 w-8 mb-4 text-slate-400" />
+                <p className="text-sm">A câmera será ativada após a busca.</p>
+              </div>
+            )}
 
-                        <div className="flex gap-4">
-                          <div className="flex flex-col gap-3 flex-1">
-                            <div>
-                              <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                                Hora de Inicio
-                              </p>
-                              <p className="text-[14px] font-semibold text-white">
-                                {formatTime(colaborador?.inicio)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                                Total de Horas
-                              </p>
-                              <p className="text-[14px] font-semibold text-white">
-                                {formatHoras(colaborador?.horas)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-3 flex-1">
-                            <div>
-                              <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                                Hora de Termino
-                              </p>
-                              <p className="text-[14px] font-semibold text-white">
-                                {formatTime(colaborador?.termino)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                                Tipo de Pagamento
-                              </p>
-                              <p className="text-[14px] font-semibold text-white">
-                                {getTipoPagamentoDesc(colaborador?.idtipopgto)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+            {viewState === 'PROCESSING' && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm">
+                <Loader2 className="h-8 w-8 text-slate-900 dark:text-white animate-spin mb-4" />
+                <p className="text-sm font-medium text-slate-900 dark:text-white">Processando...</p>
+              </div>
+            )}
 
-                        <div className="mt-4 pt-4 border-t border-slate-800">
-                          <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                            VALOR A RECEBER
-                          </p>
-                          <p className="text-[24px] font-bold text-green-500">
-                            {formatCurrency(
-                              colaborador?.valor || colaborador?.valor_a_receber || 0,
-                            )}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="w-full md:w-[220px] shrink-0 rounded-xl overflow-hidden bg-black flex items-stretch">
-                        {fotoCapturada ? (
-                          <img
-                            src={fotoCapturada}
-                            alt="Câmera"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <CameraIcon className="w-8 h-8 text-slate-500" />
-                          </div>
-                        )}
-                      </div>
+            {(viewState === 'RECOGNITION_SUCCESS' || viewState === 'CONFIRMING_PAYMENT') && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm">
+                {viewState === 'CONFIRMING_PAYMENT' ? (
+                  <>
+                    <Loader2 className="h-8 w-8 text-slate-900 dark:text-white animate-spin mb-4" />
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      Confirmando pagamento...
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mb-4">
+                      <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-500" />
                     </div>
+                    <h3 className="text-lg font-medium text-slate-900 dark:text-white">
+                      Reconhecimento Concluído
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-1">Verifique os dados ao lado.</p>
+                  </>
+                )}
+              </div>
+            )}
 
-                    <div className="flex gap-2 w-full mt-4">
-                      <Button
-                        variant="outline"
-                        className="flex-1 h-[40px] text-sm bg-slate-900 border-slate-800 text-white hover:bg-slate-800 hover:text-white"
-                        onClick={handleReset}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        className="flex-1 h-[40px] text-sm bg-green-600 hover:bg-green-700 text-white border-0"
-                        onClick={handleConfirmPayment}
-                      >
-                        Confirmar Pagamento
-                      </Button>
-                    </div>
-                  </div>
+            {viewState === 'RECOGNITION_FAILED' && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm px-6 text-center">
+                <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
+                  <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-500" />
                 </div>
-              ) : viewState === 'CONFIRMING_PAYMENT' ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-white bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-                  <Loader2 className="h-12 w-12 text-green-500 animate-spin mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">
-                    Confirmando pagamento e salvando foto...
-                  </h3>
-                  <p className="text-slate-300">Aguarde um instante.</p>
-                </div>
-              ) : viewState === 'RECOGNITION_FAILED' ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-300 bg-black/60 backdrop-blur-sm text-white">
-                  <div className="w-20 h-20 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center mb-6">
-                    <AlertCircle className="h-10 w-10" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">Reconhecimento Falhou</h3>
-                  <p className="text-slate-300 mb-8 max-w-md">
-                    {errorMsg || 'Rosto nao corresponde ao registro informado'}
-                  </p>
+                <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+                  Reconhecimento Falhou
+                </h3>
+                <p className="text-sm text-slate-500 mb-6">
+                  {errorMsg || 'Rosto não corresponde ao registro.'}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setViewState('CAPTURING')
+                    setErrorMsg(null)
+                  }}
+                >
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  Tentar Novamente
+                </Button>
+              </div>
+            )}
 
+            {viewState === 'CAPTURING' && (
+              <div className="absolute inset-0 z-10 flex flex-col justify-end p-6">
+                <div className="flex justify-center">
                   <Button
                     size="lg"
-                    variant="outline"
-                    className="w-full max-w-sm bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white"
-                    onClick={() => {
-                      setViewState('CAPTURING')
-                      setErrorMsg(null)
-                    }}
+                    className="rounded-full h-16 w-16 p-0 border border-slate-200 bg-white/90 hover:bg-white text-slate-900 shadow-sm backdrop-blur-sm transition-all"
+                    onClick={handleCapture}
                   >
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Tentar Novamente
+                    <CameraIcon className="h-6 w-6" />
+                    <span className="sr-only">Capturar Foto</span>
                   </Button>
                 </div>
-              ) : viewState === 'CAPTURING' ? (
-                <div className="flex-1 flex flex-col">
-                  <div className="flex-1 relative flex items-center justify-center">
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                      <div className="w-56 h-56 md:w-72 md:h-72 border-2 border-white/50 rounded-[40px] shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"></div>
-                    </div>
-                  </div>
-                  <div className="p-4 bg-black/80 backdrop-blur-sm border-t border-white/10 flex justify-center">
-                    <Button
-                      size="lg"
-                      className="rounded-full h-16 w-16 p-0 border-4 border-slate-300 bg-white hover:bg-slate-200"
-                      onClick={handleCapture}
-                    >
-                      <span className="sr-only">Capturar Foto</span>
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
+              </div>
+            )}
           </Card>
         </div>
       </div>
