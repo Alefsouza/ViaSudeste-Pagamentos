@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { getRecebedoriaPagamentosPaginated } from '@/services/pagamentos'
-import { getColaboradores } from '@/services/colaboradores'
 import pb from '@/lib/pocketbase/client'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,15 +32,6 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
 
 import {
   Download,
@@ -51,8 +41,6 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  ChevronsUpDown,
-  Check,
   SearchX,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -62,7 +50,6 @@ export default function RelatorioRecebedoria() {
   const { toast } = useToast()
 
   const [data, setData] = useState<any[]>([])
-  const [colaboradores, setColaboradores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [page, setPage] = useState(1)
@@ -82,16 +69,20 @@ export default function RelatorioRecebedoria() {
   const [customEndDate, setCustomEndDate] = useState(endDate)
 
   const [statusFilter, setStatusFilter] = useState('Todos')
-  const [selectedColaboradorId, setSelectedColaboradorId] = useState<string | null>(null)
-  const [openColab, setOpenColab] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
 
   // Modals
   const [photoModal, setPhotoModal] = useState<string | null>(null)
   const [detailsModal, setDetailsModal] = useState<any | null>(null)
 
   useEffect(() => {
-    getColaboradores().then(setColaboradores).catch(console.error)
-  }, [])
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setPage(1)
+    }, 500)
+    return () => clearTimeout(handler)
+  }, [searchTerm])
 
   const loadData = async () => {
     if (!user) return
@@ -101,7 +92,7 @@ export default function RelatorioRecebedoria() {
       const filters = {
         startDate: datePreset === 'Data customizada' ? customStartDate : startDate,
         endDate: datePreset === 'Data customizada' ? customEndDate : endDate,
-        colaboradorId: selectedColaboradorId,
+        search: debouncedSearchTerm,
         status: statusFilter,
       }
       const result = await getRecebedoriaPagamentosPaginated(page, 20, filters, user.id)
@@ -125,7 +116,7 @@ export default function RelatorioRecebedoria() {
     customStartDate,
     customEndDate,
     datePreset,
-    selectedColaboradorId,
+    debouncedSearchTerm,
     statusFilter,
   ])
 
@@ -154,7 +145,7 @@ export default function RelatorioRecebedoria() {
 
   const clearFilters = () => {
     setStatusFilter('Todos')
-    setSelectedColaboradorId(null)
+    setSearchTerm('')
     handlePresetChange('Últimos 30 dias')
     setPage(1)
   }
@@ -255,65 +246,13 @@ export default function RelatorioRecebedoria() {
           )}
 
           <div className="space-y-2 lg:col-span-1">
-            <Label>Colaborador</Label>
-            <Popover open={openColab} onOpenChange={setOpenColab}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={openColab}
-                  className="w-full justify-between bg-white dark:bg-slate-950 font-normal"
-                >
-                  <span className="truncate">
-                    {selectedColaboradorId
-                      ? colaboradores.find((c) => c.id === selectedColaboradorId)?.nome
-                      : 'Buscar colaborador...'}
-                  </span>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Nome ou registro..." />
-                  <CommandList>
-                    <CommandEmpty>Nenhum encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        onSelect={() => {
-                          setSelectedColaboradorId(null)
-                          setOpenColab(false)
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            'mr-2 h-4 w-4',
-                            selectedColaboradorId === null ? 'opacity-100' : 'opacity-0',
-                          )}
-                        />
-                        Todos
-                      </CommandItem>
-                      {colaboradores.map((c) => (
-                        <CommandItem
-                          key={c.id}
-                          onSelect={() => {
-                            setSelectedColaboradorId(c.id)
-                            setOpenColab(false)
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              selectedColaboradorId === c.id ? 'opacity-100' : 'opacity-0',
-                            )}
-                          />
-                          {c.nome} ({c.registro})
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <Label>Busca</Label>
+            <Input
+              placeholder="Buscar por Registro ou Nome..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-white dark:bg-slate-950"
+            />
           </div>
 
           <div className="space-y-2 lg:col-span-1">

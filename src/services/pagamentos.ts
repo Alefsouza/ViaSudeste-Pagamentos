@@ -68,7 +68,11 @@ export const getRecebedoriaPagamentosPaginated = async (
 
   if (filters.startDate) parts.push(`data_pagamento >= '${filters.startDate} 00:00:00'`)
   if (filters.endDate) parts.push(`data_pagamento <= '${filters.endDate} 23:59:59'`)
-  if (filters.colaboradorId) parts.push(`colaborador_id = '${filters.colaboradorId}'`)
+  if (filters.search) {
+    parts.push(
+      `(colaborador_id.nome ~ '${filters.search}' || colaborador_id.registro ~ '${filters.search}')`,
+    )
+  }
   if (filters.status && filters.status !== 'Todos') parts.push(`status = '${filters.status}'`)
 
   return pb.collection('pagamentos').getList(page, perPage, {

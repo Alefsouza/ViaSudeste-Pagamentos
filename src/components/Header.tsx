@@ -33,7 +33,7 @@ export function Header() {
             <span className="hidden sm:inline">Via Sudeste</span>
           </div>
 
-          {user.role === 'Administrador' && (
+          {user.role === 'Administrador' ? (
             <nav className="flex items-center gap-3 md:gap-4 text-sm font-medium">
               <Link
                 to="/dashboard"
@@ -71,6 +71,31 @@ export function Header() {
                 <Upload size={16} />
                 <span className="hidden sm:inline">Upload de Fotos</span>
               </button>
+            </nav>
+          ) : (
+            <nav className="flex items-center gap-3 md:gap-4 text-sm font-medium">
+              <Link
+                to="/camera"
+                className={`flex items-center gap-1.5 transition-colors ${
+                  location.pathname === '/camera'
+                    ? 'text-forest dark:text-mint-light'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                <Camera size={16} />
+                <span className="hidden sm:inline">Recebedoria</span>
+              </Link>
+              <Link
+                to="/relatorio-recebedoria"
+                className={`flex items-center gap-1.5 transition-colors ${
+                  location.pathname === '/relatorio-recebedoria'
+                    ? 'text-forest dark:text-mint-light'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                <FileText size={16} />
+                <span className="hidden sm:inline">Relatórios</span>
+              </Link>
             </nav>
           )}
         </div>
