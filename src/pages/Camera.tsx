@@ -282,6 +282,20 @@ export default function Camera() {
 
     try {
       const pagDetails = await getPagamentoByRegistro(colaborador.registro).catch(() => null)
+      const parsedHoras =
+        typeof colaborador.horas === 'string' ? parseFloat(colaborador.horas) : colaborador.horas
+      const validHoras =
+        typeof parsedHoras === 'number' && !isNaN(parsedHoras) ? parsedHoras : undefined
+
+      const parsedIdTipoPgto =
+        typeof colaborador.idtipopgto === 'string'
+          ? parseInt(colaborador.idtipopgto, 10)
+          : colaborador.idtipopgto
+      const validIdTipoPgto =
+        typeof parsedIdTipoPgto === 'number' && !isNaN(parsedIdTipoPgto)
+          ? parsedIdTipoPgto
+          : undefined
+
       const dataToSave = {
         colaborador_id: colaborador.id,
         valor_pago: colaborador.valor || colaborador.valor_a_receber,
@@ -290,6 +304,11 @@ export default function Camera() {
         foto_confirmacao: file,
         user_id: user?.id,
         status: 'Confirmado',
+        inicio: colaborador.inicio,
+        termino: colaborador.termino,
+        horas: validHoras,
+        idtipopgto: validIdTipoPgto,
+        tipo_pagamento: getTipoPagamentoDesc(colaborador.idtipopgto),
       }
 
       let pagamentoRecord

@@ -12,6 +12,11 @@ export const createPagamento = (data: {
   foto_confirmacao_url?: string
   user_id?: string
   status?: string
+  inicio?: string
+  termino?: string
+  horas?: number
+  idtipopgto?: number
+  tipo_pagamento?: string
 }) => pb.collection('pagamentos').create(data)
 
 export const updatePagamento = (id: string, data: Partial<{ foto_confirmacao_url: string }>) =>
