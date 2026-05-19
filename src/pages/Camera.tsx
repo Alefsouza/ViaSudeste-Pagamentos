@@ -40,7 +40,6 @@ export default function Camera() {
   const [fotoPredeterminada, setFotoPredeterminada] = useState<string | null>(null)
   const [fotoCapturada, setFotoCapturada] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [pagamentoDetails, setPagamentoDetails] = useState<any>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -96,26 +95,35 @@ export default function Camera() {
     setColaborador(null)
     setFotoPredeterminada(null)
     setFotoCapturada(null)
-    setPagamentoDetails(null)
+
+    console.log(`Buscando colaborador com registro: ${registro}`)
 
     try {
       const result = await getColaboradorByRegistro(registro)
-      if (!result.colab || !result.hasFotoRecord || !result.fotoUrl) {
+      if (!result || !result.colab) {
         setViewState('SEARCH_FAILED')
+        setErrorMsg('Colaborador nao encontrado')
         return
       }
 
-      const pagDetails = await getPagamentoByRegistro(registro)
-      setPagamentoDetails(pagDetails)
+      if (!result.hasFotoRecord || !result.fotoUrl) {
+        setViewState('SEARCH_FAILED')
+        setErrorMsg('Foto do colaborador nao encontrada')
+        return
+      }
+
+      console.log(`Colaborador encontrado: ${result.colab.nome}, ${result.colab.registro}`)
       console.log(
-        `Dados buscados: inicio=${pagDetails?.inicio}, termino=${pagDetails?.termino}, horas=${pagDetails?.horas}, idtipopgto=${pagDetails?.idtipopgto}`,
+        `Dados: inicio=${result.colab.inicio}, termino=${result.colab.termino}, horas=${result.colab.horas}, idtipopgto=${result.colab.idtipopgto}`,
       )
+      console.log(`Dados buscados de colaboradores:`, result.colab)
 
       setColaborador(result.colab)
       setFotoPredeterminada(result.fotoUrl)
       setViewState('CAPTURING')
     } catch (err) {
       setViewState('SEARCH_FAILED')
+      setErrorMsg('Colaborador nao encontrado')
     }
   }
 
@@ -229,6 +237,7 @@ export default function Camera() {
         )
 
         if (success) {
+          console.log('Exibindo card com informacoes do colaborador')
           setViewState('RECOGNITION_SUCCESS')
           setErrorMsg(null)
         } else {
@@ -321,9 +330,10 @@ export default function Camera() {
 
     try {
       console.log('Iniciando upload de foto de comprovação...')
+      const pagDetails = await getPagamentoByRegistro(colaborador.registro).catch(() => null)
       const dataToSave = {
         colaborador_id: colaborador.id,
-        valor_pago: pagamentoDetails?.valor_pago || colaborador.valor_a_receber,
+        valor_pago: colaborador.valor || colaborador.valor_a_receber,
         data_pagamento,
         hora_pagamento,
         foto_confirmacao: file,
@@ -332,8 +342,8 @@ export default function Camera() {
       }
 
       let pagamentoRecord
-      if (pagamentoDetails && pagamentoDetails.status === 'Pendente') {
-        pagamentoRecord = await updatePagamentoCompleto(pagamentoDetails.id, dataToSave)
+      if (pagDetails && pagDetails.status === 'Pendente') {
+        pagamentoRecord = await updatePagamentoCompleto(pagDetails.id, dataToSave)
       } else {
         pagamentoRecord = await createPagamento(dataToSave)
       }
@@ -378,7 +388,6 @@ export default function Camera() {
     setColaborador(null)
     setFotoPredeterminada(null)
     setFotoCapturada(null)
-    setPagamentoDetails(null)
     setErrorMsg(null)
     setViewState('EMPTY')
   }
@@ -424,8 +433,8 @@ export default function Camera() {
                   <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
                     <AlertCircle className="h-4 w-4 shrink-0" />
                     <span>
-                      {viewState === 'SEARCH_FAILED'
-                        ? 'Colaborador nao encontrado ou ja recebeu pagamento'
+                      {viewState === 'SEARCH_FAILED' && !errorMsg
+                        ? 'Colaborador nao encontrado'
                         : errorMsg}
                     </span>
                   </div>
@@ -570,7 +579,7 @@ export default function Camera() {
                           Hora de Inicio
                         </p>
                         <p className="text-base font-semibold text-white">
-                          {formatTime(pagamentoDetails?.inicio)}
+                          {formatTime(colaborador?.inicio)}
                         </p>
                       </div>
                       <div>
@@ -578,7 +587,7 @@ export default function Camera() {
                           Hora de Termino
                         </p>
                         <p className="text-base font-semibold text-white">
-                          {formatTime(pagamentoDetails?.termino)}
+                          {formatTime(colaborador?.termino)}
                         </p>
                       </div>
                       <div>
@@ -586,7 +595,7 @@ export default function Camera() {
                           Total de Horas
                         </p>
                         <p className="text-base font-semibold text-white">
-                          {formatHoras(pagamentoDetails?.horas)}
+                          {formatHoras(colaborador?.horas)}
                         </p>
                       </div>
                       <div>
@@ -594,7 +603,7 @@ export default function Camera() {
                           Tipo de Pagamento
                         </p>
                         <p className="text-base font-semibold text-white">
-                          {getTipoPagamentoDesc(pagamentoDetails?.idtipopgto)}
+                          {getTipoPagamentoDesc(colaborador?.idtipopgto)}
                         </p>
                       </div>
                     </div>
@@ -603,9 +612,7 @@ export default function Camera() {
                         Valor a Receber
                       </p>
                       <p className="text-3xl font-bold text-green-500">
-                        {formatCurrency(
-                          pagamentoDetails?.valor_pago || colaborador?.valor_a_receber || 0,
-                        )}
+                        {formatCurrency(colaborador?.valor || colaborador?.valor_a_receber || 0)}
                       </p>
                     </div>
                   </div>
