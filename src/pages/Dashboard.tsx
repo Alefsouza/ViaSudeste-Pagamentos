@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -19,8 +19,7 @@ import {
   ArrowUp,
   Search,
   Inbox,
-  Upload,
-  Camera,
+  Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,15 +32,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Info } from 'lucide-react'
-import { getPagamentosPaginated, getPagamentosAnalytics } from '@/services/pagamentos'
+import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
-import { UploadFotosModal } from '@/components/UploadFotosModal'
-import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
 import { useToast } from '@/hooks/use-toast'
+import { formatDataString, formatHoraString, formatBRL } from '@/lib/formatters'
 
 export default function Dashboard() {
   const { toast } = useToast()
@@ -76,8 +73,8 @@ export default function Dashboard() {
     setError(false)
     try {
       const [stats, paginated] = await Promise.all([
-        getPagamentosAnalytics(debouncedFilters),
-        getPagamentosPaginated(page, 20, debouncedFilters),
+        getColaboradoresAnalytics(debouncedFilters),
+        getColaboradoresPaginated(page, 20, debouncedFilters),
       ])
       setStatsData(stats)
       setTableData(paginated)
@@ -112,13 +109,13 @@ export default function Dashboard() {
     )
   }
 
-  const formatBRL = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
-
   // Calculations
-  const totalPago = statsData.reduce((acc, curr) => acc + curr.valor_pago, 0)
-  const uniqueColabs = new Set(statsData.map((c) => c.colaborador_id).filter(Boolean)).size
-  const values = statsData.map((c) => c.valor_pago)
+  const totalPago = statsData.reduce(
+    (acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0),
+    0,
+  )
+  const uniqueColabs = new Set(statsData.map((c) => c.registro).filter(Boolean)).size
+  const values = statsData.map((c) => c.valor_a_receber || c.valor || 0)
   const maxPago = values.length ? Math.max(...values) : 0
   const minPago = values.length ? Math.min(...values) : 0
   const avgPago = values.length ? totalPago / values.length : 0
@@ -126,8 +123,8 @@ export default function Dashboard() {
   // Chart Data Preparation
   const pieDataMap = statsData.reduce(
     (acc, curr) => {
-      const filial = curr.expand?.colaborador_id?.filial || 'Outra'
-      acc[filial] = (acc[filial] || 0) + curr.valor_pago
+      const filial = curr.filial || 'Outra'
+      acc[filial] = (acc[filial] || 0) + (curr.valor_a_receber || curr.valor || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -137,10 +134,18 @@ export default function Dashboard() {
 
   const dailyDataMap = statsData.reduce(
     (acc, curr) => {
-      if (!curr.data_pagamento) return acc
-      const dateObj = new Date(curr.data_pagamento)
-      const date = format(dateObj, 'yyyy-MM-dd')
-      acc[date] = (acc[date] || 0) + curr.valor_pago
+      const dStr =
+        formatDataString(curr.data) ||
+        (curr.created ? format(new Date(curr.created), 'dd/MM/yyyy') : '')
+      if (!dStr || dStr === '-') return acc
+
+      let dateKey = dStr
+      if (dStr.includes('/')) {
+        const p = dStr.split('/')
+        dateKey = `${p[2]}-${p[1]}-${p[0]}`
+      }
+
+      acc[dateKey] = (acc[dateKey] || 0) + (curr.valor_a_receber || curr.valor || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -148,13 +153,24 @@ export default function Dashboard() {
 
   const dailyData = Object.entries(dailyDataMap)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, total]) => ({
-      date,
-      formattedDate: format(new Date(date + 'T00:00:00'), 'dd/MM'),
-      total,
-    }))
+    .map(([date, total]) => {
+      const parts = date.split('-')
+      return {
+        date,
+        formattedDate: parts.length === 3 ? `${parts[2]}/${parts[1]}` : date,
+        total,
+      }
+    })
 
   const isEmpty = statsData.length === 0 && !loading
+
+  // Group table items by Name without aggregating their values
+  const groupedByName = (tableData?.items || []).reduce((acc: any, item: any) => {
+    const n = item.nome || 'Desconhecido'
+    if (!acc[n]) acc[n] = []
+    acc[n].push(item)
+    return acc
+  }, {})
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-8 animate-fade-in-up">
@@ -446,51 +462,99 @@ export default function Dashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {tableData?.items?.map((p: any) => (
-                          <TableRow key={p.id}>
-                            <TableCell className="font-medium">
-                              {p.expand?.colaborador_id?.nome}
-                            </TableCell>
-                            <TableCell>{p.expand?.colaborador_id?.registro}</TableCell>
-                            <TableCell>{p.expand?.colaborador_id?.filial}</TableCell>
-                            <TableCell className="text-right text-forest font-medium">
-                              {formatBRL(p.valor_pago)}
-                            </TableCell>
-                            <TableCell>
-                              {p.data_pagamento
-                                ? format(new Date(p.data_pagamento), 'dd/MM/yyyy')
-                                : '-'}
-                            </TableCell>
-                            <TableCell>
-                              {p.data_pagamento ? format(new Date(p.data_pagamento), 'HH:mm') : '-'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
+                          const totalLines = statsData.filter(
+                            (c) => (c.nome || 'Desconhecido') === nome,
+                          ).length
+                          return (
+                            <React.Fragment key={nome}>
+                              <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                <TableCell
+                                  colSpan={6}
+                                  className="font-semibold text-slate-700 dark:text-slate-300"
+                                >
+                                  {nome} - {totalLines}{' '}
+                                  {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
+                                </TableCell>
+                              </TableRow>
+                              {records.map((p: any) => (
+                                <TableRow key={p.id}>
+                                  <TableCell className="font-medium pl-8">{p.nome}</TableCell>
+                                  <TableCell>{p.registro}</TableCell>
+                                  <TableCell>{p.filial}</TableCell>
+                                  <TableCell className="text-right text-forest font-medium">
+                                    {formatBRL(p.valor_a_receber || p.valor)}
+                                  </TableCell>
+                                  <TableCell>
+                                    {p.data
+                                      ? formatDataString(p.data)
+                                      : p.created
+                                        ? format(new Date(p.created), 'dd/MM/yyyy')
+                                        : '-'}
+                                  </TableCell>
+                                  <TableCell>
+                                    {p.inicio
+                                      ? formatHoraString(p.inicio)
+                                      : p.created
+                                        ? format(new Date(p.created), 'HH:mm')
+                                        : '--:--'}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </React.Fragment>
+                          )
+                        })}
                       </TableBody>
                     </Table>
                   </div>
 
                   {/* Mobile View */}
-                  <div className="md:hidden space-y-4">
-                    {tableData?.items?.map((p: any) => (
-                      <Card key={p.id} className="shadow-sm">
-                        <CardContent className="p-4 flex flex-col gap-2">
-                          <div className="flex justify-between font-bold">
-                            <span className="truncate">{p.expand?.colaborador_id?.nome}</span>
-                            <span className="text-forest">{formatBRL(p.valor_pago)}</span>
+                  <div className="md:hidden space-y-6">
+                    {Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
+                      const totalLines = statsData.filter(
+                        (c) => (c.nome || 'Desconhecido') === nome,
+                      ).length
+                      return (
+                        <div key={nome} className="space-y-4">
+                          <div className="font-semibold text-slate-700 dark:text-slate-300 px-2 pt-2 border-b pb-2">
+                            {nome} - {totalLines}{' '}
+                            {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
                           </div>
-                          <div className="text-sm text-muted-foreground flex justify-between">
-                            <span>Reg: {p.expand?.colaborador_id?.registro}</span>
-                            <span>{p.expand?.colaborador_id?.filial}</span>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {p.data_pagamento
-                              ? format(new Date(p.data_pagamento), 'dd/MM/yyyy HH:mm')
-                              : '-'}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          {records.map((p: any) => (
+                            <Card key={p.id} className="shadow-sm">
+                              <CardContent className="p-4 flex flex-col gap-2">
+                                <div className="flex justify-between font-bold">
+                                  <span className="truncate">{p.nome}</span>
+                                  <span className="text-forest">
+                                    {formatBRL(p.valor_a_receber || p.valor)}
+                                  </span>
+                                </div>
+                                <div className="text-sm text-muted-foreground flex justify-between">
+                                  <span>Reg: {p.registro}</span>
+                                  <span>{p.filial}</span>
+                                </div>
+                                <div className="text-sm text-muted-foreground flex justify-between">
+                                  <span>
+                                    {p.data
+                                      ? formatDataString(p.data)
+                                      : p.created
+                                        ? format(new Date(p.created), 'dd/MM/yyyy')
+                                        : '-'}
+                                  </span>
+                                  <span>
+                                    {p.inicio
+                                      ? formatHoraString(p.inicio)
+                                      : p.created
+                                        ? format(new Date(p.created), 'HH:mm')
+                                        : '--:--'}
+                                  </span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )
+                    })}
                   </div>
 
                   {/* Pagination */}

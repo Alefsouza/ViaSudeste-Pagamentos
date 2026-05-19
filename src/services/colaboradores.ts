@@ -9,7 +9,7 @@ const colabCache = new Map<string, { data: any; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 export const getColaboradoresPaginated = async (page: number, perPage: number, filters: any) => {
-  const { search, startDate, endDate, filial } = filters
+  const { search, startDate, endDate, filial, status } = filters
   let filterStr = []
 
   if (search) {
@@ -23,6 +23,11 @@ export const getColaboradoresPaginated = async (page: number, perPage: number, f
   }
   if (endDate) {
     filterStr.push(`created <= "${endDate} 23:59:59"`)
+  }
+  if (status === 'Confirmado') {
+    filterStr.push(`foto_confirmacao_url != ""`)
+  } else if (status === 'Pendente') {
+    filterStr.push(`foto_confirmacao_url = ""`)
   }
 
   const finalFilter = filterStr.join(' && ')
@@ -34,7 +39,7 @@ export const getColaboradoresPaginated = async (page: number, perPage: number, f
 }
 
 export const getColaboradoresStats = async (filters: any) => {
-  const { search, startDate, endDate, filial } = filters
+  const { search, startDate, endDate, filial, status } = filters
   let filterStr = []
 
   if (search) {
@@ -48,6 +53,11 @@ export const getColaboradoresStats = async (filters: any) => {
   }
   if (endDate) {
     filterStr.push(`created <= "${endDate} 23:59:59"`)
+  }
+  if (status === 'Confirmado') {
+    filterStr.push(`foto_confirmacao_url != ""`)
+  } else if (status === 'Pendente') {
+    filterStr.push(`foto_confirmacao_url = ""`)
   }
 
   const finalFilter = filterStr.join(' && ')
@@ -65,7 +75,7 @@ export const getColaboradoresStats = async (filters: any) => {
 }
 
 export const getColaboradoresAnalytics = async (filters: any) => {
-  const { search, startDate, endDate, filial } = filters
+  const { search, startDate, endDate, filial, status } = filters
   let filterStr = []
 
   if (search) {
@@ -79,6 +89,11 @@ export const getColaboradoresAnalytics = async (filters: any) => {
   }
   if (endDate) {
     filterStr.push(`created <= "${endDate} 23:59:59"`)
+  }
+  if (status === 'Confirmado') {
+    filterStr.push(`foto_confirmacao_url != ""`)
+  } else if (status === 'Pendente') {
+    filterStr.push(`foto_confirmacao_url = ""`)
   }
 
   const finalFilter = filterStr.join(' && ')

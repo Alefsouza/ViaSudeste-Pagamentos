@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
-import { getRecebedoriaPagamentosPaginated } from '@/services/pagamentos'
-import pb from '@/lib/pocketbase/client'
+import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
 import { useRealtime } from '@/hooks/use-realtime'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -45,12 +44,20 @@ import {
   SearchX,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  formatDataString,
+  formatHoraString,
+  formatHoras,
+  getTipoPagamento,
+  formatBRL,
+} from '@/lib/formatters'
 
 export default function RelatorioRecebedoria() {
   const { user } = useAuth()
   const { toast } = useToast()
 
   const [data, setData] = useState<any[]>([])
+  const [statsData, setStatsData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [page, setPage] = useState(1)
@@ -96,8 +103,12 @@ export default function RelatorioRecebedoria() {
         search: debouncedSearchTerm,
         status: statusFilter,
       }
-      const result = await getRecebedoriaPagamentosPaginated(page, 20, filters, user.id)
+      const [result, stats] = await Promise.all([
+        getColaboradoresPaginated(page, 20, filters),
+        getColaboradoresAnalytics(filters),
+      ])
       setData(result.items)
+      setStatsData(stats)
       setTotalPages(result.totalPages || 1)
       setTotalItems(result.totalItems || 0)
     } catch (err: any) {
@@ -122,6 +133,9 @@ export default function RelatorioRecebedoria() {
   ])
 
   useRealtime('pagamentos', () => {
+    loadData()
+  })
+  useRealtime('colaboradores', () => {
     loadData()
   })
 
@@ -155,55 +169,20 @@ export default function RelatorioRecebedoria() {
     setPage(1)
   }
 
-  const formatBRL = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
-
-  const formatDateTime = (dateStr: string, timeStr?: string) => {
-    const d = dateStr ? new Date(dateStr) : null
-    return {
-      date: d ? d.toLocaleDateString('pt-BR') : '-',
-      time:
-        timeStr ||
-        (d ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'),
-    }
-  }
-
-  const getTipoPagamento = (id?: number) => {
-    if (id === 1) return 'Hora Extra'
-    if (id === 3) return 'Ferias Trabalhada'
-    if (id === 4) return 'Vale Refeicao'
-    return 'Tipo desconhecido'
-  }
-
-  const formatHoras = (horas?: number) =>
-    horas ? Number(horas).toFixed(2).padStart(5, '0') : '00.00'
-
-  const getStatusBadge = (status: string) => {
-    if (status === 'Confirmado')
-      return (
-        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
-          Confirmado
-        </Badge>
-      )
-    if (status === 'Pendente')
-      return (
-        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
-          Pendente
-        </Badge>
-      )
-    return (
-      <Badge variant="outline" className="text-slate-500 shadow-none">
-        Sem status
-      </Badge>
-    )
-  }
-
   const handleExport = () => {
     toast({
       title: 'Em breve',
       description: 'A funcionalidade de exportação CSV será implementada em breve.',
     })
   }
+
+  // Group items by name
+  const groupedByName = data.reduce((acc: any, item: any) => {
+    const n = item.nome || 'Desconhecido'
+    if (!acc[n]) acc[n] = []
+    acc[n].push(item)
+    return acc
+  }, {})
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-6">
@@ -372,46 +351,83 @@ export default function RelatorioRecebedoria() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.map((item) => {
-                    const dt = formatDateTime(item.data_pagamento, item.hora_pagamento)
+                  Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
+                    const totalLines = statsData.filter(
+                      (c) => (c.nome || 'Desconhecido') === nome,
+                    ).length
                     return (
-                      <TableRow
-                        key={item.id}
-                        className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
-                      >
-                        <TableCell className="font-medium">
-                          {item.expand?.colaborador_id?.registro}
-                        </TableCell>
-                        <TableCell>{item.expand?.colaborador_id?.nome}</TableCell>
-                        <TableCell>
-                          {dt.date} {dt.time !== '-' && `às ${dt.time}`}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatBRL(item.valor_pago)}
-                        </TableCell>
-                        <TableCell className="text-left">
-                          {getTipoPagamento(item.idtipopgto)}
-                        </TableCell>
-                        <TableCell className="text-center">{getStatusBadge(item.status)}</TableCell>
-                        <TableCell className="text-center">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!item.foto_confirmacao}
-                            onClick={() =>
-                              setPhotoModal(pb.files.getUrl(item, item.foto_confirmacao))
-                            }
-                            className="text-slate-600"
+                      <React.Fragment key={nome}>
+                        <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          <TableCell
+                            colSpan={8}
+                            className="font-semibold text-slate-700 dark:text-slate-300"
                           >
-                            <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
-                          </Button>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => setDetailsModal(item)}>
-                            <FileText className="h-4 w-4 mr-2" /> Detalhes
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                            {nome} - {totalLines}{' '}
+                            {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
+                          </TableCell>
+                        </TableRow>
+                        {records.map((item: any) => {
+                          const isConfirmado = !!item.foto_confirmacao_url
+                          const statusBadge = isConfirmado ? (
+                            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                              Confirmado
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                              Pendente
+                            </Badge>
+                          )
+
+                          return (
+                            <TableRow
+                              key={item.id}
+                              className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
+                            >
+                              <TableCell className="font-medium pl-8">{item.registro}</TableCell>
+                              <TableCell>{item.nome}</TableCell>
+                              <TableCell>
+                                {item.data
+                                  ? formatDataString(item.data)
+                                  : item.created
+                                    ? new Date(item.created).toLocaleDateString('pt-BR')
+                                    : '-'}{' '}
+                                {item.inicio
+                                  ? `às ${formatHoraString(item.inicio)}`
+                                  : item.created
+                                    ? `às ${new Date(item.created).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                                    : ''}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {formatBRL(item.valor_a_receber || item.valor)}
+                              </TableCell>
+                              <TableCell className="text-left">
+                                {getTipoPagamento(item.idtipopgto)}
+                              </TableCell>
+                              <TableCell className="text-center">{statusBadge}</TableCell>
+                              <TableCell className="text-center">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={!isConfirmado}
+                                  onClick={() => setPhotoModal(item.foto_confirmacao_url)}
+                                  className="text-slate-600"
+                                >
+                                  <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
+                                </Button>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDetailsModal(item)}
+                                >
+                                  <FileText className="h-4 w-4 mr-2" /> Detalhes
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </React.Fragment>
                     )
                   })
                 )}
@@ -420,7 +436,7 @@ export default function RelatorioRecebedoria() {
           </div>
 
           {/* Mobile Cards */}
-          <div className="md:hidden space-y-4">
+          <div className="md:hidden space-y-6">
             {loading ? (
               [...Array(4)].map((_, i) => <Skeleton key={i} className="h-36 w-full rounded-xl" />)
             ) : data.length === 0 ? (
@@ -432,60 +448,90 @@ export default function RelatorioRecebedoria() {
                 </Button>
               </div>
             ) : (
-              data.map((item) => {
-                const dt = formatDateTime(item.data_pagamento, item.hora_pagamento)
+              Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
+                const totalLines = statsData.filter(
+                  (c) => (c.nome || 'Desconhecido') === nome,
+                ).length
                 return (
-                  <Card key={item.id} className="shadow-sm">
-                    <CardContent className="p-4 space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-semibold text-slate-900 dark:text-slate-100">
-                            {item.expand?.colaborador_id?.nome}
-                          </div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            Reg: {item.expand?.colaborador_id?.registro}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-slate-900 dark:text-slate-100">
-                            {formatBRL(item.valor_pago)}
-                          </div>
-                          <div className="mt-1">{getStatusBadge(item.status)}</div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1 text-xs text-slate-500">
-                        <span className="font-medium text-slate-700 dark:text-slate-300">
-                          {getTipoPagamento(item.idtipopgto)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center pt-3 border-t">
-                        <div className="text-xs text-slate-500">
-                          {dt.date} {dt.time !== '-' && `às ${dt.time}`}
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            disabled={!item.foto_confirmacao}
-                            onClick={() =>
-                              setPhotoModal(pb.files.getUrl(item, item.foto_confirmacao))
-                            }
-                          >
-                            <ImageIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="h-8"
-                            onClick={() => setDetailsModal(item)}
-                          >
-                            Detalhes
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div key={nome} className="space-y-4">
+                    <div className="font-semibold text-slate-700 dark:text-slate-300 px-2 pt-2 border-b pb-2">
+                      {nome} - {totalLines}{' '}
+                      {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
+                    </div>
+                    {records.map((item: any) => {
+                      const isConfirmado = !!item.foto_confirmacao_url
+                      const statusBadge = isConfirmado ? (
+                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                          Confirmado
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                          Pendente
+                        </Badge>
+                      )
+
+                      return (
+                        <Card key={item.id} className="shadow-sm">
+                          <CardContent className="p-4 space-y-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="font-semibold text-slate-900 dark:text-slate-100">
+                                  {item.nome}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1">
+                                  Reg: {item.registro}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-slate-900 dark:text-slate-100">
+                                  {formatBRL(item.valor_a_receber || item.valor)}
+                                </div>
+                                <div className="mt-1">{statusBadge}</div>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1 text-xs text-slate-500">
+                              <span className="font-medium text-slate-700 dark:text-slate-300">
+                                {getTipoPagamento(item.idtipopgto)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center pt-3 border-t">
+                              <div className="text-xs text-slate-500">
+                                {item.data
+                                  ? formatDataString(item.data)
+                                  : item.created
+                                    ? new Date(item.created).toLocaleDateString('pt-BR')
+                                    : '-'}{' '}
+                                {item.inicio
+                                  ? `às ${formatHoraString(item.inicio)}`
+                                  : item.created
+                                    ? `às ${new Date(item.created).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                                    : ''}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  disabled={!isConfirmado}
+                                  onClick={() => setPhotoModal(item.foto_confirmacao_url)}
+                                >
+                                  <ImageIcon className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="h-8"
+                                  onClick={() => setDetailsModal(item)}
+                                >
+                                  Detalhes
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
                 )
               })
             )}
@@ -533,22 +579,33 @@ export default function RelatorioRecebedoria() {
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Registro
                   </span>
-                  <p className="font-medium">{detailsModal.expand?.colaborador_id?.registro}</p>
+                  <p className="font-medium">{detailsModal.registro}</p>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Nome
                   </span>
-                  <p className="font-medium">{detailsModal.expand?.colaborador_id?.nome}</p>
+                  <p className="font-medium">{detailsModal.nome}</p>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Data e Hora
                   </span>
                   <p className="font-medium">
-                    {formatDateTime(detailsModal.data_pagamento, detailsModal.hora_pagamento).date}{' '}
+                    {detailsModal.data
+                      ? formatDataString(detailsModal.data)
+                      : detailsModal.created
+                        ? new Date(detailsModal.created).toLocaleDateString('pt-BR')
+                        : '-'}{' '}
                     às{' '}
-                    {formatDateTime(detailsModal.data_pagamento, detailsModal.hora_pagamento).time}
+                    {detailsModal.inicio
+                      ? formatHoraString(detailsModal.inicio)
+                      : detailsModal.created
+                        ? new Date(detailsModal.created).toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '--:--'}
                   </p>
                 </div>
                 <div>
@@ -556,7 +613,7 @@ export default function RelatorioRecebedoria() {
                     Valor
                   </span>
                   <p className="font-medium text-emerald-600 dark:text-emerald-400">
-                    {formatBRL(detailsModal.valor_pago)}
+                    {formatBRL(detailsModal.valor_a_receber || detailsModal.valor)}
                   </p>
                 </div>
                 <div>
@@ -569,13 +626,13 @@ export default function RelatorioRecebedoria() {
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Horário de Início
                   </span>
-                  <p className="font-medium">{detailsModal.inicio || '--:--'}</p>
+                  <p className="font-medium">{formatHoraString(detailsModal.inicio)}</p>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Horário de Término
                   </span>
-                  <p className="font-medium">{detailsModal.termino || '--:--'}</p>
+                  <p className="font-medium">{formatHoraString(detailsModal.termino)}</p>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
@@ -587,28 +644,36 @@ export default function RelatorioRecebedoria() {
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Status
                   </span>
-                  <div>{getStatusBadge(detailsModal.status)}</div>
+                  <div>
+                    {detailsModal.foto_confirmacao_url ? (
+                      <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                        Confirmado
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                        Pendente
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Filial
                   </span>
-                  <p className="font-medium">{detailsModal.expand?.colaborador_id?.filial}</p>
+                  <p className="font-medium">{detailsModal.filial}</p>
                 </div>
               </div>
-              {detailsModal.foto_confirmacao && (
+              {detailsModal.foto_confirmacao_url && (
                 <div className="mt-4">
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-2">
                     Foto de Comprovação
                   </span>
                   <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border inline-block">
                     <img
-                      src={pb.files.getUrl(detailsModal, detailsModal.foto_confirmacao)}
+                      src={detailsModal.foto_confirmacao_url}
                       alt="Comprovante"
                       className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() =>
-                        setPhotoModal(pb.files.getUrl(detailsModal, detailsModal.foto_confirmacao))
-                      }
+                      onClick={() => setPhotoModal(detailsModal.foto_confirmacao_url)}
                     />
                   </div>
                 </div>
