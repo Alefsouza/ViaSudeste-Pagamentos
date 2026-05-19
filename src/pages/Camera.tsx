@@ -518,7 +518,7 @@ export default function Camera() {
         </div>
 
         <div className="md:col-span-7">
-          <Card className="min-h-[650px] flex flex-col overflow-hidden relative">
+          <Card className="h-[513px] flex flex-col overflow-hidden relative">
             {isCameraActive && (
               <div className="absolute inset-0 bg-black z-0">
                 {!streamActive && (
