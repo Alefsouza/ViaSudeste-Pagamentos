@@ -319,6 +319,9 @@ export default function Camera() {
           horas: validHoras,
           idtipopgto: validIdTipoPgto,
           tipo_pagamento: getTipoPagamentoDesc(record.idtipopgto),
+          registro: record.registro,
+          nome: record.nome,
+          filial: record.filial_id ? Number(record.filial_id) : undefined,
         }
 
         if (i === 0) {

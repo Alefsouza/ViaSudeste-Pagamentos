@@ -122,7 +122,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
     const allRecords = await pb
       .collection('colaboradores')
       .getFullList({
-        filter: `nome="${firstColab.nome}" && foto_confirmacao_url=""`,
+        filter: `registro="${registro}" && foto_confirmacao_url=""`,
         sort: '-data',
       })
       .catch(() => [firstColab])
