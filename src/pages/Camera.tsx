@@ -554,59 +554,55 @@ export default function Camera() {
                   <p className="text-slate-300">Aguarde enquanto verificamos a identidade.</p>
                 </div>
               ) : viewState === 'RECOGNITION_SUCCESS' ? (
-                <div className="flex-1 flex flex-col items-center justify-start sm:justify-center p-4 sm:p-4 text-center animate-in zoom-in-95 duration-300 bg-black/80 backdrop-blur-sm text-white overflow-y-auto">
-                  <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mb-4 shrink-0 mt-4 sm:mt-0">
-                    <CheckCircle2 className="h-8 w-8" />
+                <div className="flex-1 flex flex-col items-center justify-start sm:justify-center p-4 sm:p-8 text-center animate-in zoom-in-95 duration-300 bg-black/80 backdrop-blur-sm text-white overflow-y-auto">
+                  <div className="w-20 h-20 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mb-6 shrink-0 mt-4 sm:mt-0">
+                    <CheckCircle2 className="h-10 w-10" />
                   </div>
-                  <h3 className="text-[18px] font-bold mb-1 shrink-0">Identidade Confirmada</h3>
-                  <p className="text-[12px] text-slate-300 mb-4 shrink-0">
+                  <h3 className="text-2xl font-bold mb-2 shrink-0">Identidade Confirmada</h3>
+                  <p className="text-sm text-slate-300 mb-6 shrink-0">
                     O rosto corresponde ao registro informado.
                   </p>
 
-                  <div className="bg-black/50 w-full max-w-full rounded-xl p-[16px] m-0 border border-white/10 text-left space-y-4 shrink-0 shadow-lg h-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                            Hora de Inicio
-                          </p>
-                          <p className="text-[14px] font-semibold text-white">
-                            {formatTime(pagamentoDetails?.inicio)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                            Total de Horas
-                          </p>
-                          <p className="text-[14px] font-semibold text-white">
-                            {formatHoras(pagamentoDetails?.horas)}
-                          </p>
-                        </div>
+                  <div className="bg-black/50 w-full max-w-md rounded-2xl p-6 md:p-8 m-0 border border-white/10 text-left space-y-6 shrink-0 shadow-lg h-auto">
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-sm text-slate-400 uppercase tracking-wider font-medium mb-1">
+                          Hora de Inicio
+                        </p>
+                        <p className="text-base font-semibold text-white">
+                          {formatTime(pagamentoDetails?.inicio)}
+                        </p>
                       </div>
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                            Hora de Termino
-                          </p>
-                          <p className="text-[14px] font-semibold text-white">
-                            {formatTime(pagamentoDetails?.termino)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                            Tipo de Pagamento
-                          </p>
-                          <p className="text-[14px] font-semibold text-white">
-                            {getTipoPagamentoDesc(pagamentoDetails?.idtipopgto)}
-                          </p>
-                        </div>
+                      <div>
+                        <p className="text-sm text-slate-400 uppercase tracking-wider font-medium mb-1">
+                          Hora de Termino
+                        </p>
+                        <p className="text-base font-semibold text-white">
+                          {formatTime(pagamentoDetails?.termino)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-400 uppercase tracking-wider font-medium mb-1">
+                          Total de Horas
+                        </p>
+                        <p className="text-base font-semibold text-white">
+                          {formatHoras(pagamentoDetails?.horas)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-400 uppercase tracking-wider font-medium mb-1">
+                          Tipo de Pagamento
+                        </p>
+                        <p className="text-base font-semibold text-white">
+                          {getTipoPagamentoDesc(pagamentoDetails?.idtipopgto)}
+                        </p>
                       </div>
                     </div>
-                    <div className="pt-4 border-t border-white/10">
-                      <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
+                    <div className="pt-6 border-t border-white/10">
+                      <p className="text-sm text-slate-400 uppercase tracking-wider font-medium mb-2">
                         Valor a Receber
                       </p>
-                      <p className="text-[20px] font-bold text-green-600">
+                      <p className="text-3xl font-bold text-green-500">
                         {formatCurrency(
                           pagamentoDetails?.valor_pago || colaborador?.valor_a_receber || 0,
                         )}
@@ -614,16 +610,16 @@ export default function Camera() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md shrink-0 pb-4 sm:pb-0 mt-6">
+                  <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md shrink-0 pb-8 sm:pb-0 mt-8">
                     <Button
                       variant="outline"
-                      className="flex-1 h-[40px] bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white order-2 sm:order-1"
+                      className="flex-1 h-12 text-base bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white order-2 sm:order-1"
                       onClick={handleReset}
                     >
                       Cancelar
                     </Button>
                     <Button
-                      className="flex-1 h-[40px] bg-green-600 hover:bg-green-700 text-white border-0 order-1 sm:order-2"
+                      className="flex-1 h-12 text-base bg-green-600 hover:bg-green-700 text-white border-0 order-1 sm:order-2"
                       onClick={handleConfirmPayment}
                     >
                       Confirmar Pagamento
