@@ -120,6 +120,15 @@ export default function Camera() {
     }
   }
 
+  const formatDateSafe = (dStr?: string) => {
+    if (!dStr) return 'Data não informada'
+    const match = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) return `${match[3]}/${match[2]}/${match[1]}`
+    const d = new Date(dStr)
+    if (!isNaN(d.getTime())) return d.toLocaleDateString('pt-BR')
+    return dStr
+  }
+
   const formatTime = (timeStr?: string) => {
     if (!timeStr) return '--:--'
     if (timeStr.length === 4 && !timeStr.includes(':')) {
@@ -153,9 +162,9 @@ export default function Camera() {
       case 1:
         return 'Hora Extra'
       case 3:
-        return 'Férias Trabalhada'
+        return 'Ferias Trabalhada'
       case 4:
-        return 'Vale Refeição'
+        return 'Vale Refeicao'
       default:
         return 'Tipo desconhecido'
     }
@@ -383,59 +392,72 @@ export default function Camera() {
           {viewState === 'RECOGNITION_SUCCESS' || viewState === 'CONFIRMING_PAYMENT' ? (
             <Card className="h-full flex flex-col border-slate-200 dark:border-slate-800 shadow-sm rounded-xl">
               <CardContent className="p-6 flex flex-col h-full">
-                <div className="flex-1">
-                  <h3 className="text-[18px] font-bold text-slate-900 dark:text-white mb-1">
+                <div className="flex-1 flex flex-col min-h-0">
+                  <h3 className="text-[18px] font-bold text-slate-900 dark:text-white mb-1 shrink-0">
                     Identidade Confirmada
                   </h3>
-                  <p className="text-[12px] text-slate-500 mb-6">
+                  <p className="text-[12px] text-slate-500 mb-4 shrink-0">
                     O rosto corresponde ao registro informado.
                   </p>
 
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="flex flex-col gap-4">
-                      <div>
-                        <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
-                          Hora de Início
-                        </p>
-                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white">
-                          {formatTime(colaborador?.inicio)}
-                        </p>
+                  <div className="flex-1 overflow-y-auto pr-2 mb-4 space-y-3 min-h-0">
+                    {colaborador?.records?.map((record: any, idx: number) => (
+                      <div
+                        key={record.id || idx}
+                        className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50"
+                      >
+                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+                          <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                            {formatDateSafe(record.data)}
+                          </p>
+                          <p className="text-[14px] font-bold text-slate-900 dark:text-white">
+                            {formatCurrency(record.valor_a_receber || record.valor || 0)}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                          <div className="flex flex-col gap-1">
+                            <p className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">
+                              Hora de Inicio
+                            </p>
+                            <p className="text-[13px] font-medium text-slate-900 dark:text-white">
+                              {formatTime(record.inicio)}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <p className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">
+                              Hora de Termino
+                            </p>
+                            <p className="text-[13px] font-medium text-slate-900 dark:text-white">
+                              {formatTime(record.termino)}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <p className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">
+                              Total de Horas
+                            </p>
+                            <p className="text-[13px] font-medium text-slate-900 dark:text-white">
+                              {formatHoras(record.horas)}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <p className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">
+                              Tipo de Pagamento
+                            </p>
+                            <p className="text-[13px] font-medium text-slate-900 dark:text-white">
+                              {getTipoPagamentoDesc(record.idtipopgto)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
-                          Total de Horas
-                        </p>
-                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white">
-                          {formatHoras(colaborador?.horas)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                      <div>
-                        <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
-                          Hora de Término
-                        </p>
-                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white">
-                          {formatTime(colaborador?.termino)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
-                          Tipo de Pagamento
-                        </p>
-                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white">
-                          {getTipoPagamentoDesc(colaborador?.idtipopgto)}
-                        </p>
-                      </div>
-                    </div>
+                    ))}
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
                     <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
-                      Valor a Receber
+                      VALOR TOTAL A RECEBER
                     </p>
-                    <p className="text-[24px] font-bold text-green-600 dark:text-green-500">
-                      {formatCurrency(colaborador?.valor || colaborador?.valor_a_receber || 0)}
+                    <p className="text-[28px] font-bold text-green-600 dark:text-green-500">
+                      {formatCurrency(colaborador?.valor_a_receber || colaborador?.valor || 0)}
                     </p>
                   </div>
                 </div>

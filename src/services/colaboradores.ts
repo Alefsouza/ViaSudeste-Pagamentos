@@ -25,7 +25,10 @@ export const getColaboradorByRegistro = async (registro: string) => {
   if (firstColab) {
     const allRecords = await pb
       .collection('colaboradores')
-      .getFullList({ filter: `nome="${firstColab.nome}" && foto_confirmacao_url=""` })
+      .getFullList({
+        filter: `nome="${firstColab.nome}" && foto_confirmacao_url=""`,
+        sort: '-data',
+      })
       .catch(() => [firstColab])
 
     const totalValor = allRecords.reduce((acc, curr) => {
@@ -38,6 +41,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
       valor_a_receber: totalValor,
       valor: totalValor,
       all_records_ids: allRecords.map((r) => r.id),
+      records: allRecords,
     }
   }
 
