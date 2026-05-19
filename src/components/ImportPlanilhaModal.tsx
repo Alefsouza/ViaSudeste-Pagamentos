@@ -178,15 +178,16 @@ export function ImportPlanilhaModal({
           }
 
           return {
-            REGISTRO: String(row['REGISTRO'] || ''),
-            NOME: String(row['NOME'] || ''),
-            DATA: dataFormatted,
-            IDTIPOPGTO: Number(row['IDTIPOPGTO']) || 0,
-            INICIO: excelTimeToHHMM(row['INICIO']),
-            TERMINO: excelTimeToHHMM(row['TERMINO']),
-            HORAS: formatHoras(row['HORAS']),
-            VALOR: Number(parseFloat(String(row['VALOR'] || 0).replace(',', '.')).toFixed(2)) || 0,
-            FILIAL: filialParsed,
+            registro: String(row['REGISTRO'] || ''),
+            nome: String(row['NOME'] || ''),
+            data: dataFormatted,
+            idtipopgto: Number(row['IDTIPOPGTO']) || 0,
+            inicio: excelTimeToHHMM(row['INICIO']),
+            termino: excelTimeToHHMM(row['TERMINO']),
+            horas: formatHoras(row['HORAS']),
+            valor_a_receber:
+              Number(parseFloat(String(row['VALOR'] || 0).replace(',', '.')).toFixed(2)) || 0,
+            filial: filialParsed,
           }
         })
 
@@ -242,7 +243,7 @@ export function ImportPlanilhaModal({
         }
       }}
     >
-      <DialogContent className="sm:max-w-md w-11/12 overflow-hidden">
+      <DialogContent className="sm:max-w-2xl w-11/12 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-center">Importar Planilha</DialogTitle>
           <DialogDescription className="text-center">

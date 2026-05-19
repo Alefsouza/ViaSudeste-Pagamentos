@@ -2,50 +2,59 @@ routerAdd(
   'POST',
   '/backend/v1/import/colaboradores',
   (e) => {
-    const body = e.requestInfo().body
-    if (!body || !body.data || !Array.isArray(body.data)) {
-      return e.badRequestError('Invalid payload')
+    const body = e.requestInfo().body || {}
+    if (!body.data || !Array.isArray(body.data)) {
+      return e.badRequestError('Invalid payload, missing data array.')
     }
 
-    const data = body.data
+    const col = $app.findCollectionByNameOrId('colaboradores')
     let count = 0
-    const errors = []
+    let errors = []
 
     $app.runInTransaction((txApp) => {
-      const colabCollection = txApp.findCollectionByNameOrId('colaboradores')
-
-      for (let i = 0; i < data.length; i++) {
-        const row = data[i]
+      for (let i = 0; i < body.data.length; i++) {
+        const row = body.data[i]
         try {
-          const record = new Record(colabCollection)
+          // Every row must always create a NEW record
+          const record = new Record(col)
 
-          record.set('registro', String(row['REGISTRO'] || ''))
-          record.set('nome', String(row['NOME'] || ''))
-          record.set('data', String(row['DATA'] || ''))
-          record.set('idtipopgto', Number(row['IDTIPOPGTO']) || 0)
-          record.set('inicio', String(row['INICIO'] || ''))
-          record.set('termino', String(row['TERMINO'] || ''))
-          record.set('horas', String(row['HORAS'] || ''))
-          record.set('valor_a_receber', Number(row['VALOR']) || 0)
+          const registro = row.registro || row.REGISTRO || ''
+          const nome = row.nome || row.NOME || ''
+          const dataStr = row.data || row.DATA || ''
+          const idtipopgto =
+            Number(row.idtipopgto !== undefined ? row.idtipopgto : row.IDTIPOPGTO) || 0
+          const inicio = row.inicio || row.INICIO || ''
+          const termino = row.termino || row.TERMINO || ''
+          const horas = String(row.horas || row.HORAS || '')
+          const valor =
+            Number(
+              row.valor_a_receber !== undefined
+                ? row.valor_a_receber
+                : row.VALOR !== undefined
+                  ? row.VALOR
+                  : 0,
+            ) || 0
+          const filial = row.filial || row.FILIAL || ''
 
-          const filialVal = String(row['FILIAL'] || '').trim()
-          let finalFilial = ''
-          if (filialVal === '2') {
-            finalFilial = 'Sapopemba'
-          } else if (filialVal === '3' || filialVal === '4') {
-            finalFilial = 'Cursino'
-          } else if (filialVal === 'Sapopemba' || filialVal === 'Cursino') {
-            finalFilial = filialVal
-          }
+          record.set('registro', registro)
+          record.set('nome', nome)
+          record.set('data', dataStr)
+          record.set('idtipopgto', idtipopgto)
+          record.set('inicio', inicio)
+          record.set('termino', termino)
+          record.set('horas', horas)
+          record.set('valor_a_receber', valor)
 
-          if (finalFilial) {
-            record.set('filial', finalFilial)
+          if (filial === 'Sapopemba' || filial === 'Cursino') {
+            record.set('filial', filial)
+          } else {
+            record.set('filial', '')
           }
 
           txApp.save(record)
           count++
         } catch (err) {
-          errors.push(`Row ${i + 1}: ${err.message}`)
+          errors.push(`Row ${i + 1} error: ${err.message}`)
         }
       }
     })
