@@ -563,77 +563,101 @@ export default function Camera() {
                   <p className="text-slate-300">Aguarde enquanto verificamos a identidade.</p>
                 </div>
               ) : viewState === 'RECOGNITION_SUCCESS' ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-4 text-center animate-in zoom-in-95 duration-300 bg-black/80 backdrop-blur-sm text-white overflow-y-auto">
-                  <div className="bg-slate-950 w-full max-w-[400px] rounded-xl p-4 border border-slate-800 text-left shadow-2xl h-auto">
-                    <div className="mb-4">
-                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        Identidade Confirmada
-                      </h3>
-                      <p className="text-xs text-slate-300 mt-1">
-                        O rosto corresponde ao registro informado.
-                      </p>
+                <div className="flex-1 flex flex-col items-center justify-center p-4 animate-in zoom-in-95 duration-300 bg-black/80 backdrop-blur-sm text-white overflow-y-auto">
+                  <div className="w-full max-w-[600px] flex flex-col">
+                    <div className="flex flex-col md:flex-row gap-4 h-auto items-stretch">
+                      <div className="flex-1 bg-slate-950 rounded-xl p-4 border border-slate-800 text-left shadow-2xl flex flex-col">
+                        <div className="mb-4">
+                          <h3 className="text-[18px] font-bold text-white flex items-center gap-2">
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            Identidade Confirmada
+                          </h3>
+                          <p className="text-[12px] text-slate-300 mt-1">
+                            O rosto corresponde ao registro informado.
+                          </p>
+                        </div>
+
+                        <div className="flex gap-4">
+                          <div className="flex flex-col gap-3 flex-1">
+                            <div>
+                              <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
+                                Hora de Inicio
+                              </p>
+                              <p className="text-[14px] font-semibold text-white">
+                                {formatTime(colaborador?.inicio)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
+                                Total de Horas
+                              </p>
+                              <p className="text-[14px] font-semibold text-white">
+                                {formatHoras(colaborador?.horas)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-3 flex-1">
+                            <div>
+                              <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
+                                Hora de Termino
+                              </p>
+                              <p className="text-[14px] font-semibold text-white">
+                                {formatTime(colaborador?.termino)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
+                                Tipo de Pagamento
+                              </p>
+                              <p className="text-[14px] font-semibold text-white">
+                                {getTipoPagamentoDesc(colaborador?.idtipopgto)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-slate-800">
+                          <p className="text-[12px] text-slate-400 uppercase tracking-wider font-medium mb-1">
+                            VALOR A RECEBER
+                          </p>
+                          <p className="text-[24px] font-bold text-green-500">
+                            {formatCurrency(
+                              colaborador?.valor || colaborador?.valor_a_receber || 0,
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="w-full md:w-[220px] shrink-0 rounded-xl overflow-hidden bg-black flex items-stretch">
+                        {fotoCapturada ? (
+                          <img
+                            src={fotoCapturada}
+                            alt="Câmera"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <CameraIcon className="w-8 h-8 text-slate-500" />
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-                      <div>
-                        <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
-                          Hora de Inicio
-                        </p>
-                        <p className="text-sm font-semibold text-white">
-                          {formatTime(colaborador?.inicio)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
-                          Hora de Termino
-                        </p>
-                        <p className="text-sm font-semibold text-white">
-                          {formatTime(colaborador?.termino)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
-                          Total de Horas
-                        </p>
-                        <p className="text-sm font-semibold text-white">
-                          {formatHoras(colaborador?.horas)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
-                          Tipo de Pagamento
-                        </p>
-                        <p className="text-sm font-semibold text-white">
-                          {getTipoPagamentoDesc(colaborador?.idtipopgto)}
-                        </p>
-                      </div>
+                    <div className="flex gap-2 w-full mt-4">
+                      <Button
+                        variant="outline"
+                        className="flex-1 h-[40px] text-sm bg-slate-900 border-slate-800 text-white hover:bg-slate-800 hover:text-white"
+                        onClick={handleReset}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        className="flex-1 h-[40px] text-sm bg-green-600 hover:bg-green-700 text-white border-0"
+                        onClick={handleConfirmPayment}
+                      >
+                        Confirmar Pagamento
+                      </Button>
                     </div>
-
-                    <div className="pt-4 mt-4 border-t border-slate-800">
-                      <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
-                        Valor a Receber
-                      </p>
-                      <p className="text-2xl font-bold text-green-500">
-                        {formatCurrency(colaborador?.valor || colaborador?.valor_a_receber || 0)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 w-full max-w-[400px] mt-4">
-                    <Button
-                      variant="outline"
-                      className="flex-1 h-10 text-sm bg-slate-900 border-slate-800 text-white hover:bg-slate-800 hover:text-white"
-                      onClick={handleReset}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      className="flex-1 h-10 text-sm bg-green-600 hover:bg-green-700 text-white border-0"
-                      onClick={handleConfirmPayment}
-                    >
-                      Confirmar Pagamento
-                    </Button>
                   </div>
                 </div>
               ) : viewState === 'CONFIRMING_PAYMENT' ? (
