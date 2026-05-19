@@ -20,8 +20,11 @@ import {
   Search,
   Inbox,
   Info,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -54,6 +57,7 @@ export default function Dashboard() {
   const [error, setError] = useState(false)
   const [statsData, setStatsData] = useState<any[]>([])
   const [tableData, setTableData] = useState<any>(null)
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -465,6 +469,8 @@ export default function Dashboard() {
                           <TableHead className="text-right">Valor</TableHead>
                           <TableHead>Tipo de Pagamento</TableHead>
                           <TableHead>Data de Pagamento</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-center">Foto</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -476,7 +482,7 @@ export default function Dashboard() {
                             <React.Fragment key={nome}>
                               <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 <TableCell
-                                  colSpan={6}
+                                  colSpan={8}
                                   className="font-semibold text-slate-700 dark:text-slate-300"
                                 >
                                   {nome} - {totalLines}{' '}
@@ -493,6 +499,41 @@ export default function Dashboard() {
                                   </TableCell>
                                   <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
                                   <TableCell>{p.data_pagamento || 'Pendente'}</TableCell>
+                                  <TableCell>
+                                    {(() => {
+                                      const status =
+                                        p.status ||
+                                        (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                      if (!status) return null
+                                      if (status === 'Confirmado')
+                                        return (
+                                          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
+                                            Confirmado
+                                          </Badge>
+                                        )
+                                      if (status === 'Pendente')
+                                        return (
+                                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
+                                            Pendente
+                                          </Badge>
+                                        )
+                                      if (status === 'Cancelado')
+                                        return <Badge variant="destructive">Cancelado</Badge>
+                                      return <Badge variant="outline">{status}</Badge>
+                                    })()}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {p.foto_confirmacao_url && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setSelectedPhotoUrl(p.foto_confirmacao_url)}
+                                      >
+                                        <ImageIcon className="w-4 h-4 mr-2" />
+                                        Visualizar
+                                      </Button>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </React.Fragment>
@@ -533,6 +574,41 @@ export default function Dashboard() {
                                 <div className="text-sm text-muted-foreground flex justify-between">
                                   <span>Data de Pagamento:</span>
                                   <span>{p.data_pagamento || 'Pendente'}</span>
+                                </div>
+                                <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
+                                  <div>
+                                    {(() => {
+                                      const status =
+                                        p.status ||
+                                        (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                      if (!status) return null
+                                      if (status === 'Confirmado')
+                                        return (
+                                          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
+                                            Confirmado
+                                          </Badge>
+                                        )
+                                      if (status === 'Pendente')
+                                        return (
+                                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
+                                            Pendente
+                                          </Badge>
+                                        )
+                                      if (status === 'Cancelado')
+                                        return <Badge variant="destructive">Cancelado</Badge>
+                                      return <Badge variant="outline">{status}</Badge>
+                                    })()}
+                                  </div>
+                                  {p.foto_confirmacao_url && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setSelectedPhotoUrl(p.foto_confirmacao_url)}
+                                    >
+                                      <ImageIcon className="w-4 h-4 mr-2" />
+                                      Foto
+                                    </Button>
+                                  )}
                                 </div>
                               </CardContent>
                             </Card>
@@ -580,6 +656,23 @@ export default function Dashboard() {
           </Card>
         </>
       )}
+
+      <Dialog open={!!selectedPhotoUrl} onOpenChange={(open) => !open && setSelectedPhotoUrl(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Comprovante de Pagamento</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900 rounded-md border">
+            {selectedPhotoUrl && (
+              <img
+                src={selectedPhotoUrl}
+                alt="Comprovante"
+                className="max-w-full max-h-[70vh] object-contain rounded-md shadow-sm"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
