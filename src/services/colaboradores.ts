@@ -105,6 +105,14 @@ export const getColaboradoresAnalytics = async (filters: any) => {
 }
 
 export const getColaboradorByRegistro = async (registro: string) => {
+  if (!registro || registro.trim() === '') {
+    throw new Error('Informe o numero de registro')
+  }
+
+  if (!/^\d+$/.test(registro)) {
+    throw new Error('Numero de registro invalido')
+  }
+
   const now = Date.now()
   const cached = colabCache.get(registro)
 
@@ -114,16 +122,25 @@ export const getColaboradorByRegistro = async (registro: string) => {
 
   const firstColab = await pb
     .collection('colaboradores')
-    .getFirstListItem(`registro="${registro}" && foto_confirmacao_url=""`)
+    .getFirstListItem(
+      `registro="${registro}" && (foto_confirmacao_url="" || foto_confirmacao_url=null)`,
+      {
+        sort: '-created',
+      },
+    )
     .catch(() => null)
+
+  if (!firstColab) {
+    throw new Error('Nenhum registro pendente encontrado para este funcionário')
+  }
 
   let colab = null
   if (firstColab) {
     const allRecords = await pb
       .collection('colaboradores')
       .getFullList({
-        filter: `registro="${registro}" && foto_confirmacao_url=""`,
-        sort: '-data',
+        filter: `registro="${registro}" && (foto_confirmacao_url="" || foto_confirmacao_url=null)`,
+        sort: '-created',
       })
       .catch(() => [firstColab])
 
