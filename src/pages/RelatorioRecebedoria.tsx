@@ -162,9 +162,21 @@ export default function RelatorioRecebedoria() {
     const d = dateStr ? new Date(dateStr) : null
     return {
       date: d ? d.toLocaleDateString('pt-BR') : '-',
-      time: timeStr || '-',
+      time:
+        timeStr ||
+        (d ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'),
     }
   }
+
+  const getTipoPagamento = (id?: number) => {
+    if (id === 1) return 'Hora Extra'
+    if (id === 3) return 'Ferias Trabalhada'
+    if (id === 4) return 'Vale Refeicao'
+    return 'Tipo desconhecido'
+  }
+
+  const formatHoras = (horas?: number) =>
+    horas ? Number(horas).toFixed(2).padStart(5, '0') : '00.00'
 
   const getStatusBadge = (status: string) => {
     if (status === 'Confirmado')
@@ -313,8 +325,9 @@ export default function RelatorioRecebedoria() {
                   <TableHead>Nome</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-left w-[150px]">Tipo de Pagamento</TableHead>
                   <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Foto Comprovação</TableHead>
+                  <TableHead className="text-center">Foto</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -335,6 +348,9 @@ export default function RelatorioRecebedoria() {
                         <Skeleton className="h-4 w-24 ml-auto" />
                       </TableCell>
                       <TableCell>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-6 w-24 mx-auto rounded-full" />
                       </TableCell>
                       <TableCell>
@@ -347,7 +363,7 @@ export default function RelatorioRecebedoria() {
                   ))
                 ) : data.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-48 text-center">
+                    <TableCell colSpan={8} className="h-48 text-center">
                       <SearchX className="mx-auto h-10 w-10 text-slate-300 mb-3" />
                       <p className="text-slate-500 font-medium">Nenhum pagamento encontrado.</p>
                       <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4">
@@ -372,6 +388,9 @@ export default function RelatorioRecebedoria() {
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {formatBRL(item.valor_pago)}
+                        </TableCell>
+                        <TableCell className="text-left">
+                          {getTipoPagamento(item.idtipopgto)}
                         </TableCell>
                         <TableCell className="text-center">{getStatusBadge(item.status)}</TableCell>
                         <TableCell className="text-center">
@@ -433,6 +452,11 @@ export default function RelatorioRecebedoria() {
                           </div>
                           <div className="mt-1">{getStatusBadge(item.status)}</div>
                         </div>
+                      </div>
+                      <div className="flex flex-col gap-1 text-xs text-slate-500">
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          {getTipoPagamento(item.idtipopgto)}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center pt-3 border-t">
                         <div className="text-xs text-slate-500">
@@ -537,6 +561,30 @@ export default function RelatorioRecebedoria() {
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                    Total de Horas
+                  </span>
+                  <p className="font-medium">{formatHoras(detailsModal.horas)}</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                    Horário de Início
+                  </span>
+                  <p className="font-medium">{detailsModal.inicio || '--:--'}</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                    Horário de Término
+                  </span>
+                  <p className="font-medium">{detailsModal.termino || '--:--'}</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                    Tipo de Pagamento
+                  </span>
+                  <p className="font-medium">{getTipoPagamento(detailsModal.idtipopgto)}</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Status
                   </span>
                   <div>{getStatusBadge(detailsModal.status)}</div>
@@ -546,12 +594,6 @@ export default function RelatorioRecebedoria() {
                     Filial
                   </span>
                   <p className="font-medium">{detailsModal.expand?.colaborador_id?.filial}</p>
-                </div>
-                <div className="col-span-2 border-t pt-3 mt-1">
-                  <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
-                    Tipo de Pagamento
-                  </span>
-                  <p className="font-medium">{detailsModal.tipo_pagamento || 'Não informado'}</p>
                 </div>
               </div>
               {detailsModal.foto_confirmacao && (

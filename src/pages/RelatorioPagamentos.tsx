@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Badge } from '@/components/ui/badge'
 import { PrintableReport } from '@/components/PrintableReport'
 import {
   Search,
@@ -50,6 +51,7 @@ import {
   Clock,
   Download,
   Loader2,
+  FileText,
 } from 'lucide-react'
 
 export default function RelatorioPagamentos() {
@@ -61,6 +63,7 @@ export default function RelatorioPagamentos() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
+  const [detailsModal, setDetailsModal] = useState<any | null>(null)
 
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -152,13 +155,45 @@ export default function RelatorioPagamentos() {
 
   const formatBRL = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
-  const formatDateTime = (isoString: string) => {
-    const d = new Date(isoString)
+  const formatDateTime = (isoString: string, timeStr?: string) => {
+    const d = isoString ? new Date(isoString) : null
     return {
-      date: d.toLocaleDateString('pt-BR'),
-      time: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      date: d ? d.toLocaleDateString('pt-BR') : '-',
+      time:
+        timeStr ||
+        (d ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'),
     }
   }
+
+  const getStatusBadge = (status: string) => {
+    if (status === 'Confirmado')
+      return (
+        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+          Confirmado
+        </Badge>
+      )
+    if (status === 'Pendente')
+      return (
+        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+          Pendente
+        </Badge>
+      )
+    return (
+      <Badge variant="outline" className="text-slate-500 shadow-none">
+        Sem status
+      </Badge>
+    )
+  }
+
+  const getTipoPagamento = (id?: number) => {
+    if (id === 1) return 'Hora Extra'
+    if (id === 3) return 'Ferias Trabalhada'
+    if (id === 4) return 'Vale Refeicao'
+    return 'Tipo desconhecido'
+  }
+
+  const formatHoras = (horas?: number) =>
+    horas ? Number(horas).toFixed(2).padStart(5, '0') : '00.00'
 
   return (
     <>
@@ -256,13 +291,15 @@ export default function RelatorioPagamentos() {
               <Table>
                 <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                   <TableRow>
-                    <TableHead>Nome do Colaborador</TableHead>
                     <TableHead>Registro</TableHead>
+                    <TableHead>Nome</TableHead>
                     <TableHead>Filial</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead>Hora</TableHead>
-                    <TableHead className="text-right">Valor Pago</TableHead>
-                    <TableHead className="text-center">Ação</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-left w-[150px]">Tipo de Pagamento</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-center">Foto</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -270,54 +307,70 @@ export default function RelatorioPagamentos() {
                     [...Array(5)].map((_, i) => (
                       <TableRow key={i}>
                         <TableCell>
+                          <Skeleton className="h-4 w-20" />
+                        </TableCell>
+                        <TableCell>
                           <Skeleton className="h-4 w-32" />
                         </TableCell>
                         <TableCell>
-                          <Skeleton className="h-4 w-20" />
-                        </TableCell>
-                        <TableCell>
                           <Skeleton className="h-4 w-24" />
                         </TableCell>
                         <TableCell>
                           <Skeleton className="h-4 w-24" />
                         </TableCell>
                         <TableCell>
-                          <Skeleton className="h-4 w-16" />
+                          <Skeleton className="h-4 w-20 ml-auto" />
                         </TableCell>
                         <TableCell>
-                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-4 w-24" />
                         </TableCell>
                         <TableCell>
-                          <Skeleton className="h-8 w-24" />
+                          <Skeleton className="h-6 w-24 mx-auto rounded-full" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-8 w-24 mx-auto" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-8 w-24 ml-auto" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                      <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                         Nenhum pagamento encontrado.
                       </TableCell>
                     </TableRow>
                   ) : (
                     data.map((item) => {
-                      const { date, time } = formatDateTime(item.data_pagamento)
+                      const { date, time } = formatDateTime(
+                        item.data_pagamento,
+                        item.hora_pagamento,
+                      )
                       const colab = item.expand?.colaborador_id
                       return (
                         <TableRow
                           key={item.id}
                           className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                         >
-                          <TableCell className="font-medium">{colab?.nome}</TableCell>
                           <TableCell>{colab?.registro}</TableCell>
+                          <TableCell className="font-medium">{colab?.nome}</TableCell>
                           <TableCell>{colab?.filial}</TableCell>
-                          <TableCell>{date}</TableCell>
-                          <TableCell>{time}</TableCell>
+                          <TableCell>
+                            {date} {time !== '-' && `às ${time}`}
+                          </TableCell>
                           <TableCell className="text-right font-medium text-emerald-600">
                             {formatBRL(item.valor_pago)}
                           </TableCell>
+                          <TableCell className="text-left">
+                            {getTipoPagamento(item.idtipopgto)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {getStatusBadge(item.status)}
+                          </TableCell>
                           <TableCell className="text-center">
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
                               disabled={!item.foto_confirmacao}
                               onClick={() =>
@@ -327,9 +380,14 @@ export default function RelatorioPagamentos() {
                                     : null,
                                 )
                               }
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/50"
+                              className="text-slate-600"
                             >
-                              <ImageIcon className="h-4 w-4 mr-1" /> Foto
+                              <ImageIcon className="h-4 w-4 mr-2" /> Foto
+                            </Button>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm" onClick={() => setDetailsModal(item)}>
+                              <FileText className="h-4 w-4 mr-2" /> Detalhes
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -368,35 +426,43 @@ export default function RelatorioPagamentos() {
                             <div className="font-bold text-emerald-600">
                               {formatBRL(item.valor_pago)}
                             </div>
-                            <div className="flex items-center justify-end text-xs text-muted-foreground mt-1">
-                              <Building className="h-3 w-3 mr-1" /> {colab?.filial}
-                            </div>
+                            <div className="mt-1">{getStatusBadge(item.status)}</div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between pt-3 border-t">
-                          <div className="flex gap-4 text-xs text-muted-foreground">
-                            <span className="flex items-center">
-                              <CalendarIcon className="h-3 w-3 mr-1" /> {date}
-                            </span>
-                            <span className="flex items-center">
-                              <Clock className="h-3 w-3 mr-1" /> {time}
-                            </span>
+                        <div className="flex flex-col gap-1 text-xs text-slate-500">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            {getTipoPagamento(item.idtipopgto)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center pt-3 border-t">
+                          <div className="text-xs text-slate-500">
+                            {date} {time !== '-' && `às ${time}`}
                           </div>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="h-8"
-                            disabled={!item.foto_confirmacao}
-                            onClick={() =>
-                              setSelectedPhoto(
-                                item.foto_confirmacao
-                                  ? pb.files.getUrl(item, item.foto_confirmacao)
-                                  : null,
-                              )
-                            }
-                          >
-                            <ImageIcon className="h-3 w-3 mr-1" /> Foto
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              disabled={!item.foto_confirmacao}
+                              onClick={() =>
+                                setSelectedPhoto(
+                                  item.foto_confirmacao
+                                    ? pb.files.getUrl(item, item.foto_confirmacao)
+                                    : null,
+                                )
+                              }
+                            >
+                              <ImageIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => setDetailsModal(item)}
+                            >
+                              Detalhes
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -447,6 +513,116 @@ export default function RelatorioPagamentos() {
                 />
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!detailsModal} onOpenChange={(open) => !open && setDetailsModal(null)}>
+          <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950">
+            <DialogHeader>
+              <DialogTitle>Detalhes do Pagamento</DialogTitle>
+            </DialogHeader>
+            {detailsModal && (
+              <div className="space-y-4 py-2">
+                <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 dark:bg-slate-900 p-4 rounded-lg">
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Registro
+                    </span>
+                    <p className="font-medium">{detailsModal.expand?.colaborador_id?.registro}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Nome
+                    </span>
+                    <p className="font-medium">{detailsModal.expand?.colaborador_id?.nome}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Data e Hora
+                    </span>
+                    <p className="font-medium">
+                      {
+                        formatDateTime(detailsModal.data_pagamento, detailsModal.hora_pagamento)
+                          .date
+                      }{' '}
+                      às{' '}
+                      {
+                        formatDateTime(detailsModal.data_pagamento, detailsModal.hora_pagamento)
+                          .time
+                      }
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Valor
+                    </span>
+                    <p className="font-medium text-emerald-600 dark:text-emerald-400">
+                      {formatBRL(detailsModal.valor_pago)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Total de Horas
+                    </span>
+                    <p className="font-medium">{formatHoras(detailsModal.horas)}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Horário de Início
+                    </span>
+                    <p className="font-medium">{detailsModal.inicio || '--:--'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Horário de Término
+                    </span>
+                    <p className="font-medium">{detailsModal.termino || '--:--'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Tipo de Pagamento
+                    </span>
+                    <p className="font-medium">{getTipoPagamento(detailsModal.idtipopgto)}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Status
+                    </span>
+                    <div>{getStatusBadge(detailsModal.status)}</div>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Filial
+                    </span>
+                    <p className="font-medium">{detailsModal.expand?.colaborador_id?.filial}</p>
+                  </div>
+                </div>
+                {detailsModal.foto_confirmacao && (
+                  <div className="mt-4">
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-2">
+                      Foto de Comprovação
+                    </span>
+                    <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border inline-block">
+                      <img
+                        src={pb.files.getUrl(detailsModal, detailsModal.foto_confirmacao)}
+                        alt="Comprovante"
+                        className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() =>
+                          setSelectedPhoto(
+                            pb.files.getUrl(detailsModal, detailsModal.foto_confirmacao),
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDetailsModal(null)}>
+                Fechar
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

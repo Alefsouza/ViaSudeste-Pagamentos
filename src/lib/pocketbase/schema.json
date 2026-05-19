@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-19T15:12:14.130Z",
+  "generatedAt": "2026-05-19T15:28:53.532Z",
   "collections": [
     {
       "name": "users",
@@ -191,6 +191,30 @@
           "required": false,
           "system": false,
           "collectionRef": "users"
+        },
+        {
+          "name": "idtipopgto",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "horas",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inicio",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "termino",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
