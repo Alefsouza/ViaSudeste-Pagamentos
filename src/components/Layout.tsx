@@ -8,9 +8,6 @@ export default function Layout() {
       <main className="flex-grow flex flex-col w-full animate-fade-in pb-8">
         <Outlet />
       </main>
-      <footer className="relative mt-auto p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400 text-center text-sm">
-        <p>Via Sudeste</p>
-      </footer>
     </div>
   )
 }
