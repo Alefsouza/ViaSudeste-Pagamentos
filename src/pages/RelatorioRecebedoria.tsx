@@ -386,16 +386,9 @@ export default function RelatorioRecebedoria() {
                               <TableCell className="font-medium pl-8">{item.registro}</TableCell>
                               <TableCell>{item.nome}</TableCell>
                               <TableCell>
-                                {item.data
-                                  ? formatDataString(item.data)
-                                  : item.created
-                                    ? new Date(item.created).toLocaleDateString('pt-BR')
-                                    : '-'}{' '}
-                                {item.inicio
-                                  ? `às ${formatHoraString(item.inicio)}`
-                                  : item.created
-                                    ? `às ${new Date(item.created).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                                    : ''}
+                                {item.updated
+                                  ? `${new Date(item.updated).toLocaleDateString('pt-BR')} às ${new Date(item.updated).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                                  : '-'}
                               </TableCell>
                               <TableCell className="text-right font-medium">
                                 {formatBRL(item.valor_a_receber || item.valor)}
@@ -496,16 +489,9 @@ export default function RelatorioRecebedoria() {
                             </div>
                             <div className="flex justify-between items-center pt-3 border-t">
                               <div className="text-xs text-slate-500">
-                                {item.data
-                                  ? formatDataString(item.data)
-                                  : item.created
-                                    ? new Date(item.created).toLocaleDateString('pt-BR')
-                                    : '-'}{' '}
-                                {item.inicio
-                                  ? `às ${formatHoraString(item.inicio)}`
-                                  : item.created
-                                    ? `às ${new Date(item.created).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                                    : ''}
+                                {item.updated
+                                  ? `${new Date(item.updated).toLocaleDateString('pt-BR')} às ${new Date(item.updated).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                                  : '-'}
                               </div>
                               <div className="flex gap-2">
                                 <Button
@@ -592,20 +578,9 @@ export default function RelatorioRecebedoria() {
                     Data e Hora
                   </span>
                   <p className="font-medium">
-                    {detailsModal.data
-                      ? formatDataString(detailsModal.data)
-                      : detailsModal.created
-                        ? new Date(detailsModal.created).toLocaleDateString('pt-BR')
-                        : '-'}{' '}
-                    às{' '}
-                    {detailsModal.inicio
-                      ? formatHoraString(detailsModal.inicio)
-                      : detailsModal.created
-                        ? new Date(detailsModal.created).toLocaleTimeString('pt-BR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : '--:--'}
+                    {detailsModal.updated
+                      ? `${new Date(detailsModal.updated).toLocaleDateString('pt-BR')} às ${new Date(detailsModal.updated).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                      : '-'}
                   </p>
                 </div>
                 <div>
