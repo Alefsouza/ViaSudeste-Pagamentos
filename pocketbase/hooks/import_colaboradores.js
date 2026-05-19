@@ -34,8 +34,9 @@ routerAdd(
                   ? row.VALOR
                   : 0,
             ) || 0
-          const filial =
-            row.filial !== undefined ? row.filial : row.FILIAL !== undefined ? row.FILIAL : ''
+          const filial = row.filial || ''
+          const filial_id =
+            row.filial_id !== undefined ? row.filial_id : row.FILIAL !== undefined ? row.FILIAL : ''
 
           record.set('registro', registro)
           record.set('nome', nome)
@@ -45,10 +46,17 @@ routerAdd(
           record.set('termino', termino)
           record.set('horas', horas)
           record.set('valor_a_receber', valor)
+          if (filial) {
+            record.set('filial', filial)
+          }
 
-          const filialNum = Number(filial)
-          if (!isNaN(filialNum) && String(filial).trim() !== '') {
+          const filialNum = Number(filial_id)
+          if (!isNaN(filialNum) && String(filial_id).trim() !== '') {
             record.set('filial_id', filialNum)
+            if (!filial) {
+              if (filialNum === 2) record.set('filial', 'Sapopemba')
+              else if (filialNum === 3 || filialNum === 4) record.set('filial', 'Cursino')
+            }
           }
 
           txApp.save(record)

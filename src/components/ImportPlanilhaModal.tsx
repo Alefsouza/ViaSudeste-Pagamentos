@@ -169,6 +169,9 @@ export function ImportPlanilhaModal({
           if (!isNaN(Number(rawFilial)) && rawFilial !== '') {
             filialNumber = Number(rawFilial)
           }
+          let filialMapped = ''
+          if (filialNumber === 2) filialMapped = 'Sapopemba'
+          else if (filialNumber === 3 || filialNumber === 4) filialMapped = 'Cursino'
 
           return {
             registro: String(row['REGISTRO'] || ''),
@@ -180,7 +183,8 @@ export function ImportPlanilhaModal({
             horas: formatHoras(row['HORAS']),
             valor_a_receber:
               Number(parseFloat(String(row['VALOR'] || 0).replace(',', '.')).toFixed(2)) || 0,
-            filial: filialNumber,
+            filial: filialMapped,
+            filial_id: filialNumber,
           }
         })
 
