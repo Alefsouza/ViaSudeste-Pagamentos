@@ -29,8 +29,8 @@ export const formatHoras = (horas?: string | number) => {
 
 export const getTipoPagamento = (id?: number) => {
   if (id === 1) return 'Hora Extra'
-  if (id === 3) return 'Ferias Trabalhada'
-  if (id === 4) return 'Vale Refeicao'
+  if (id === 3) return 'Férias Trabalhada'
+  if (id === 4) return 'Vale Refeição'
   return 'Tipo desconhecido'
 }
 

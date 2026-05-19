@@ -34,7 +34,7 @@ export const getColaboradoresPaginated = async (page: number, perPage: number, f
 
   return pb.collection('colaboradores').getList(page, perPage, {
     filter: finalFilter,
-    sort: '-created',
+    sort: '-data,-created',
   })
 }
 
@@ -100,7 +100,7 @@ export const getColaboradoresAnalytics = async (filters: any) => {
 
   return pb.collection('colaboradores').getFullList({
     filter: finalFilter,
-    sort: '-created',
+    sort: '-data,-created',
   })
 }
 

@@ -38,7 +38,7 @@ import { format, subDays } from 'date-fns'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
-import { formatDataString, formatHoraString, formatBRL } from '@/lib/formatters'
+import { formatDataString, formatHoraString, formatBRL, getTipoPagamento } from '@/lib/formatters'
 
 export default function Dashboard() {
   const { toast } = useToast()
@@ -457,6 +457,7 @@ export default function Dashboard() {
                           <TableHead>Registro</TableHead>
                           <TableHead>Filial</TableHead>
                           <TableHead className="text-right">Valor</TableHead>
+                          <TableHead>Tipo de Pagamento</TableHead>
                           <TableHead>Data</TableHead>
                           <TableHead>Hora</TableHead>
                         </TableRow>
@@ -470,7 +471,7 @@ export default function Dashboard() {
                             <React.Fragment key={nome}>
                               <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 <TableCell
-                                  colSpan={6}
+                                  colSpan={7}
                                   className="font-semibold text-slate-700 dark:text-slate-300"
                                 >
                                   {nome} - {totalLines}{' '}
@@ -485,6 +486,7 @@ export default function Dashboard() {
                                   <TableCell className="text-right text-forest font-medium">
                                     {formatBRL(p.valor_a_receber || p.valor)}
                                   </TableCell>
+                                  <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
                                   <TableCell>
                                     {p.data
                                       ? formatDataString(p.data)
@@ -532,6 +534,9 @@ export default function Dashboard() {
                                 <div className="text-sm text-muted-foreground flex justify-between">
                                   <span>Reg: {p.registro}</span>
                                   <span>{p.filial}</span>
+                                </div>
+                                <div className="text-sm text-muted-foreground flex justify-between">
+                                  <span>{getTipoPagamento(p.idtipopgto)}</span>
                                 </div>
                                 <div className="text-sm text-muted-foreground flex justify-between">
                                   <span>
