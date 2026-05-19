@@ -83,7 +83,7 @@ export function Header() {
                 }`}
               >
                 <Camera size={16} />
-                <span className="hidden sm:inline">Recebedoria</span>
+                <span className="hidden sm:inline">Pagamentos</span>
               </Link>
               <Link
                 to="/relatorio-recebedoria"
