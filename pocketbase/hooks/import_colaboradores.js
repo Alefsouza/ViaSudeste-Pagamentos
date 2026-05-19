@@ -26,8 +26,18 @@ routerAdd(
           record.set('inicio', String(row['INICIO'] || ''))
           record.set('termino', String(row['TERMINO'] || ''))
           record.set('horas', String(row['HORAS'] || ''))
-          record.set('valor', Number(row['VALOR']) || 0)
-          record.set('filial_id', Number(row['FILIAL']) || 0)
+          record.set('valor_a_receber', Number(row['VALOR']) || 0)
+
+          const filialVal = row['FILIAL']
+          if (filialVal === 'Cursino' || filialVal === 'Sapopemba') {
+            record.set('filial', filialVal)
+          } else if (
+            filialVal !== undefined &&
+            filialVal !== null &&
+            String(filialVal).trim() !== ''
+          ) {
+            record.set('filial_id', Number(filialVal) || 0)
+          }
 
           txApp.save(record)
           count++

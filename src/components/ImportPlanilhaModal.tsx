@@ -167,7 +167,7 @@ export function ImportPlanilhaModal({
             TERMINO: excelTimeToHHMM(row['TERMINO']),
             HORAS: formatHoras(row['HORAS']),
             VALOR: Number(parseFloat(String(row['VALOR'] || 0).replace(',', '.')).toFixed(2)) || 0,
-            FILIAL: Number(row['FILIAL']) || 0,
+            FILIAL: row['FILIAL'] !== undefined ? row['FILIAL'] : '',
           }
         })
 
