@@ -158,6 +158,19 @@ export function ImportPlanilhaModal({
             ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
             : String(rawData || '')
 
+          let rawFilial = row['FILIAL'] !== undefined ? String(row['FILIAL']).trim() : ''
+          let filialParsed = rawFilial
+          if (rawFilial === '2') {
+            filialParsed = 'Sapopemba'
+          } else if (rawFilial === '3' || rawFilial === '4') {
+            filialParsed = 'Cursino'
+          } else if (
+            rawFilial.toLowerCase() === 'sapopemba' ||
+            rawFilial.toLowerCase() === 'cursino'
+          ) {
+            filialParsed = rawFilial.charAt(0).toUpperCase() + rawFilial.slice(1).toLowerCase()
+          }
+
           return {
             REGISTRO: String(row['REGISTRO'] || ''),
             NOME: String(row['NOME'] || ''),
@@ -167,7 +180,7 @@ export function ImportPlanilhaModal({
             TERMINO: excelTimeToHHMM(row['TERMINO']),
             HORAS: formatHoras(row['HORAS']),
             VALOR: Number(parseFloat(String(row['VALOR'] || 0).replace(',', '.')).toFixed(2)) || 0,
-            FILIAL: row['FILIAL'] !== undefined ? row['FILIAL'] : '',
+            FILIAL: filialParsed,
           }
         })
 
@@ -275,8 +288,8 @@ export function ImportPlanilhaModal({
               ) : (
                 <div className="mt-2 p-4 border rounded-md bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 animate-fade-in-up">
                   <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-4">
-                    Tem certeza que deseja importar estes dados? Registros existentes poderão ser
-                    atualizados e novos serão criados.
+                    Tem certeza que deseja importar estes dados? Um novo registro será criado para
+                    cada linha da planilha.
                   </p>
                   <div className="flex gap-2 justify-end">
                     <Button
