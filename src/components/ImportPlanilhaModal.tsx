@@ -129,20 +129,26 @@ export function ImportPlanilhaModal({
         const excelTimeToHHMM = (serial: any) => {
           if (typeof serial === 'number') {
             const totalSeconds = Math.round(serial * 86400)
-            const hours = Math.floor(totalSeconds / 3600)
+            const hours = Math.floor(totalSeconds / 3600) % 24
             const minutes = Math.floor((totalSeconds % 3600) / 60)
             return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
           }
-          return String(serial).trim()
+          if (typeof serial === 'string') {
+            const parts = serial.split(':')
+            if (parts.length >= 2) {
+              return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
+            }
+          }
+          return String(serial || '').trim()
         }
 
         const formatHoras = (val: any) => {
           if (typeof val === 'number') {
-            if (val < 1) {
-              const hours = val * 24
-              return hours.toFixed(2).padStart(5, '0')
+            let hours = val
+            if (val > 0 && val < 1) {
+              hours = val * 24
             }
-            return Number(val).toFixed(2).padStart(5, '0')
+            return Number(hours).toFixed(2).padStart(5, '0')
           }
           if (typeof val === 'string') {
             const num = parseFloat(val.replace(',', '.'))
@@ -236,17 +242,17 @@ export function ImportPlanilhaModal({
         }
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md w-11/12 overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Importar Planilha</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-center">Importar Planilha</DialogTitle>
+          <DialogDescription className="text-center">
             Faça upload de uma planilha Excel (.xlsx, .xls) para atualizar ou cadastrar
             colaboradores.
           </DialogDescription>
         </DialogHeader>
 
         <div
-          className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg mt-2 transition-colors ${!file ? 'cursor-pointer' : ''} ${isDragging ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'} ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+          className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg mt-2 transition-colors w-full ${!file ? 'cursor-pointer' : ''} ${isDragging ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'} ${loading ? 'opacity-50 pointer-events-none' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -261,11 +267,11 @@ export function ImportPlanilhaModal({
           />
 
           {file ? (
-            <div className="flex flex-col items-center gap-4 w-full">
-              <div className="flex items-center gap-3 bg-background p-3 rounded-md w-full border shadow-sm">
+            <div className="flex flex-col items-center gap-4 w-full overflow-hidden">
+              <div className="flex items-center gap-3 bg-background p-3 rounded-md w-full border shadow-sm max-w-full">
                 <FileSpreadsheet className="h-8 w-8 text-emerald-600 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{file.name}</p>
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <p className="text-sm font-medium truncate w-full">{file.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {(file.size / 1024).toFixed(1)} KB
                   </p>
@@ -273,6 +279,7 @@ export function ImportPlanilhaModal({
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="shrink-0"
                   onClick={(e) => {
                     e.stopPropagation()
                     setFile(null)
@@ -286,17 +293,18 @@ export function ImportPlanilhaModal({
                   Verificar Importação
                 </Button>
               ) : (
-                <div className="mt-2 p-4 border rounded-md bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 animate-fade-in-up">
-                  <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-4">
+                <div className="w-full p-4 border rounded-md bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 animate-fade-in-up">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-4 text-center">
                     Tem certeza que deseja importar estes dados? Um novo registro será criado para
-                    cada linha da planilha.
+                    cada linha.
                   </p>
-                  <div className="flex gap-2 justify-end">
+                  <div className="flex gap-2 justify-center w-full">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setConfirming(false)}
                       disabled={loading}
+                      className="flex-1"
                     >
                       Cancelar
                     </Button>
@@ -305,12 +313,10 @@ export function ImportPlanilhaModal({
                       size="sm"
                       onClick={handleUpload}
                       disabled={loading}
-                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                      className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
                     >
                       {loading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importando planilha...
-                        </>
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                       ) : (
                         'Sim, importar'
                       )}
