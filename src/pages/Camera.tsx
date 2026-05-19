@@ -133,13 +133,16 @@ export default function Camera() {
     return timeStr
   }
 
-  const formatHoras = (horas?: number) => {
+  const formatHoras = (horas?: number | string) => {
     if (horas === undefined || horas === null) return '--'
-    return horas.toFixed(2).padStart(5, '0')
+    const num = typeof horas === 'string' ? parseFloat(horas) : horas
+    if (isNaN(num)) return '--'
+    return num.toFixed(2).padStart(5, '0')
   }
 
-  const getTipoPagamentoDesc = (idtipopgto?: number) => {
-    switch (idtipopgto) {
+  const getTipoPagamentoDesc = (idtipopgto?: number | string) => {
+    const id = typeof idtipopgto === 'string' ? parseInt(idtipopgto, 10) : idtipopgto
+    switch (id) {
       case 1:
         return 'Hora Extra'
       case 3:
@@ -500,7 +503,7 @@ export default function Camera() {
         </div>
 
         <div className="md:col-span-7">
-          <Card className="h-[500px] flex flex-col overflow-hidden relative">
+          <Card className="min-h-[650px] flex flex-col overflow-hidden relative">
             {isCameraActive && (
               <div className="absolute inset-0 bg-black z-0">
                 {!streamActive && (
@@ -521,7 +524,7 @@ export default function Camera() {
               </div>
             )}
 
-            <div className="relative z-10 flex-1 flex flex-col">
+            <div className="relative z-10 flex-1 flex flex-col overflow-y-auto">
               {viewState === 'EMPTY' ||
               viewState === 'SEARCHING' ||
               viewState === 'SEARCH_FAILED' ? (
