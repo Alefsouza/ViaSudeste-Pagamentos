@@ -20,10 +20,9 @@ routerAdd(
         return found ? row[found] : ''
       }
 
-      const registroRaw = String(getVal('REGISTRO')).trim()
-      if (!registroRaw) continue
+      const registro = String(getVal('REGISTRO')).trim()
+      if (!registro) continue
 
-      const registro = Number(registroRaw).toString()
       const nome = String(getVal('NOME')).trim() || ''
 
       // Parse DATA DD/MM/YYYY
@@ -116,12 +115,12 @@ routerAdd(
         record.set('foto_confirmacao_url', '')
       }
 
-      if (nome) record.set('nome', nome)
-      if (dataVal) record.set('data', dataVal)
+      record.set('nome', nome)
+      record.set('data', dataVal)
       record.set('idtipopgto', idtipopgto)
-      if (inicio) record.set('inicio', inicio)
-      if (termino) record.set('termino', termino)
-      if (horas) record.set('horas', horas)
+      record.set('inicio', inicio)
+      record.set('termino', termino)
+      record.set('horas', horas)
       record.set('valor', valor)
       record.set('filial_id', filialId)
 
