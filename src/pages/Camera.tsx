@@ -146,9 +146,9 @@ export default function Camera() {
       case 1:
         return 'Hora Extra'
       case 3:
-        return 'Férias Trabalhada'
+        return 'Ferias Trabalhada'
       case 4:
-        return 'Vale Refeição'
+        return 'Vale Refeicao'
       default:
         return 'Tipo desconhecido'
     }
@@ -227,7 +227,7 @@ export default function Camera() {
           setErrorMsg(null)
         } else {
           setViewState('RECOGNITION_FAILED')
-          setErrorMsg('Rosto não corresponde ao registro informado')
+          setErrorMsg('Rosto nao corresponde ao registro informado')
         }
       } catch (err: any) {
         const errorEndTime = performance.now()
@@ -548,18 +548,20 @@ export default function Camera() {
                   <p className="text-slate-300">Aguarde enquanto verificamos a identidade.</p>
                 </div>
               ) : viewState === 'RECOGNITION_SUCCESS' ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-300 bg-black/60 backdrop-blur-sm text-white">
-                  <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mb-4">
+                <div className="flex-1 flex flex-col items-center justify-start sm:justify-center p-4 sm:p-8 text-center animate-in zoom-in-95 duration-300 bg-black/80 backdrop-blur-sm text-white overflow-y-auto">
+                  <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mb-4 shrink-0 mt-4 sm:mt-0">
                     <CheckCircle2 className="h-8 w-8" />
                   </div>
-                  <h3 className="text-2xl font-bold mb-2">Identidade Confirmada</h3>
-                  <p className="text-slate-300 mb-6">O rosto corresponde ao registro informado.</p>
+                  <h3 className="text-2xl font-bold mb-2 shrink-0">Identidade Confirmada</h3>
+                  <p className="text-slate-300 mb-6 shrink-0">
+                    O rosto corresponde ao registro informado.
+                  </p>
 
-                  <div className="bg-black/50 w-full max-w-md rounded-xl p-6 mb-6 border border-white/10 text-left space-y-4">
+                  <div className="bg-black/50 w-full max-w-md rounded-xl p-6 mb-6 border border-white/10 text-left space-y-4 shrink-0 shadow-lg">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
-                          Início
+                          Hora de Inicio
                         </p>
                         <p className="text-lg font-semibold text-white">
                           {formatTime(pagamentoDetails?.inicio)}
@@ -567,7 +569,7 @@ export default function Camera() {
                       </div>
                       <div>
                         <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
-                          Término
+                          Hora de Termino
                         </p>
                         <p className="text-lg font-semibold text-white">
                           {formatTime(pagamentoDetails?.termino)}
@@ -583,7 +585,7 @@ export default function Camera() {
                       </div>
                       <div>
                         <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
-                          Tipo
+                          Tipo de Pagamento
                         </p>
                         <p className="text-lg font-semibold text-white">
                           {getTipoPagamentoDesc(pagamentoDetails?.idtipopgto)}
@@ -602,18 +604,18 @@ export default function Camera() {
                     </div>
                   </div>
 
-                  <div className="flex gap-4 w-full max-w-md">
+                  <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md shrink-0 pb-4 sm:pb-0">
                     <Button
                       size="lg"
                       variant="outline"
-                      className="flex-1 bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white"
+                      className="flex-1 bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white order-2 sm:order-1"
                       onClick={handleReset}
                     >
                       Cancelar
                     </Button>
                     <Button
                       size="lg"
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white border-0"
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white border-0 order-1 sm:order-2"
                       onClick={handleConfirmPayment}
                     >
                       Confirmar Pagamento
