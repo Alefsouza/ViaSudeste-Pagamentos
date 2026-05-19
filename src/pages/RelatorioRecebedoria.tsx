@@ -345,9 +345,9 @@ export default function RelatorioRecebedoria() {
                     <TableCell colSpan={7} className="h-48 text-center">
                       <SearchX className="mx-auto h-10 w-10 text-slate-300 mb-3" />
                       <p className="text-slate-500 font-medium">Nenhum pagamento encontrado.</p>
-                      <p className="text-sm text-slate-400 mt-1">
-                        Tente ajustar os filtros para ver outros resultados.
-                      </p>
+                      <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4">
+                        Limpar Filtros
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -403,6 +403,9 @@ export default function RelatorioRecebedoria() {
               <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-xl border">
                 <SearchX className="mx-auto h-10 w-10 text-slate-300 mb-3" />
                 <p className="text-slate-500 font-medium">Nenhum pagamento encontrado.</p>
+                <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4">
+                  Limpar Filtros
+                </Button>
               </div>
             ) : (
               data.map((item) => {

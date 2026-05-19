@@ -16,6 +16,7 @@ import {
   RefreshCcw,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
 
 type ViewState =
   | 'EMPTY'
@@ -40,6 +41,7 @@ export default function Camera() {
   const [streamActive, setStreamActive] = useState(false)
 
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const stopCamera = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -271,6 +273,7 @@ export default function Camera() {
         data_pagamento,
         hora_pagamento,
         foto_confirmacao: file,
+        user_id: user?.id,
       })
 
       const fileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)
