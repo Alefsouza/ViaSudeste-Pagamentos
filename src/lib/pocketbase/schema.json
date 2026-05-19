@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-19T20:12:02.946Z",
+  "generatedAt": "2026-05-19T20:16:18.909Z",
   "collections": [
     {
       "name": "users",
@@ -145,6 +145,12 @@
         },
         {
           "name": "data",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_pagamento",
           "type": "text",
           "required": false,
           "system": false
