@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-19T17:38:14.672Z",
+  "generatedAt": "2026-05-19T17:46:00.922Z",
   "collections": [
     {
       "name": "users",
@@ -108,12 +108,6 @@
           "system": false
         },
         {
-          "name": "data",
-          "type": "date",
-          "required": false,
-          "system": false
-        },
-        {
           "name": "idtipopgto",
           "type": "number",
           "required": false,
@@ -146,6 +140,12 @@
         {
           "name": "filial_id",
           "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data",
+          "type": "text",
           "required": false,
           "system": false
         }

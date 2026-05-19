@@ -111,29 +111,81 @@ export function ImportPlanilhaModal({
           )
         }
 
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' })
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: true, defval: '' })
+
+        const excelDateToJSDate = (serial: any) => {
+          if (typeof serial === 'number') {
+            return new Date(Math.round((serial - 25569) * 86400 * 1000))
+          }
+          if (typeof serial === 'string') {
+            const parts = serial.split('/')
+            if (parts.length === 3) {
+              return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+            }
+          }
+          return new Date()
+        }
+
+        const excelTimeToHHMM = (serial: any) => {
+          if (typeof serial === 'number') {
+            const totalSeconds = Math.round(serial * 86400)
+            const hours = Math.floor(totalSeconds / 3600)
+            const minutes = Math.floor((totalSeconds % 3600) / 60)
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+          }
+          return String(serial).trim()
+        }
+
+        const formatHoras = (val: any) => {
+          if (typeof val === 'number') {
+            if (val < 1) {
+              const hours = val * 24
+              return hours.toFixed(2).padStart(5, '0')
+            }
+            return Number(val).toFixed(2).padStart(5, '0')
+          }
+          if (typeof val === 'string') {
+            const num = parseFloat(val.replace(',', '.'))
+            return isNaN(num) ? val : num.toFixed(2).padStart(5, '0')
+          }
+          return '00.00'
+        }
+
+        const formattedData = jsonData.map((row: any) => {
+          const rawData = row['DATA']
+          const d = excelDateToJSDate(rawData)
+          const dataFormatted = !isNaN(d.getTime())
+            ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+            : String(rawData || '')
+
+          return {
+            REGISTRO: String(row['REGISTRO'] || ''),
+            NOME: String(row['NOME'] || ''),
+            DATA: dataFormatted,
+            IDTIPOPGTO: Number(row['IDTIPOPGTO']) || 0,
+            INICIO: excelTimeToHHMM(row['INICIO']),
+            TERMINO: excelTimeToHHMM(row['TERMINO']),
+            HORAS: formatHoras(row['HORAS']),
+            VALOR: Number(parseFloat(String(row['VALOR'] || 0).replace(',', '.')).toFixed(2)) || 0,
+            FILIAL: Number(row['FILIAL']) || 0,
+          }
+        })
 
         const res = await pb.send('/backend/v1/import/colaboradores', {
           method: 'POST',
-          body: JSON.stringify({ data: jsonData }),
+          body: JSON.stringify({ data: formattedData }),
         })
 
         if (res.errors && res.errors.length > 0) {
           res.errors.forEach((err: string) => toast.error(err))
         }
 
-        if (res.count > 0) {
-          toast.success(`${res.count} colaboradores importados com sucesso`)
-          onOpenChange(false)
-          setFile(null)
-        } else if (!res.errors || res.errors.length === 0) {
-          toast.success('0 colaboradores importados com sucesso')
-          onOpenChange(false)
-          setFile(null)
-        }
+        toast.success(`${res.count} registros importados com sucesso`)
+        onOpenChange(false)
+        setFile(null)
       } catch (error: any) {
         const errorMsg = error.response?.message || error.message || 'Erro desconhecido'
-        const isValidationError = errorMsg.includes('Arquivo invalido. Verifique se tem as colunas')
+        const isValidationError = errorMsg.includes('Arquivo invalido')
 
         toast.error(isValidationError ? errorMsg : `Erro ao importar: ${errorMsg}`, {
           action: {
