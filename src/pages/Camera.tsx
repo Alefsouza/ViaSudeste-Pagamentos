@@ -274,6 +274,7 @@ export default function Camera() {
         hora_pagamento,
         foto_confirmacao: file,
         user_id: user?.id,
+        status: 'Confirmado',
       })
 
       const fileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)

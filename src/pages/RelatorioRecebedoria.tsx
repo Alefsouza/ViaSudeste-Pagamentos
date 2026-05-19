@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { getRecebedoriaPagamentosPaginated } from '@/services/pagamentos'
 import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -119,6 +120,10 @@ export default function RelatorioRecebedoria() {
     debouncedSearchTerm,
     statusFilter,
   ])
+
+  useRealtime('pagamentos', () => {
+    loadData()
+  })
 
   const handlePresetChange = (preset: string) => {
     setDatePreset(preset)
