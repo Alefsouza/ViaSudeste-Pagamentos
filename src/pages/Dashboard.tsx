@@ -522,7 +522,7 @@ export default function Dashboard() {
                           <TableHead>Colaborador</TableHead>
                           <TableHead>Registro</TableHead>
                           <TableHead>Filial</TableHead>
-                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead className="text-left">Valor</TableHead>
                           <TableHead>Tipo de Pagamento</TableHead>
                           <TableHead>Data de Pagamento</TableHead>
                           <TableHead>Status</TableHead>
@@ -550,7 +550,7 @@ export default function Dashboard() {
                                   <TableCell className="font-medium pl-8">{p.nome}</TableCell>
                                   <TableCell>{p.registro}</TableCell>
                                   <TableCell>{p.filial}</TableCell>
-                                  <TableCell className="text-right text-forest font-medium">
+                                  <TableCell className="text-forest font-medium text-left">
                                     {formatBRL(p.valor_a_receber || p.valor)}
                                   </TableCell>
                                   <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
