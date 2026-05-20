@@ -55,7 +55,32 @@ const buildFilter = (filters: any) => {
       `(colaborador_id.nome ~ '${filters.search}' || colaborador_id.registro ~ '${filters.search}')`,
     )
   }
+  if (filters.status && filters.status !== 'Todos') {
+    parts.push(`status = '${filters.status}'`)
+  }
+  if (filters.tipoPagamento && filters.tipoPagamento !== 'Todos') {
+    parts.push(`idtipopgto = ${filters.tipoPagamento}`)
+  }
   return parts.join(' && ')
+}
+
+export const getPagamentosTotals = async (filters: any) => {
+  const filterString = buildFilter(filters)
+
+  const records = await pb.collection('pagamentos').getFullList({
+    filter: filterString,
+    fields: 'valor_pago,status',
+  })
+
+  let pago = 0
+  let pendente = 0
+
+  records.forEach((r) => {
+    if (r.status === 'Confirmado') pago += r.valor_pago || 0
+    else if (r.status === 'Pendente') pendente += r.valor_pago || 0
+  })
+
+  return { pago, pendente }
 }
 
 export const getPagamentosPaginated = async (page: number, perPage: number, filters: any) => {

@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
+import { getPagamentosTotals } from '@/services/pagamentos'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -60,6 +61,7 @@ export default function Dashboard() {
   const [error, setError] = useState(false)
   const [statsData, setStatsData] = useState<any[]>([])
   const [tableData, setTableData] = useState<any>(null)
+  const [pagamentosTotals, setPagamentosTotals] = useState({ pago: 0, pendente: 0 })
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -79,12 +81,14 @@ export default function Dashboard() {
     setLoading(true)
     setError(false)
     try {
-      const [stats, paginated] = await Promise.all([
+      const [stats, paginated, totals] = await Promise.all([
         getColaboradoresAnalytics(debouncedFilters),
         getColaboradoresPaginated(page, 20, debouncedFilters),
+        getPagamentosTotals(debouncedFilters),
       ])
       setStatsData(stats)
       setTableData(paginated)
+      setPagamentosTotals(totals)
     } catch (e: any) {
       setError(true)
       toast({
@@ -131,7 +135,7 @@ export default function Dashboard() {
   }
 
   // Calculations
-  const totalPago = statsData.reduce(
+  const totalValor = statsData.reduce(
     (acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0),
     0,
   )
@@ -139,7 +143,7 @@ export default function Dashboard() {
   const values = statsData.map((c) => c.valor_a_receber || c.valor || 0)
   const maxPago = values.length ? Math.max(...values) : 0
   const minPago = values.length ? Math.min(...values) : 0
-  const avgPago = values.length ? totalPago / values.length : 0
+  const avgPago = values.length ? totalValor / values.length : 0
 
   // Chart Data Preparation
   const pieDataMap = statsData.reduce(
@@ -320,7 +324,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
@@ -330,7 +334,20 @@ export default function Dashboard() {
             {loading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatBRL(totalPago)}</div>
+              <div className="text-2xl font-bold">{formatBRL(pagamentosTotals.pago)}</div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Valor a Pagar</CardTitle>
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold">{formatBRL(pagamentosTotals.pendente)}</div>
             )}
           </CardContent>
         </Card>
