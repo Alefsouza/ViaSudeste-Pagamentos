@@ -36,7 +36,6 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
-import { getPagamentosTotals } from '@/services/pagamentos'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -81,14 +80,28 @@ export default function Dashboard() {
     setLoading(true)
     setError(false)
     try {
-      const [stats, paginated, totals] = await Promise.all([
+      const [stats, paginated] = await Promise.all([
         getColaboradoresAnalytics(debouncedFilters),
         getColaboradoresPaginated(page, 20, debouncedFilters),
-        getPagamentosTotals(debouncedFilters),
       ])
       setStatsData(stats)
       setTableData(paginated)
-      setPagamentosTotals(totals)
+
+      const pago = stats.reduce((acc: number, curr: any) => {
+        if (curr.foto_confirmacao_url && curr.foto_confirmacao_url.trim() !== '') {
+          return acc + (curr.valor_a_receber || curr.valor || 0)
+        }
+        return acc
+      }, 0)
+
+      const pendente = stats.reduce((acc: number, curr: any) => {
+        if (!curr.foto_confirmacao_url || curr.foto_confirmacao_url.trim() === '') {
+          return acc + (curr.valor_a_receber || curr.valor || 0)
+        }
+        return acc
+      }, 0)
+
+      setPagamentosTotals({ pago, pendente })
     } catch (e: any) {
       setError(true)
       toast({
