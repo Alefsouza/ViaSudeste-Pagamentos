@@ -50,8 +50,11 @@ export default function Dashboard() {
     endDate: format(new Date(), 'yyyy-MM-dd'),
     filial: 'Todas',
     search: '',
+    status: 'Todos',
+    tipoPagamento: 'Todos',
   })
   const [debouncedFilters, setDebouncedFilters] = useState(filters)
+  const [knownTipos, setKnownTipos] = useState<Set<number>>(new Set())
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -97,6 +100,20 @@ export default function Dashboard() {
   useEffect(() => {
     loadData()
   }, [debouncedFilters, page])
+
+  useEffect(() => {
+    if (statsData.length > 0) {
+      setKnownTipos((prev) => {
+        const next = new Set(prev)
+        statsData.forEach((c) => {
+          if (c.idtipopgto != null) next.add(c.idtipopgto)
+        })
+        return next
+      })
+    }
+  }, [statsData])
+
+  const availableTipos = Array.from(knownTipos).sort()
 
   useRealtime('pagamentos', loadData)
   useRealtime('colaboradores', loadData)
@@ -197,78 +214,10 @@ export default function Dashboard() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
-              <Label>Data Inicial</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Filtre os pagamentos a partir desta data.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <Input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Data Final</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Filtre os pagamentos até esta data.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <Input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Filial</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Visualize os dados de uma filial específica ou de todas.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <Select
-              value={filters.filial}
-              onValueChange={(val) => setFilters({ ...filters, filial: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todas">Ambas</SelectItem>
-                <SelectItem value="Cursino">Cursino</SelectItem>
-                <SelectItem value="Sapopemba">Sapopemba</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Buscar Colaborador</Label>
+              <Label>Buscar</Label>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -289,6 +238,83 @@ export default function Dashboard() {
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Label>Status</Label>
+            </div>
+            <Select
+              value={filters.status}
+              onValueChange={(val) => setFilters({ ...filters, status: val })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todos">Todos</SelectItem>
+                <SelectItem value="Confirmado">Confirmado</SelectItem>
+                <SelectItem value="Pendente">Pendente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Label>Tipo</Label>
+            </div>
+            <Select
+              value={filters.tipoPagamento}
+              onValueChange={(val) => setFilters({ ...filters, tipoPagamento: val })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todos">Todos</SelectItem>
+                {availableTipos.map((t) => (
+                  <SelectItem key={t} value={String(t)}>
+                    {getTipoPagamento(t)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Label>Filial</Label>
+            </div>
+            <Select
+              value={filters.filial}
+              onValueChange={(val) => setFilters({ ...filters, filial: val })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todas">Ambas</SelectItem>
+                <SelectItem value="Cursino">Cursino</SelectItem>
+                <SelectItem value="Sapopemba">Sapopemba</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Label>Data Inicial</Label>
+            </div>
+            <Input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Label>Data Final</Label>
+            </div>
+            <Input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+            />
           </div>
         </CardContent>
       </Card>

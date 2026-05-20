@@ -8,8 +8,8 @@ export const updateColaborador = (id: string, data: Partial<{ foto_confirmacao_u
 const colabCache = new Map<string, { data: any; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
-export const getColaboradoresPaginated = async (page: number, perPage: number, filters: any) => {
-  const { search, startDate, endDate, filial, status } = filters
+const buildFilterStr = (filters: any) => {
+  const { search, startDate, endDate, filial, status, tipoPagamento } = filters
   let filterStr = []
 
   if (search) {
@@ -27,43 +27,25 @@ export const getColaboradoresPaginated = async (page: number, perPage: number, f
   if (status === 'Confirmado') {
     filterStr.push(`foto_confirmacao_url != ""`)
   } else if (status === 'Pendente') {
-    filterStr.push(`foto_confirmacao_url = ""`)
+    filterStr.push(`(foto_confirmacao_url = "" || foto_confirmacao_url = null)`)
+  }
+  if (tipoPagamento && tipoPagamento !== 'Todos') {
+    filterStr.push(`idtipopgto=${tipoPagamento}`)
   }
 
-  const finalFilter = filterStr.join(' && ')
+  return filterStr.join(' && ')
+}
 
+export const getColaboradoresPaginated = async (page: number, perPage: number, filters: any) => {
   return pb.collection('colaboradores').getList(page, perPage, {
-    filter: finalFilter,
+    filter: buildFilterStr(filters),
     sort: '-data,-created',
   })
 }
 
 export const getColaboradoresStats = async (filters: any) => {
-  const { search, startDate, endDate, filial, status } = filters
-  let filterStr = []
-
-  if (search) {
-    filterStr.push(`(nome~"${search}" || registro~"${search}")`)
-  }
-  if (filial && filial !== 'Todas') {
-    filterStr.push(`filial="${filial}"`)
-  }
-  if (startDate) {
-    filterStr.push(`created >= "${startDate} 00:00:00"`)
-  }
-  if (endDate) {
-    filterStr.push(`created <= "${endDate} 23:59:59"`)
-  }
-  if (status === 'Confirmado') {
-    filterStr.push(`foto_confirmacao_url != ""`)
-  } else if (status === 'Pendente') {
-    filterStr.push(`foto_confirmacao_url = ""`)
-  }
-
-  const finalFilter = filterStr.join(' && ')
-
   const records = await pb.collection('colaboradores').getFullList({
-    filter: finalFilter,
+    filter: buildFilterStr(filters),
     fields: 'valor_a_receber,valor',
   })
 
@@ -75,31 +57,8 @@ export const getColaboradoresStats = async (filters: any) => {
 }
 
 export const getColaboradoresAnalytics = async (filters: any) => {
-  const { search, startDate, endDate, filial, status } = filters
-  let filterStr = []
-
-  if (search) {
-    filterStr.push(`(nome~"${search}" || registro~"${search}")`)
-  }
-  if (filial && filial !== 'Todas') {
-    filterStr.push(`filial="${filial}"`)
-  }
-  if (startDate) {
-    filterStr.push(`created >= "${startDate} 00:00:00"`)
-  }
-  if (endDate) {
-    filterStr.push(`created <= "${endDate} 23:59:59"`)
-  }
-  if (status === 'Confirmado') {
-    filterStr.push(`foto_confirmacao_url != ""`)
-  } else if (status === 'Pendente') {
-    filterStr.push(`foto_confirmacao_url = ""`)
-  }
-
-  const finalFilter = filterStr.join(' && ')
-
   return pb.collection('colaboradores').getFullList({
-    filter: finalFilter,
+    filter: buildFilterStr(filters),
     sort: '-data,-created',
   })
 }
