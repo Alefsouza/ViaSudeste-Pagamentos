@@ -22,23 +22,53 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Loader2, Plus, Users as UsersIcon, Shield, MapPin, Mail, Loader } from 'lucide-react'
+import {
+  Loader2,
+  Plus,
+  Users as UsersIcon,
+  Shield,
+  MapPin,
+  Mail,
+  Loader,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
+import { useRealtime } from '@/hooks/use-realtime'
 
 export default function Usuarios() {
+  const { user } = useAuth()
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editingUser, setEditingUser] = useState<any>(null)
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+  const [deletingUser, setDeletingUser] = useState<any>(null)
 
   const [email, setEmail] = useState('')
   const [nome, setNome] = useState('')
@@ -46,29 +76,42 @@ export default function Usuarios() {
   const [garagem, setGaragem] = useState('')
   const [role, setRole] = useState<'Administrador' | 'recebedoria' | 'DP'>('recebedoria')
 
-  const fetchUsers = async () => {
-    setLoading(true)
+  const fetchUsers = async (showLoader = true) => {
+    if (showLoader) setLoading(true)
     try {
       const records = await pb.collection('users').getFullList({ sort: '-created' })
       setUsers(records)
     } catch (err) {
       toast.error('Erro ao carregar usuários')
     } finally {
-      setLoading(false)
+      if (showLoader) setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchUsers()
+    fetchUsers(true)
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useRealtime('users', () => {
+    fetchUsers(false)
+  })
+
+  const openCreateDialog = () => {
+    setEmail('')
+    setNome('')
+    setSenha('')
+    setGaragem('')
+    setRole('recebedoria')
+    setIsCreateDialogOpen(true)
+  }
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitting(true)
+    setCreateSubmitting(true)
 
     if (!garagem) {
       toast.error('Selecione uma garagem')
-      setSubmitting(false)
+      setCreateSubmitting(false)
       return
     }
 
@@ -82,19 +125,73 @@ export default function Usuarios() {
         tipo_usuario: role,
       })
       toast.success('Usuário criado com sucesso')
-      setIsDialogOpen(false)
-      setEmail('')
-      setNome('')
-      setSenha('')
-      setGaragem('')
-      setRole('recebedoria')
-      fetchUsers()
+      setIsCreateDialogOpen(false)
     } catch (err) {
       const errors = extractFieldErrors(err)
       const firstError = Object.values(errors)[0]
       toast.error(firstError || 'Erro ao criar usuário. Verifique os dados.')
     } finally {
-      setSubmitting(false)
+      setCreateSubmitting(false)
+    }
+  }
+
+  const openEditDialog = (u: any) => {
+    setEditingUser(u)
+    setEmail(u.email)
+    setNome(u.name || '')
+    setGaragem(u.garagem || '')
+    setRole(u.tipo_usuario || 'recebedoria')
+    setIsEditDialogOpen(true)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return
+    setEditSubmitting(true)
+
+    if (!garagem) {
+      toast.error('Selecione uma garagem')
+      setEditSubmitting(false)
+      return
+    }
+
+    try {
+      await pb.collection('users').update(editingUser.id, {
+        email,
+        name: nome,
+        garagem,
+        tipo_usuario: role,
+      })
+      toast.success('Usuário atualizado com sucesso')
+      setIsEditDialogOpen(false)
+      setEditingUser(null)
+    } catch (err) {
+      const errors = extractFieldErrors(err)
+      const firstError = Object.values(errors)[0]
+      toast.error(firstError || 'Erro ao atualizar usuário. Verifique os dados.')
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
+  const openDeleteDialog = (u: any) => {
+    setDeletingUser(u)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingUser) return
+    setDeleteSubmitting(true)
+
+    try {
+      await pb.collection('users').delete(deletingUser.id)
+      toast.success('Usuário excluído com sucesso')
+      setIsDeleteDialogOpen(false)
+      setDeletingUser(null)
+    } catch (err) {
+      toast.error('Erro ao excluir usuário.')
+    } finally {
+      setDeleteSubmitting(false)
     }
   }
 
@@ -109,88 +206,185 @@ export default function Usuarios() {
           <p className="text-slate-500 mt-1">Crie e gerencie os acessos ao sistema.</p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-forest hover:bg-forest/90">
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Usuário
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Criar Novo Usuário</DialogTitle>
-              <DialogDescription>
-                Preencha os dados abaixo para cadastrar um novo usuário no sistema.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nome">Nome</Label>
-                <Input id="nome" required value={nome} onChange={(e) => setNome(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="senha">Senha</Label>
-                <Input
-                  id="senha"
-                  type="password"
-                  required
-                  minLength={8}
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="garagem">Garagem</Label>
-                <Select value={garagem} onValueChange={setGaragem}>
-                  <SelectTrigger id="garagem">
-                    <SelectValue placeholder="Selecione a garagem" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Cursino">Cursino</SelectItem>
-                    <SelectItem value="Sapopemba">Sapopemba</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="permissao">Permissão de Acesso</Label>
-                <Select value={role} onValueChange={(v: any) => setRole(v)}>
-                  <SelectTrigger id="permissao">
-                    <SelectValue placeholder="Selecione um papel" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Administrador">Admin</SelectItem>
-                    <SelectItem value="recebedoria">Recebedoria</SelectItem>
-                    <SelectItem value="DP">DP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter className="pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  className="bg-forest hover:bg-forest/90"
-                >
-                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Salvar Usuário
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={openCreateDialog} className="bg-forest hover:bg-forest/90">
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Usuário
+        </Button>
       </div>
+
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Criar Novo Usuário</DialogTitle>
+            <DialogDescription>
+              Preencha os dados abaixo para cadastrar um novo usuário no sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nome">Nome</Label>
+              <Input id="nome" required value={nome} onChange={(e) => setNome(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="senha">Senha</Label>
+              <Input
+                id="senha"
+                type="password"
+                required
+                minLength={8}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="garagem">Garagem</Label>
+              <Select value={garagem} onValueChange={setGaragem}>
+                <SelectTrigger id="garagem">
+                  <SelectValue placeholder="Selecione a garagem" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cursino">Cursino</SelectItem>
+                  <SelectItem value="Sapopemba">Sapopemba</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="permissao">Permissão de Acesso</Label>
+              <Select value={role} onValueChange={(v: any) => setRole(v)}>
+                <SelectTrigger id="permissao">
+                  <SelectValue placeholder="Selecione um papel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Administrador">Admin</SelectItem>
+                  <SelectItem value="recebedoria">Recebedoria</SelectItem>
+                  <SelectItem value="DP">DP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={createSubmitting}
+                className="bg-forest hover:bg-forest/90"
+              >
+                {createSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar Usuário
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+            <DialogDescription>Atualize os dados do usuário abaixo.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">E-mail</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-nome">Nome</Label>
+              <Input
+                id="edit-nome"
+                required
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-garagem">Garagem</Label>
+              <Select value={garagem} onValueChange={setGaragem}>
+                <SelectTrigger id="edit-garagem">
+                  <SelectValue placeholder="Selecione a garagem" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cursino">Cursino</SelectItem>
+                  <SelectItem value="Sapopemba">Sapopemba</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-permissao">Permissão de Acesso</Label>
+              <Select value={role} onValueChange={(v: any) => setRole(v)}>
+                <SelectTrigger id="edit-permissao">
+                  <SelectValue placeholder="Selecione um papel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Administrador">Admin</SelectItem>
+                  <SelectItem value="recebedoria">Recebedoria</SelectItem>
+                  <SelectItem value="DP">DP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={editSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={editSubmitting}
+                className="bg-forest hover:bg-forest/90"
+              >
+                {editSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSubmitting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteConfirm()
+              }}
+              disabled={deleteSubmitting}
+              className="bg-rose-600 hover:bg-rose-700 focus:ring-rose-600"
+            >
+              {deleteSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         <CardContent className="p-0">
@@ -201,18 +395,19 @@ export default function Usuarios() {
                 <TableHead>E-mail</TableHead>
                 <TableHead>Garagem</TableHead>
                 <TableHead>Nível de Acesso</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center">
+                  <TableCell colSpan={5} className="h-32 text-center">
                     <Loader className="h-6 w-6 animate-spin mx-auto text-slate-400" />
                   </TableCell>
                 </TableRow>
               ) : users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-slate-500">
+                  <TableCell colSpan={5} className="h-32 text-center text-slate-500">
                     Nenhum usuário encontrado.
                   </TableCell>
                 </TableRow>
@@ -235,8 +430,34 @@ export default function Usuarios() {
                     <TableCell>
                       <Badge variant="secondary" className="flex w-fit items-center gap-1">
                         <Shield className="h-3 w-3" />
-                        {u.tipo_usuario}
+                        {u.tipo_usuario === 'Administrador'
+                          ? 'Admin'
+                          : u.tipo_usuario === 'recebedoria'
+                            ? 'Recebedoria'
+                            : 'DP'}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(u)}
+                        title="Editar"
+                      >
+                        <Pencil className="h-4 w-4 text-slate-500" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openDeleteDialog(u)}
+                        disabled={u.id === user?.id}
+                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                        title={
+                          u.id === user?.id ? 'Não é possível excluir o próprio usuário' : 'Excluir'
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
