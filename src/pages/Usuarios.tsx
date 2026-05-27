@@ -202,7 +202,8 @@ export default function Usuarios() {
         tipo_usuario: role,
       }
 
-      if (email !== editingUser.email) {
+      const originalEmail = editingUser.email || ''
+      if (email !== originalEmail) {
         updateData.email = email
       }
 
