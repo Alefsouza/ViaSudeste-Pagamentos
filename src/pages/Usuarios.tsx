@@ -52,7 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { extractFieldErrors } from '@/lib/pocketbase/errors'
+import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 import { useRealtime } from '@/hooks/use-realtime'
 
 export default function Usuarios() {
@@ -196,19 +196,24 @@ export default function Usuarios() {
     }
 
     try {
-      await pb.collection('users').update(editingUser.id, {
-        email,
+      const updateData: any = {
         name: nome,
         garagem,
         tipo_usuario: role,
-      })
+      }
+
+      if (email !== editingUser.email) {
+        updateData.email = email
+      }
+
+      await pb.collection('users').update(editingUser.id, updateData)
       toast.success('Usuário atualizado com sucesso')
       setIsEditDialogOpen(false)
       setEditingUser(null)
     } catch (err) {
       const errors = extractFieldErrors(err)
       const firstError = Object.values(errors)[0]
-      toast.error(firstError || 'Erro ao atualizar usuário. Verifique os dados.')
+      toast.error(firstError || getErrorMessage(err))
     } finally {
       setEditSubmitting(false)
     }
