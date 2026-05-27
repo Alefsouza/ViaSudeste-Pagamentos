@@ -80,14 +80,14 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
 
         currentFiles[i].registro = registroTrimmed
 
-        let filialName = 'Cursino'
+        let filialName = ''
         try {
           const colab = await pb
             .collection('colaboradores')
             .getFirstListItem(`registro="${registroTrimmed}"`)
           if (colab.filial) filialName = colab.filial
         } catch (err) {
-          throw new Error(`Colaborador não encontrado: ${registroTrimmed}`)
+          // Colaborador não encontrado, continua sem filial
         }
 
         const newFilename = `${registroTrimmed}_${Date.now()}.${extension}`
@@ -96,7 +96,9 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
         const formData = new FormData()
         formData.append('foto', newFile)
         formData.append('registro', registroTrimmed)
-        formData.append('filial', filialName)
+        if (filialName) {
+          formData.append('filial', filialName)
+        }
         formData.append('data_upload', new Date().toISOString())
 
         let fotoRecord
@@ -117,10 +119,9 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
         toast.success(`Foto enviada com sucesso para registro ${registroTrimmed}`)
       } catch (error: any) {
         currentFiles[i].status = 'error'
-        currentFiles[i].error =
-          error.message.includes('Nome do arquivo') || error.message.includes('Colaborador')
-            ? error.message
-            : 'Erro ao enviar foto'
+        currentFiles[i].error = error?.message?.includes('Nome do arquivo')
+          ? error.message
+          : 'Erro ao enviar foto'
         errorCount++
       }
       setFiles([...currentFiles])

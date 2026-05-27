@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-27T14:25:38.377Z",
+  "generatedAt": "2026-05-27T16:09:49.797Z",
   "collections": [
     {
       "name": "users",
@@ -311,7 +311,7 @@
         {
           "name": "filial",
           "type": "select",
-          "required": true,
+          "required": false,
           "system": false,
           "selectValues": ["Cursino", "Sapopemba"]
         },
