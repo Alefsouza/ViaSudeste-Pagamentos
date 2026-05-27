@@ -32,6 +32,7 @@ import {
   Loader,
   Pencil,
   Trash2,
+  Key,
 } from 'lucide-react'
 import {
   Dialog,
@@ -75,6 +76,12 @@ export default function Usuarios() {
   const [senha, setSenha] = useState('')
   const [garagem, setGaragem] = useState('')
   const [role, setRole] = useState<'Administrador' | 'recebedoria' | 'DP'>('recebedoria')
+
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false)
+  const [resetSubmitting, setResetSubmitting] = useState(false)
+  const [resettingUser, setResettingUser] = useState<any>(null)
+  const [novaSenha, setNovaSenha] = useState('')
+  const [confirmarSenha, setConfirmarSenha] = useState('')
 
   const fetchUsers = async (showLoader = true) => {
     if (showLoader) setLoading(true)
@@ -137,11 +144,44 @@ export default function Usuarios() {
 
   const openEditDialog = (u: any) => {
     setEditingUser(u)
-    setEmail(u.email)
+    setEmail(u.email || '')
     setNome(u.name || '')
     setGaragem(u.garagem || '')
     setRole(u.tipo_usuario || 'recebedoria')
     setIsEditDialogOpen(true)
+  }
+
+  const openResetPasswordDialog = (u: any) => {
+    setResettingUser(u)
+    setNovaSenha('')
+    setConfirmarSenha('')
+    setIsResetPasswordDialogOpen(true)
+  }
+
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resettingUser) return
+    if (novaSenha !== confirmarSenha) {
+      toast.error('As senhas não coincidem')
+      return
+    }
+    setResetSubmitting(true)
+
+    try {
+      await pb.collection('users').update(resettingUser.id, {
+        password: novaSenha,
+        passwordConfirm: confirmarSenha,
+      })
+      toast.success('Senha redefinida com sucesso')
+      setIsResetPasswordDialogOpen(false)
+      setResettingUser(null)
+    } catch (err) {
+      const errors = extractFieldErrors(err)
+      const firstError = Object.values(errors)[0]
+      toast.error(firstError || 'Erro ao redefinir senha. Verifique os dados.')
+    } finally {
+      setResetSubmitting(false)
+    }
   }
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -227,13 +267,18 @@ export default function Usuarios() {
                 id="email"
                 type="email"
                 required
-                value={email}
+                value={email || ''}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="nome">Nome</Label>
-              <Input id="nome" required value={nome} onChange={(e) => setNome(e.target.value)} />
+              <Input
+                id="nome"
+                required
+                value={nome || ''}
+                onChange={(e) => setNome(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="senha">Senha</Label>
@@ -242,13 +287,13 @@ export default function Usuarios() {
                 type="password"
                 required
                 minLength={8}
-                value={senha}
+                value={senha || ''}
                 onChange={(e) => setSenha(e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="garagem">Garagem</Label>
-              <Select value={garagem} onValueChange={setGaragem}>
+              <Select value={garagem || ''} onValueChange={setGaragem}>
                 <SelectTrigger id="garagem">
                   <SelectValue placeholder="Selecione a garagem" />
                 </SelectTrigger>
@@ -260,7 +305,7 @@ export default function Usuarios() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="permissao">Permissão de Acesso</Label>
-              <Select value={role} onValueChange={(v: any) => setRole(v)}>
+              <Select value={role || ''} onValueChange={(v: any) => setRole(v)}>
                 <SelectTrigger id="permissao">
                   <SelectValue placeholder="Selecione um papel" />
                 </SelectTrigger>
@@ -301,7 +346,7 @@ export default function Usuarios() {
                 id="edit-email"
                 type="email"
                 required
-                value={email}
+                value={email || ''}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
@@ -310,13 +355,13 @@ export default function Usuarios() {
               <Input
                 id="edit-nome"
                 required
-                value={nome}
+                value={nome || ''}
                 onChange={(e) => setNome(e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-garagem">Garagem</Label>
-              <Select value={garagem} onValueChange={setGaragem}>
+              <Select value={garagem || ''} onValueChange={setGaragem}>
                 <SelectTrigger id="edit-garagem">
                   <SelectValue placeholder="Selecione a garagem" />
                 </SelectTrigger>
@@ -328,7 +373,7 @@ export default function Usuarios() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-permissao">Permissão de Acesso</Label>
-              <Select value={role} onValueChange={(v: any) => setRole(v)}>
+              <Select value={role || ''} onValueChange={(v: any) => setRole(v)}>
                 <SelectTrigger id="edit-permissao">
                   <SelectValue placeholder="Selecione um papel" />
                 </SelectTrigger>
@@ -355,6 +400,59 @@ export default function Usuarios() {
               >
                 {editSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Redefinir Senha</DialogTitle>
+            <DialogDescription>
+              Defina uma nova senha para o usuário {resettingUser?.name || resettingUser?.email}.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPasswordSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="nova-senha">Nova Senha</Label>
+              <Input
+                id="nova-senha"
+                type="password"
+                required
+                minLength={8}
+                value={novaSenha || ''}
+                onChange={(e) => setNovaSenha(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmar-senha">Confirmar Senha</Label>
+              <Input
+                id="confirmar-senha"
+                type="password"
+                required
+                minLength={8}
+                value={confirmarSenha || ''}
+                onChange={(e) => setConfirmarSenha(e.target.value)}
+              />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsResetPasswordDialogOpen(false)}
+                disabled={resetSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={resetSubmitting}
+                className="bg-forest hover:bg-forest/90"
+              >
+                {resetSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar Nova Senha
               </Button>
             </DialogFooter>
           </form>
@@ -445,6 +543,14 @@ export default function Usuarios() {
                         title="Editar"
                       >
                         <Pencil className="h-4 w-4 text-slate-500" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openResetPasswordDialog(u)}
+                        title="Redefinir Senha"
+                      >
+                        <Key className="h-4 w-4 text-slate-500" />
                       </Button>
                       <Button
                         variant="ghost"
