@@ -134,6 +134,7 @@ export default function Dashboard() {
 
   useRealtime('pagamentos', loadData)
   useRealtime('colaboradores', loadData)
+  useRealtime('fotos_colaboradores', loadData)
 
   if (error) {
     return (

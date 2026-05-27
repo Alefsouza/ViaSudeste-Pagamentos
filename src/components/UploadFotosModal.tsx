@@ -46,9 +46,7 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
   const handleFiles = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return
     const newFiles: FileItem[] = Array.from(selectedFiles)
-      .filter(
-        (f) => f.name.toLowerCase().endsWith('.jpg') || f.name.toLowerCase().endsWith('.jpeg'),
-      )
+      .filter((f) => f.name.match(/^\d+\.(jpe?g|png)$/i))
       .map((file) => ({
         id: Math.random().toString(36).substring(7),
         file,
@@ -72,21 +70,27 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
 
       try {
         const file = currentFiles[i].file
-        const match = file.name.match(/^015(\d{3})(\d+)\.jpe?g$/i)
+        const match = file.name.match(/^(\d+)\.(jpe?g|png)$/i)
         if (!match) {
-          throw new Error('Nome do arquivo inválido. Use o padrão: 015[filial][registro].jpg')
+          throw new Error('Nome do arquivo inválido. Use apenas o registro (ex: 12345.jpg)')
         }
 
-        const filialCode = match[1]
-        const registroRaw = match[2]
-        const registroTrimmed = Number(registroRaw).toString()
+        const registroTrimmed = match[1]
+        const extension = match[2].toLowerCase()
 
         currentFiles[i].registro = registroTrimmed
 
-        const filialInt = parseInt(filialCode, 10)
-        const filialName = filialInt === 2 ? 'Sapopemba' : 'Cursino'
+        let filialName = 'Cursino'
+        try {
+          const colab = await pb
+            .collection('colaboradores')
+            .getFirstListItem(`registro="${registroTrimmed}"`)
+          if (colab.filial) filialName = colab.filial
+        } catch (err) {
+          throw new Error(`Colaborador não encontrado: ${registroTrimmed}`)
+        }
 
-        const newFilename = `${registroTrimmed}_${Date.now()}.jpg`
+        const newFilename = `${registroTrimmed}_${Date.now()}.${extension}`
         const newFile = new File([file], newFilename, { type: file.type })
 
         const formData = new FormData()
@@ -114,7 +118,7 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
       } catch (error: any) {
         currentFiles[i].status = 'error'
         currentFiles[i].error =
-          error.message === 'Nome do arquivo inválido. Use o padrão: 015[filial][registro].jpg'
+          error.message.includes('Nome do arquivo') || error.message.includes('Colaborador')
             ? error.message
             : 'Erro ao enviar foto'
         errorCount++
@@ -183,12 +187,12 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
               <UploadCloud className="mx-auto h-12 w-12 text-forest mb-4" />
               <p className="text-sm font-medium text-forest">Upload de Fotos</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Apenas .jpg, .jpeg. Padrão: 015[filial][registro].jpg
+                Apenas .jpg, .jpeg, .png. Padrão: [registro].jpg
               </p>
               <input
                 type="file"
                 multiple
-                accept=".jpg,.jpeg"
+                accept=".jpg,.jpeg,.png"
                 className="hidden"
                 ref={fileInputRef}
                 onChange={(e) => handleFiles(e.target.files)}
