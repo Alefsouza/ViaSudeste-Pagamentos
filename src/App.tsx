@@ -2,28 +2,32 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { AuthProvider, useAuth } from '@/hooks/use-auth'
+import { AuthProvider, useAuth, Role } from '@/hooks/use-auth'
 import Index from './pages/Index'
 import Dashboard from './pages/Dashboard'
 import Camera from './pages/Camera'
 import RelatorioPagamentos from './pages/RelatorioPagamentos'
 import RelatorioRecebedoria from './pages/RelatorioRecebedoria'
+import Usuarios from './pages/Usuarios'
+import DPFotos from './pages/DPFotos'
 import Layout from './components/Layout'
 
 function ProtectedRoute({
   children,
-  allowedRole,
+  allowedRoles,
 }: {
   children: React.ReactNode
-  allowedRole: 'Administrador' | 'recebedoria'
+  allowedRoles: Role[]
 }) {
   const { user, loading } = useAuth()
 
   if (loading) return null
 
   if (!user) return <Navigate to="/" replace />
-  if (user.role !== allowedRole) {
-    return <Navigate to={user.role === 'Administrador' ? '/dashboard' : '/camera'} replace />
+  if (!allowedRoles.includes(user.role)) {
+    if (user.role === 'Administrador') return <Navigate to="/dashboard" replace />
+    if (user.role === 'DP') return <Navigate to="/dp/fotos" replace />
+    return <Navigate to="/camera" replace />
   }
   return <>{children}</>
 }
@@ -35,15 +39,23 @@ const AppRoutes = () => (
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute allowedRole="Administrador">
+          <ProtectedRoute allowedRoles={['Administrador']}>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/usuarios"
+        element={
+          <ProtectedRoute allowedRoles={['Administrador']}>
+            <Usuarios />
           </ProtectedRoute>
         }
       />
       <Route
         path="/camera"
         element={
-          <ProtectedRoute allowedRole="recebedoria">
+          <ProtectedRoute allowedRoles={['recebedoria']}>
             <Camera />
           </ProtectedRoute>
         }
@@ -51,7 +63,7 @@ const AppRoutes = () => (
       <Route
         path="/relatorio-recebedoria"
         element={
-          <ProtectedRoute allowedRole="recebedoria">
+          <ProtectedRoute allowedRoles={['recebedoria']}>
             <RelatorioRecebedoria />
           </ProtectedRoute>
         }
@@ -59,8 +71,16 @@ const AppRoutes = () => (
       <Route
         path="/relatorio"
         element={
-          <ProtectedRoute allowedRole="Administrador">
+          <ProtectedRoute allowedRoles={['Administrador']}>
             <RelatorioPagamentos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dp/fotos"
+        element={
+          <ProtectedRoute allowedRoles={['DP']}>
+            <DPFotos />
           </ProtectedRoute>
         }
       />

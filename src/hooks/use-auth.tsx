@@ -1,13 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import pb from '@/lib/pocketbase/client'
 
-export type Role = 'Administrador' | 'recebedoria'
+export type Role = 'Administrador' | 'recebedoria' | 'DP'
 
 export interface User {
   id: string
   name: string
   role: Role
   email: string
+  garagem?: string
 }
 
 interface AuthContextType {
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: record.name || record.email.split('@')[0],
         role: record.tipo_usuario as Role,
         email: record.email,
+        garagem: record.garagem,
       }
     }
 

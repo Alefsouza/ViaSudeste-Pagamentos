@@ -2,7 +2,16 @@ import { useState } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { LogOut, LayoutDashboard, Camera, FileText, Upload, FileSpreadsheet } from 'lucide-react'
+import {
+  LogOut,
+  LayoutDashboard,
+  Camera,
+  FileText,
+  Upload,
+  FileSpreadsheet,
+  Users,
+  Camera as CameraIcon,
+} from 'lucide-react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
 import { UploadFotosModal } from '@/components/UploadFotosModal'
@@ -28,7 +37,13 @@ export function Header() {
         <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white">
             <div className="bg-gradient-to-tr from-mint to-mint-light p-2 rounded-lg text-white shadow-sm">
-              {user.role === 'Administrador' ? <LayoutDashboard size={20} /> : <Camera size={20} />}
+              {user.role === 'Administrador' ? (
+                <LayoutDashboard size={20} />
+              ) : user.role === 'DP' ? (
+                <CameraIcon size={20} />
+              ) : (
+                <Camera size={20} />
+              )}
             </div>
             <span className="hidden sm:inline">Via Sudeste</span>
           </div>
@@ -69,8 +84,26 @@ export function Header() {
                 className="flex items-center gap-1.5 transition-colors text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               >
                 <Upload size={16} />
-                <span className="hidden sm:inline">Upload de Fotos</span>
+                <span className="hidden sm:inline">Upload Fotos</span>
               </button>
+              <Link
+                to="/usuarios"
+                className={`flex items-center gap-1.5 transition-colors ${
+                  location.pathname === '/usuarios'
+                    ? 'text-forest dark:text-mint-light'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                <Users size={16} />
+                <span className="hidden sm:inline">Usuários</span>
+              </Link>
+            </nav>
+          ) : user.role === 'DP' ? (
+            <nav className="flex items-center gap-3 md:gap-4 text-sm font-medium">
+              <span className="flex items-center gap-1.5 text-forest dark:text-mint-light font-semibold">
+                <CameraIcon size={16} />
+                <span className="hidden sm:inline">Captura de Fotos (DP)</span>
+              </span>
             </nav>
           ) : (
             <nav className="flex items-center gap-3 md:gap-4 text-sm font-medium">
@@ -105,7 +138,11 @@ export function Header() {
             variant="outline"
             className="border-forest text-forest bg-forest/10 dark:bg-forest/20 px-3 py-1 text-sm font-medium shadow-sm"
           >
-            {user.role === 'Administrador' ? 'Administrador' : 'Recebedoria'}
+            {user.role === 'Administrador'
+              ? 'Administrador'
+              : user.role === 'DP'
+                ? 'DP'
+                : 'Recebedoria'}
           </Badge>
           <div className="text-sm font-medium text-slate-600 dark:text-slate-300 hidden md:block">
             {user.name}
