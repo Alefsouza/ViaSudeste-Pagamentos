@@ -65,6 +65,13 @@ export default function Usuarios() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
+
+    if (!garagem) {
+      toast.error('Selecione uma garagem')
+      setSubmitting(false)
+      return
+    }
+
     try {
       await pb.collection('users').create({
         email,
@@ -144,12 +151,15 @@ export default function Usuarios() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="garagem">Garagem</Label>
-                <Input
-                  id="garagem"
-                  required
-                  value={garagem}
-                  onChange={(e) => setGaragem(e.target.value)}
-                />
+                <Select value={garagem} onValueChange={setGaragem}>
+                  <SelectTrigger id="garagem">
+                    <SelectValue placeholder="Selecione a garagem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cursino">Cursino</SelectItem>
+                    <SelectItem value="Sapopemba">Sapopemba</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="permissao">Permissão de Acesso</Label>
@@ -158,9 +168,9 @@ export default function Usuarios() {
                     <SelectValue placeholder="Selecione um papel" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Administrador">Administrador</SelectItem>
+                    <SelectItem value="Administrador">Admin</SelectItem>
                     <SelectItem value="recebedoria">Recebedoria</SelectItem>
-                    <SelectItem value="DP">Departamento Pessoal (DP)</SelectItem>
+                    <SelectItem value="DP">DP</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
