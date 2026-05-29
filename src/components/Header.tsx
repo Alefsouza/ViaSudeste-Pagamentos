@@ -11,10 +11,12 @@ import {
   FileSpreadsheet,
   Users,
   Camera as CameraIcon,
+  FileDown,
 } from 'lucide-react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
 import { UploadFotosModal } from '@/components/UploadFotosModal'
+import { ExportFolhaModal } from '@/components/ExportFolhaModal'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 
 export function Header() {
@@ -23,6 +25,7 @@ export function Header() {
   const location = useLocation()
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
+  const [exportFolhaModalOpen, setExportFolhaModalOpen] = useState(false)
 
   if (!user) return null
 
@@ -78,6 +81,13 @@ export function Header() {
               >
                 <FileSpreadsheet size={16} />
                 <span className="hidden sm:inline">Importar Excel</span>
+              </button>
+              <button
+                onClick={() => setExportFolhaModalOpen(true)}
+                className="flex items-center gap-1.5 transition-colors text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              >
+                <FileDown size={16} />
+                <span className="hidden sm:inline">Exportar Folha</span>
               </button>
               <button
                 onClick={() => setUploadModalOpen(true)}
@@ -170,6 +180,7 @@ export function Header() {
       </div>
       <ImportPlanilhaModal open={importModalOpen} onOpenChange={setImportModalOpen} />
       <UploadFotosModal open={uploadModalOpen} onOpenChange={setUploadModalOpen} />
+      <ExportFolhaModal open={exportFolhaModalOpen} onOpenChange={setExportFolhaModalOpen} />
     </header>
   )
 }
