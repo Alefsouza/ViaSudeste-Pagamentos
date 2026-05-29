@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { exportFolha } from '@/services/export'
+import { exportFolha } from '@/services/export-folha'
 
 interface ExportFolhaModalProps {
   open: boolean
@@ -35,14 +35,22 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
       const [yyyy, mm] = competencia.split('-')
       const mmYyyy = `${mm}/${yyyy}`
 
-      const txtContent = await exportFolha(mmYyyy)
+      const result = await exportFolha(mmYyyy)
 
-      const lastDay = new Date(parseInt(yyyy, 10), parseInt(mm, 10), 0).getDate()
-      const lastDayStr = String(lastDay).padStart(2, '0')
-      const filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}.txt`
+      if (!result.success) {
+        toast.error(result.message)
+        setLoading(false)
+        return
+      }
 
-      const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
+      let filename = result.filename
+      if (!filename) {
+        const lastDay = new Date(parseInt(yyyy, 10), parseInt(mm, 10), 0).getDate()
+        const lastDayStr = String(lastDay).padStart(2, '0')
+        filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}.txt`
+      }
+
+      const url = URL.createObjectURL(result.blob)
       const a = document.createElement('a')
       a.href = url
       a.download = filename

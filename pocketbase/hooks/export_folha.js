@@ -43,15 +43,13 @@ routerAdd(
       for (const item of items) {
         // Remove leading zeros, keep at least one '0' if it's all zeros
         let reg = String(item.registro || '').replace(/^0+(?!$)/, '')
-        // Pad end with spaces to exactly 10 characters
-        reg = reg.padEnd(10, ' ')
 
         // Format number to 2 decimal places with comma
         let val = Number(item.valor_calculado || 0)
         let valStr = val.toFixed(2).replace('.', ',')
 
-        // Concatenate directly (value starts at column 11)
-        lines.push(`${reg}${valStr}`)
+        // Concatenate directly: registro + exactly 10 spaces + valor
+        lines.push(`${reg}          ${valStr}`)
       }
 
       return e.string(200, lines.join('\n'))
