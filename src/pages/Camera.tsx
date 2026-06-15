@@ -8,6 +8,22 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
   Loader2,
   Search,
   Camera as CameraIcon,
@@ -410,211 +426,117 @@ export default function Camera() {
       <div className="grid md:grid-cols-12 gap-4 h-auto md:h-[513px]">
         {/* Left Column */}
         <div className="md:col-span-5 h-full">
-          {viewState === 'RECOGNITION_SUCCESS' || viewState === 'CONFIRMING_PAYMENT' ? (
-            <Card className="h-full flex flex-col border-slate-200 dark:border-slate-800 shadow-sm rounded-xl">
-              <CardContent className="p-6 flex flex-col h-full">
-                <div className="flex-1 flex flex-col min-h-0">
-                  <h3 className="text-[18px] font-bold text-slate-900 dark:text-white mb-1 shrink-0">
-                    Identidade Confirmada
-                  </h3>
-                  <p className="text-[12px] text-slate-500 mb-4 shrink-0">
-                    O rosto corresponde ao registro informado.
-                  </p>
-
-                  <div className="flex-1 overflow-y-auto pr-2 mb-4 space-y-3 min-h-0">
-                    {colaborador?.records?.map((record: any, idx: number) => (
-                      <div
-                        key={record.id || idx}
-                        className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50"
-                      >
-                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200 dark:border-slate-800">
-                          <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                            {formatDateSafe(record.data)}
-                          </p>
-                          <p className="text-[14px] font-bold text-slate-900 dark:text-white">
-                            {formatCurrency(record.valor_a_receber || record.valor || 0)}
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-y-3 gap-x-4">
-                          <div className="flex flex-col gap-1">
-                            <p className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">
-                              Hora de Inicio
-                            </p>
-                            <p className="text-[13px] font-medium text-slate-900 dark:text-white">
-                              {formatTime(record.inicio)}
-                            </p>
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <p className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">
-                              Hora de Termino
-                            </p>
-                            <p className="text-[13px] font-medium text-slate-900 dark:text-white">
-                              {formatTime(record.termino)}
-                            </p>
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <p className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">
-                              Total de Horas
-                            </p>
-                            <p className="text-[13px] font-medium text-slate-900 dark:text-white">
-                              {formatHoras(record.horas)}
-                            </p>
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <p className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">
-                              Tipo de Pagamento
-                            </p>
-                            <p className="text-[13px] font-medium text-slate-900 dark:text-white">
-                              {getTipoPagamentoDesc(record.idtipopgto)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+          <div className="flex flex-col gap-4 h-full">
+            <Card className="shrink-0 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Busca de Funcionário</CardTitle>
+                <CardDescription>Insira o número de registro para localizar.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSearch} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="registro" className="text-slate-700 dark:text-slate-300">
+                      Registro
+                    </Label>
+                    <Input
+                      id="registro"
+                      placeholder="Ex: 12345"
+                      value={registro}
+                      onChange={(e) => setRegistro(e.target.value)}
+                      className="border-slate-200 dark:border-slate-800"
+                      disabled={
+                        viewState !== 'EMPTY' &&
+                        viewState !== 'SEARCH_FAILED' &&
+                        viewState !== 'RECOGNITION_FAILED'
+                      }
+                    />
                   </div>
-
-                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
-                    <p className="text-[12px] text-slate-500 uppercase tracking-wider font-medium mb-1">
-                      VALOR TOTAL A RECEBER
-                    </p>
-                    <p className="text-[28px] font-bold text-green-600 dark:text-green-500">
-                      {formatCurrency(colaborador?.valor_a_receber || colaborador?.valor || 0)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 w-full mt-6">
-                  <Button
-                    variant="outline"
-                    className="flex-1 h-[40px] text-slate-700 dark:text-slate-300"
-                    onClick={handleReset}
-                    disabled={viewState === 'CONFIRMING_PAYMENT'}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    className="flex-1 h-[40px] bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900"
-                    onClick={handleConfirmPayment}
-                    disabled={viewState === 'CONFIRMING_PAYMENT'}
-                  >
-                    Confirmar Pagamento
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="flex flex-col gap-4 h-full">
-              <Card className="shrink-0 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg">Busca de Funcionário</CardTitle>
-                  <CardDescription>Insira o número de registro para localizar.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSearch} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="registro" className="text-slate-700 dark:text-slate-300">
-                        Registro
-                      </Label>
-                      <Input
-                        id="registro"
-                        placeholder="Ex: 12345"
-                        value={registro}
-                        onChange={(e) => setRegistro(e.target.value)}
-                        className="border-slate-200 dark:border-slate-800"
-                        disabled={
-                          viewState !== 'EMPTY' &&
-                          viewState !== 'SEARCH_FAILED' &&
-                          viewState !== 'RECOGNITION_FAILED'
-                        }
-                      />
+                  {(viewState === 'SEARCH_FAILED' || errorMsg) && (
+                    <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/10 dark:text-red-400 p-3 rounded-md">
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span className="leading-snug">
+                        {viewState === 'SEARCH_FAILED' && !errorMsg
+                          ? 'Todos os pagamentos deste colaborador estão em dia.'
+                          : errorMsg}
+                      </span>
                     </div>
-                    {(viewState === 'SEARCH_FAILED' || errorMsg) && (
-                      <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/10 dark:text-red-400 p-3 rounded-md">
-                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                        <span className="leading-snug">
-                          {viewState === 'SEARCH_FAILED' && !errorMsg
-                            ? 'Todos os pagamentos deste colaborador estão em dia.'
-                            : errorMsg}
-                        </span>
-                      </div>
-                    )}
-                    {viewState === 'SEARCH_FAILED' ? (
+                  )}
+                  {viewState === 'SEARCH_FAILED' ? (
+                    <Button
+                      type="button"
+                      className="w-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 h-10"
+                      onClick={handleRetry}
+                    >
+                      Tentar Novamente
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      className="w-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 h-10"
+                      disabled={viewState === 'SEARCHING' || viewState === 'PROCESSING'}
+                    >
+                      {viewState === 'SEARCHING' ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Buscando...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-4 w-4" />
+                          Buscar
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  {viewState !== 'EMPTY' &&
+                    viewState !== 'SEARCHING' &&
+                    viewState !== 'SEARCH_FAILED' && (
                       <Button
                         type="button"
-                        className="w-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 h-10"
-                        onClick={handleRetry}
+                        variant="outline"
+                        className="w-full h-10 mt-2 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800"
+                        onClick={handleReset}
+                        disabled={viewState === 'PROCESSING'}
                       >
-                        Tentar Novamente
-                      </Button>
-                    ) : (
-                      <Button
-                        type="submit"
-                        className="w-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 h-10"
-                        disabled={viewState === 'SEARCHING' || viewState === 'PROCESSING'}
-                      >
-                        {viewState === 'SEARCHING' ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Buscando...
-                          </>
-                        ) : (
-                          <>
-                            <Search className="mr-2 h-4 w-4" />
-                            Buscar
-                          </>
-                        )}
+                        Nova Busca
                       </Button>
                     )}
-                    {viewState !== 'EMPTY' &&
-                      viewState !== 'SEARCHING' &&
-                      viewState !== 'SEARCH_FAILED' && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full h-10 mt-2 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800"
-                          onClick={handleReset}
-                          disabled={viewState === 'PROCESSING'}
-                        >
-                          Nova Busca
-                        </Button>
-                      )}
-                  </form>
+                </form>
+              </CardContent>
+            </Card>
+
+            {colaborador && (
+              <Card className="shrink-0 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl animate-in fade-in duration-300">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-md">Perfil</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    {fotoPredeterminada ? (
+                      <div className="w-14 h-14 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800 shrink-0">
+                        <img
+                          src={fotoPredeterminada}
+                          alt="Foto"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                        <CameraIcon className="h-5 w-5 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-slate-900 dark:text-white truncate">
+                        {colaborador.nome}
+                      </p>
+                      <p className="text-sm text-slate-500">Reg: {colaborador.registro}</p>
+                      <p className="text-sm text-slate-500">{colaborador.filial}</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
-
-              {colaborador && (
-                <Card className="shrink-0 border-slate-200 dark:border-slate-800 shadow-sm rounded-xl animate-in fade-in duration-300">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-md">Perfil</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-4">
-                      {fotoPredeterminada ? (
-                        <div className="w-14 h-14 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800 shrink-0">
-                          <img
-                            src={fotoPredeterminada}
-                            alt="Foto"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                          <CameraIcon className="h-5 w-5 text-slate-400" />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-slate-900 dark:text-white truncate">
-                          {colaborador.nome}
-                        </p>
-                        <p className="text-sm text-slate-500">Reg: {colaborador.registro}</p>
-                        <p className="text-sm text-slate-500">{colaborador.filial}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Right Column - Camera */}
@@ -672,7 +594,7 @@ export default function Camera() {
                     <h3 className="text-lg font-medium text-slate-900 dark:text-white">
                       Reconhecimento Concluído
                     </h3>
-                    <p className="text-sm text-slate-500 mt-1">Verifique os dados ao lado.</p>
+                    <p className="text-sm text-slate-500 mt-1">Verifique os dados no resumo.</p>
                   </>
                 )}
               </div>
@@ -719,6 +641,128 @@ export default function Camera() {
           </Card>
         </div>
       </div>
+
+      {/* Resumo Modal */}
+      <Dialog
+        open={viewState === 'RECOGNITION_SUCCESS' || viewState === 'CONFIRMING_PAYMENT'}
+        onOpenChange={(open) => {
+          if (!open && viewState !== 'CONFIRMING_PAYMENT') handleReset()
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Resumo do Pagamento</DialogTitle>
+            <DialogDescription>
+              Confirme os detalhes do pagamento para o colaborador identificado.
+            </DialogDescription>
+          </DialogHeader>
+
+          {colaborador && (
+            <div className="space-y-6 mt-4">
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900 p-4 rounded-lg">
+                <div>
+                  <p className="text-sm text-slate-500">Registro</p>
+                  <p className="font-medium text-slate-900 dark:text-white">
+                    {colaborador.registro}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Nome</p>
+                  <p className="font-medium text-slate-900 dark:text-white">{colaborador.nome}</p>
+                </div>
+              </div>
+
+              <div className="border rounded-md overflow-x-auto">
+                <Table className="min-w-[600px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Registro</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Início</TableHead>
+                      <TableHead>Término</TableHead>
+                      <TableHead>Tipo de Pagamento</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(colaborador.records && colaborador.records.length > 0
+                      ? colaborador.records
+                      : [colaborador]
+                    ).map((record: any, idx: number) => (
+                      <TableRow key={record.id || idx}>
+                        <TableCell>{record.registro}</TableCell>
+                        <TableCell>{record.nome}</TableCell>
+                        <TableCell>
+                          {formatDateSafe(record.data)} {formatTime(record.inicio)}
+                        </TableCell>
+                        <TableCell>
+                          {formatDateSafe(record.data)} {formatTime(record.termino)}
+                        </TableCell>
+                        <TableCell>{getTipoPagamentoDesc(record.idtipopgto)}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(record.valor_a_receber || record.valor || 0)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex justify-end">
+                <div className="w-full md:w-1/2 space-y-3">
+                  <div className="border-b pb-3 space-y-2">
+                    <h4 className="font-medium text-sm text-slate-700 dark:text-slate-300">
+                      Subtotais por Tipo
+                    </h4>
+                    {Object.entries(
+                      (colaborador.records && colaborador.records.length > 0
+                        ? colaborador.records
+                        : [colaborador]
+                      ).reduce((acc: any, record: any) => {
+                        const type = getTipoPagamentoDesc(record.idtipopgto)
+                        const val = record.valor_a_receber || record.valor || 0
+                        acc[type] = (acc[type] || 0) + val
+                        return acc
+                      }, {}),
+                    ).map(([type, total]: any) => (
+                      <div key={type} className="flex justify-between text-sm">
+                        <span className="text-slate-500">{type}</span>
+                        <span className="font-medium">{formatCurrency(total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="font-bold text-lg">Total Geral</span>
+                    <span className="font-bold text-xl text-green-600 dark:text-green-500">
+                      {formatCurrency(colaborador.valor_a_receber || colaborador.valor || 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="mt-6">
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              disabled={viewState === 'CONFIRMING_PAYMENT'}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmPayment} disabled={viewState === 'CONFIRMING_PAYMENT'}>
+              {viewState === 'CONFIRMING_PAYMENT' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Confirmando...
+                </>
+              ) : (
+                'Confirmar'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
