@@ -99,12 +99,6 @@ export default function Camera() {
         return
       }
 
-      if (!result.hasFotoRecord || !result.fotoUrl) {
-        setViewState('SEARCH_FAILED')
-        setErrorMsg('Foto do colaborador não encontrada')
-        return
-      }
-
       setColaborador(result.colab)
       setFotoPredeterminada(result.fotoUrl)
       setViewState('CAPTURING')
@@ -523,9 +517,9 @@ export default function Camera() {
                       />
                     </div>
                     {(viewState === 'SEARCH_FAILED' || errorMsg) && (
-                      <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/10 dark:text-red-400 p-3 rounded-md">
-                        <AlertCircle className="h-4 w-4 shrink-0" />
-                        <span>
+                      <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/10 dark:text-red-400 p-3 rounded-md">
+                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                        <span className="leading-snug">
                           {viewState === 'SEARCH_FAILED' && !errorMsg
                             ? 'Colaborador não encontrado'
                             : errorMsg}

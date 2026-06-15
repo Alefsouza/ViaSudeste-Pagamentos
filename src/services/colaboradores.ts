@@ -79,51 +79,19 @@ export const getColaboradorByRegistro = async (registro: string) => {
     return cached.data
   }
 
-  const firstColab = await pb
+  const anyColab = await pb
     .collection('colaboradores')
-    .getFirstListItem(
-      `registro="${registro}" && (foto_confirmacao_url="" || foto_confirmacao_url=null)`,
-      {
-        sort: '-created',
-      },
-    )
+    .getFirstListItem(`registro="${registro}"`)
     .catch(() => null)
 
-  if (!firstColab) {
-    throw new Error('Nenhum registro pendente encontrado para este funcionário')
-  }
-
-  let colab = null
-  if (firstColab) {
-    const allRecords = await pb
-      .collection('colaboradores')
-      .getFullList({
-        filter: `registro="${registro}" && (foto_confirmacao_url="" || foto_confirmacao_url=null)`,
-        sort: '-created',
-      })
-      .catch(() => [firstColab])
-
-    const totalValor = allRecords.reduce((acc, curr) => {
-      const v = curr.valor_a_receber || curr.valor || 0
-      return acc + v
-    }, 0)
-
-    colab = {
-      ...firstColab,
-      valor_a_receber: totalValor,
-      valor: totalValor,
-      all_records_ids: allRecords.map((r) => r.id),
-      records: allRecords,
-    }
+  if (!anyColab) {
+    throw new Error('Colaborador não encontrado')
   }
 
   const fotoRecord = await pb
     .collection('fotos_colaboradores')
     .getFirstListItem(`registro="${registro}"`)
-    .catch((error) => {
-      console.error('Erro ao buscar foto do colaborador:', error)
-      return null
-    })
+    .catch(() => null)
 
   let fotoUrl = null
   if (fotoRecord) {
@@ -134,7 +102,38 @@ export const getColaboradorByRegistro = async (registro: string) => {
     }
   }
 
-  const result = { colab, fotoUrl, hasFotoRecord: !!fotoRecord }
+  if (!fotoRecord || !fotoUrl) {
+    throw new Error('Não há foto cadastrada no sistema para realizar o reconhecimento facial.')
+  }
+
+  const allRecords = await pb
+    .collection('colaboradores')
+    .getFullList({
+      filter: `registro="${registro}" && (foto_confirmacao_url="" || foto_confirmacao_url=null)`,
+      sort: '-created',
+    })
+    .catch(() => [])
+
+  const totalValor = allRecords.reduce((acc, curr) => {
+    const v = curr.valor_a_receber || curr.valor || 0
+    return acc + v
+  }, 0)
+
+  if (allRecords.length === 0 || totalValor === 0) {
+    throw new Error('Não há valor pendente para receber para este colaborador.')
+  }
+
+  const firstColab = allRecords[0]
+
+  const colab = {
+    ...firstColab,
+    valor_a_receber: totalValor,
+    valor: totalValor,
+    all_records_ids: allRecords.map((r) => r.id),
+    records: allRecords,
+  }
+
+  const result = { colab, fotoUrl, hasFotoRecord: true }
   colabCache.set(registro, { data: result, timestamp: now })
 
   return result
