@@ -159,6 +159,8 @@ export default function Camera() {
           hour12: false,
         })
       }
+      const timeMatch = timeStr.match(/\b([01]?[0-9]|2[0-3]):([0-5][0-9])\b/)
+      if (timeMatch) return timeMatch[0]
     }
     const parts = timeStr.split(':')
     if (parts.length >= 2) return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
@@ -676,13 +678,11 @@ export default function Camera() {
                 <Table className="min-w-[600px]">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Registro</TableHead>
-                      <TableHead>Nome</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Início</TableHead>
                       <TableHead>Término</TableHead>
-                      <TableHead>Tipo de Pagamento</TableHead>
                       <TableHead>Total (Horas)</TableHead>
+                      <TableHead>Tipo de Pagamento</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -692,13 +692,11 @@ export default function Camera() {
                       : [colaborador]
                     ).map((record: any, idx: number) => (
                       <TableRow key={record.id || idx}>
-                        <TableCell>{record.registro}</TableCell>
-                        <TableCell>{record.nome}</TableCell>
                         <TableCell>{formatDateSafe(record.data)}</TableCell>
                         <TableCell>{formatTime(record.inicio)}</TableCell>
                         <TableCell>{formatTime(record.termino)}</TableCell>
-                        <TableCell>{getTipoPagamentoDesc(record.idtipopgto)}</TableCell>
                         <TableCell>{formatHoras(record.horas)}</TableCell>
+                        <TableCell>{getTipoPagamentoDesc(record.idtipopgto)}</TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(record.valor_a_receber || record.valor || 0)}
                         </TableCell>
