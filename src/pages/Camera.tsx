@@ -69,15 +69,20 @@ export default function Camera() {
     return arr.sort((a, b) => {
       const parseDate = (dStr: string) => {
         if (!dStr) return 0
+        const matchIso = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (matchIso)
+          return new Date(`${matchIso[1]}-${matchIso[2]}-${matchIso[3]}T00:00:00`).getTime()
         const matchBr = dStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
-        if (matchBr) return new Date(`${matchBr[3]}-${matchBr[2]}-${matchBr[1]}`).getTime()
+        if (matchBr) return new Date(`${matchBr[3]}-${matchBr[2]}-${matchBr[1]}T00:00:00`).getTime()
         return new Date(dStr).getTime()
       }
-      const da = parseDate(a.data)
-      const db = parseDate(b.data)
-      if (isNaN(da) && isNaN(db)) return String(a.data || '').localeCompare(String(b.data || ''))
-      if (isNaN(da)) return -1
-      if (isNaN(db)) return 1
+      const valA = a.data || a.data_pagamento || a.data_pagamento_v2 || ''
+      const valB = b.data || b.data_pagamento || b.data_pagamento_v2 || ''
+      const da = parseDate(valA)
+      const db = parseDate(valB)
+      if (isNaN(da) && isNaN(db)) return String(valA).localeCompare(String(valB))
+      if (isNaN(da)) return 1
+      if (isNaN(db)) return -1
       return da - db
     })
   }, [colaborador])
@@ -161,15 +166,15 @@ export default function Camera() {
   const formatDateSafe = (dStr?: string) => {
     if (!dStr) return 'Data não informada'
     const matchIso = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
-    if (matchIso) return `${matchIso[2]}/${matchIso[3]}/${matchIso[1]}`
+    if (matchIso) return `${matchIso[3]}/${matchIso[2]}/${matchIso[1]}`
     const matchBr = dStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
-    if (matchBr) return `${matchBr[2]}/${matchBr[1]}/${matchBr[3]}`
+    if (matchBr) return `${matchBr[1]}/${matchBr[2]}/${matchBr[3]}`
     const d = new Date(dStr)
     if (!isNaN(d.getTime())) {
       const month = String(d.getMonth() + 1).padStart(2, '0')
       const day = String(d.getDate()).padStart(2, '0')
       const year = d.getFullYear()
-      return `${month}/${day}/${year}`
+      return `${day}/${month}/${year}`
     }
     return dStr
   }
@@ -754,7 +759,9 @@ export default function Camera() {
                         className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                       >
                         <TableCell className="py-1.5 leading-tight text-slate-700 dark:text-slate-300">
-                          {formatDateSafe(record.data)}
+                          {formatDateSafe(
+                            record.data || record.data_pagamento || record.data_pagamento_v2,
+                          )}
                         </TableCell>
                         <TableCell className="py-1.5 leading-tight text-slate-700 dark:text-slate-300">
                           {formatTime(record.inicio)}
