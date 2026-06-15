@@ -206,35 +206,24 @@ export default function RelatorioRecebedoria() {
 
       const filterString = conditions.length > 0 ? conditions.join(' && ') : ''
 
-      const results = await Promise.allSettled([
-        pb.collection('pagamentos').getList(page, 20, {
-          filter: filterString,
-          sort: '-created',
-          expand: 'colaborador_id,user_id',
-        }),
-        pb.collection('pagamentos').getFullList({
-          filter: filterString,
-          sort: '-created',
-          expand: 'colaborador_id,user_id',
-        }),
-      ])
+      const fullRes = await pb.collection('pagamentos').getFullList({
+        filter: filterString,
+        sort: '-created',
+        expand: 'colaborador_id,user_id',
+      })
 
-      const paginatedRes = results[0]
-      const fullRes = results[1]
+      const sortedData = fullRes.sort((a: any, b: any) => {
+        const dateA = parseDateForSort(a.expand?.colaborador_id?.data)
+        const dateB = parseDateForSort(b.expand?.colaborador_id?.data)
+        return dateA - dateB
+      })
 
-      if (paginatedRes.status === 'fulfilled') {
-        setData(paginatedRes.value.items)
-        setTotalPages(paginatedRes.value.totalPages || 1)
-        setTotalItems(paginatedRes.value.totalItems || 0)
-      } else {
-        throw new Error('Falha ao carregar pagamentos paginados')
-      }
+      setSummaryData(sortedData)
+      setTotalItems(sortedData.length)
 
-      if (fullRes.status === 'fulfilled') {
-        setSummaryData(fullRes.value)
-      } else {
-        setSummaryData([])
-      }
+      const newTotalPages = Math.ceil(sortedData.length / 20) || 1
+      setTotalPages(newTotalPages)
+      setPage((p) => (p > newTotalPages ? newTotalPages : p))
     } catch (err: any) {
       console.error(err)
       setError(true)
@@ -246,7 +235,6 @@ export default function RelatorioRecebedoria() {
   useEffect(() => {
     loadData()
   }, [
-    page,
     startDate,
     endDate,
     startTime,
@@ -259,6 +247,11 @@ export default function RelatorioRecebedoria() {
     allUsers.length,
     filiaisOptions.length,
   ])
+
+  useEffect(() => {
+    const startIndex = (page - 1) * 20
+    setData(summaryData.slice(startIndex, startIndex + 20))
+  }, [page, summaryData])
 
   useRealtime('pagamentos', () => {
     loadData()
@@ -284,6 +277,23 @@ export default function RelatorioRecebedoria() {
     window.print()
   }
 
+  const parseDateForSort = (dateStr: string | undefined | null) => {
+    if (!dateStr || dateStr === '-') return 0
+    if (dateStr.includes('/')) {
+      const parts = dateStr.split(' ')[0].split('/')
+      if (parts.length >= 3) {
+        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime()
+      }
+    }
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split(' ')[0].split('-')
+      if (parts.length >= 3) {
+        return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getTime()
+      }
+    }
+    return 0
+  }
+
   const formatDateStringSafe = (dateStr: string) => {
     if (!dateStr || dateStr === '-') return '-'
     if (dateStr.includes('/')) return dateStr
@@ -293,14 +303,6 @@ export default function RelatorioRecebedoria() {
     }
     return dateStr
   }
-
-  // Group items by name
-  const groupedByName = data.reduce((acc: any, item: any) => {
-    const n = item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'
-    if (!acc[n]) acc[n] = []
-    acc[n].push(item)
-    return acc
-  }, {})
 
   // Summary Data grouping for simple table
   const summaryArray = React.useMemo(() => {
@@ -738,7 +740,8 @@ export default function RelatorioRecebedoria() {
                   <TableRow>
                     <TableHead>Registro</TableHead>
                     <TableHead>Nome</TableHead>
-                    <TableHead>Data</TableHead>
+                    <TableHead>Dt. Ref.</TableHead>
+                    <TableHead>Data Pgto</TableHead>
                     <TableHead>Horário</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead className="text-left w-[150px]">Tipo de Pagamento</TableHead>
@@ -758,7 +761,10 @@ export default function RelatorioRecebedoria() {
                           <Skeleton className="h-4 w-40" />
                         </TableCell>
                         <TableCell>
-                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-24" />
                         </TableCell>
                         <TableCell>
                           <Skeleton className="h-4 w-16" />
@@ -782,7 +788,7 @@ export default function RelatorioRecebedoria() {
                     ))
                   ) : data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-48 text-center">
+                      <TableCell colSpan={10} className="h-48 text-center">
                         <SearchX className="mx-auto h-10 w-10 text-slate-300 mb-3" />
                         <p className="text-slate-500 font-medium">Nenhum pagamento encontrado.</p>
                         <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4">
@@ -791,88 +797,72 @@ export default function RelatorioRecebedoria() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
-                      const totalLines = summaryData.filter(
-                        (c) =>
-                          (c.expand?.colaborador_id?.nome || c.nome || 'Desconhecido') === nome,
-                      ).length
-                      return (
-                        <React.Fragment key={nome}>
-                          <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 print:bg-slate-100">
-                            <TableCell
-                              colSpan={9}
-                              className="font-semibold text-lg text-slate-700 dark:text-slate-300 print:text-black"
-                            >
-                              {nome} - {totalLines}{' '}
-                              {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
-                            </TableCell>
-                          </TableRow>
-                          {records.map((item: any) => {
-                            const isConfirmado = !!item.foto_confirmacao_url
-                            const statusBadge = isConfirmado ? (
-                              <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
-                                Confirmado
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
-                                Pendente
-                              </Badge>
-                            )
+                    data.map((item: any) => {
+                      const isConfirmado = !!item.foto_confirmacao_url
+                      const statusBadge = isConfirmado ? (
+                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                          Confirmado
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                          Pendente
+                        </Badge>
+                      )
 
-                            return (
-                              <TableRow
-                                key={item.id}
-                                className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
-                              >
-                                <TableCell className="font-medium pl-8 print:text-black">
-                                  {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
-                                </TableCell>
-                                <TableCell className="print:text-black">
-                                  {item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'}
-                                </TableCell>
-                                <TableCell className="print:text-black">
-                                  {formatDateStringSafe(item.data_pagamento) || '-'}
-                                </TableCell>
-                                <TableCell className="print:text-black">
-                                  {item.hora_pagamento || '-'}
-                                </TableCell>
-                                <TableCell className="text-right font-medium print:text-black">
-                                  {formatBRL(
-                                    item.expand?.colaborador_id?.valor_a_receber ||
-                                      item.valor_pago ||
-                                      item.valor_a_receber ||
-                                      item.valor,
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-left print:text-black">
-                                  {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
-                                </TableCell>
-                                <TableCell className="text-center">{statusBadge}</TableCell>
-                                <TableCell className="text-center print:hidden">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!isConfirmado}
-                                    onClick={() => setPhotoModal(item.foto_confirmacao_url)}
-                                    className="text-slate-600 print:hidden"
-                                  >
-                                    <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
-                                  </Button>
-                                </TableCell>
-                                <TableCell className="text-right print:hidden">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setDetailsModal(item)}
-                                    className="print:hidden"
-                                  >
-                                    <FileText className="h-4 w-4 mr-2" /> Detalhes
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })}
-                        </React.Fragment>
+                      return (
+                        <TableRow
+                          key={item.id}
+                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
+                        >
+                          <TableCell className="font-medium print:text-black">
+                            {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
+                          </TableCell>
+                          <TableCell className="print:text-black">
+                            {item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'}
+                          </TableCell>
+                          <TableCell className="print:text-black">
+                            {formatDateStringSafe(item.expand?.colaborador_id?.data) || '-'}
+                          </TableCell>
+                          <TableCell className="print:text-black">
+                            {formatDateStringSafe(item.data_pagamento) || '-'}
+                          </TableCell>
+                          <TableCell className="print:text-black">
+                            {item.hora_pagamento || '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium print:text-black">
+                            {formatBRL(
+                              item.expand?.colaborador_id?.valor_a_receber ||
+                                item.valor_pago ||
+                                item.valor_a_receber ||
+                                item.valor,
+                            )}
+                          </TableCell>
+                          <TableCell className="text-left print:text-black">
+                            {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
+                          </TableCell>
+                          <TableCell className="text-center">{statusBadge}</TableCell>
+                          <TableCell className="text-center print:hidden">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={!isConfirmado}
+                              onClick={() => setPhotoModal(item.foto_confirmacao_url)}
+                              className="text-slate-600 print:hidden"
+                            >
+                              <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
+                            </Button>
+                          </TableCell>
+                          <TableCell className="text-right print:hidden">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDetailsModal(item)}
+                              className="print:hidden"
+                            >
+                              <FileText className="h-4 w-4 mr-2" /> Detalhes
+                            </Button>
+                          </TableCell>
+                        </TableRow>
                       )
                     })
                   )}
@@ -881,7 +871,7 @@ export default function RelatorioRecebedoria() {
             </div>
 
             {/* Mobile Cards */}
-            <div className="md:hidden print:hidden space-y-6">
+            <div className="md:hidden print:hidden space-y-4">
               {loading ? (
                 [...Array(4)].map((_, i) => <Skeleton key={i} className="h-36 w-full rounded-xl" />)
               ) : data.length === 0 ? (
@@ -893,92 +883,78 @@ export default function RelatorioRecebedoria() {
                   </Button>
                 </div>
               ) : (
-                Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
-                  const totalLines = summaryData.filter(
-                    (c) => (c.expand?.colaborador_id?.nome || c.nome || 'Desconhecido') === nome,
-                  ).length
-                  return (
-                    <div key={nome} className="space-y-4">
-                      <div className="font-semibold text-lg text-slate-700 dark:text-slate-300 px-2 pt-2 border-b pb-2">
-                        {nome} - {totalLines}{' '}
-                        {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
-                      </div>
-                      {records.map((item: any) => {
-                        const isConfirmado = !!item.foto_confirmacao_url
-                        const statusBadge = isConfirmado ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
-                            Confirmado
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
-                            Pendente
-                          </Badge>
-                        )
+                data.map((item: any) => {
+                  const isConfirmado = !!item.foto_confirmacao_url
+                  const statusBadge = isConfirmado ? (
+                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                      Confirmado
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                      Pendente
+                    </Badge>
+                  )
 
-                        return (
-                          <Card key={item.id} className="shadow-sm">
-                            <CardContent className="p-4 space-y-4">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <div className="font-semibold text-lg text-slate-900 dark:text-slate-100">
-                                    {item.expand?.colaborador_id?.nome ||
-                                      item.nome ||
-                                      'Desconhecido'}
-                                  </div>
-                                  <div className="text-sm text-slate-500 mt-1">
-                                    Reg:{' '}
-                                    {item.expand?.colaborador_id?.registro ||
-                                      item.registro ||
-                                      'N/A'}
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="font-bold text-lg text-slate-900 dark:text-slate-100">
-                                    {formatBRL(
-                                      item.expand?.colaborador_id?.valor_a_receber ||
-                                        item.valor_pago ||
-                                        item.valor_a_receber ||
-                                        item.valor,
-                                    )}
-                                  </div>
-                                  <div className="mt-1">{statusBadge}</div>
-                                </div>
-                              </div>
-                              <div className="flex flex-col gap-1 text-sm text-slate-500">
-                                <span className="font-medium text-slate-700 dark:text-slate-300">
-                                  {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center pt-3 border-t">
-                                <div className="text-sm text-slate-500">
-                                  {formatDateStringSafe(item.data_pagamento) || '-'}{' '}
-                                  {item.hora_pagamento || ''}
-                                </div>
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    disabled={!isConfirmado}
-                                    onClick={() => setPhotoModal(item.foto_confirmacao_url)}
-                                  >
-                                    <ImageIcon className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    className="h-8"
-                                    onClick={() => setDetailsModal(item)}
-                                  >
-                                    Detalhes
-                                  </Button>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        )
-                      })}
-                    </div>
+                  return (
+                    <Card key={item.id} className="shadow-sm">
+                      <CardContent className="p-4 space-y-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-semibold text-lg text-slate-900 dark:text-slate-100">
+                              {item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'}
+                            </div>
+                            <div className="text-sm text-slate-500 mt-1">
+                              Reg: {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
+                            </div>
+                            <div className="text-sm text-slate-500 mt-1">
+                              Dt. Ref:{' '}
+                              {formatDateStringSafe(item.expand?.colaborador_id?.data) || '-'}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-lg text-slate-900 dark:text-slate-100">
+                              {formatBRL(
+                                item.expand?.colaborador_id?.valor_a_receber ||
+                                  item.valor_pago ||
+                                  item.valor_a_receber ||
+                                  item.valor,
+                              )}
+                            </div>
+                            <div className="mt-1">{statusBadge}</div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1 text-sm text-slate-500">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center pt-3 border-t">
+                          <div className="text-sm text-slate-500">
+                            {formatDateStringSafe(item.data_pagamento) || '-'}{' '}
+                            {item.hora_pagamento || ''}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              disabled={!isConfirmado}
+                              onClick={() => setPhotoModal(item.foto_confirmacao_url)}
+                            >
+                              <ImageIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => setDetailsModal(item)}
+                            >
+                              Detalhes
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   )
                 })
               )}
@@ -1196,6 +1172,14 @@ export default function RelatorioRecebedoria() {
                     {detailsModal.expand?.colaborador_id?.nome ||
                       detailsModal.nome ||
                       'Desconhecido'}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                    Dt. Ref.
+                  </span>
+                  <p className="font-medium">
+                    {formatDateStringSafe(detailsModal.expand?.colaborador_id?.data) || '-'}
                   </p>
                 </div>
                 <div>
