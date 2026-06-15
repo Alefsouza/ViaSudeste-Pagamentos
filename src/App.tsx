@@ -63,7 +63,7 @@ const AppRoutes = () => (
       <Route
         path="/relatorio-recebedoria"
         element={
-          <ProtectedRoute allowedRoles={['recebedoria']}>
+          <ProtectedRoute allowedRoles={['recebedoria', 'Administrador']}>
             <RelatorioRecebedoria />
           </ProtectedRoute>
         }
