@@ -283,7 +283,8 @@ export default function Dashboard() {
 
   const getFilialName = useCallback(
     (curr: any) => {
-      const fromRel = curr.expand?.colaborador_id?.filial
+      if (!curr) return 'Outra'
+      const fromRel = curr?.expand?.colaborador_id?.filial
       if (fromRel) return fromRel
       if (curr.filial != null && filialIdToNameMap.has(curr.filial)) {
         return filialIdToNameMap.get(curr.filial)
@@ -404,7 +405,8 @@ export default function Dashboard() {
   const isEmpty = statsData.length === 0 && !statsLoading
 
   const groupedByName = (tableData?.items || []).reduce((acc: any, item: any) => {
-    const n = item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'
+    if (!item) return acc
+    const n = item?.expand?.colaborador_id?.nome || item?.nome || 'Desconhecido'
     if (!acc[n]) acc[n] = []
     acc[n].push(item)
     return acc
@@ -834,7 +836,7 @@ export default function Dashboard() {
                           Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
                             const totalLines = filteredStatsData.filter(
                               (c) =>
-                                (c.expand?.colaborador_id?.nome || c.nome || 'Desconhecido') ===
+                                (c?.expand?.colaborador_id?.nome || c?.nome || 'Desconhecido') ===
                                 nome,
                             ).length
                             return (
@@ -853,10 +855,10 @@ export default function Dashboard() {
                                 {records.map((p: any) => (
                                   <TableRow key={p.id}>
                                     <TableCell className="font-medium pl-8">
-                                      {p.expand?.colaborador_id?.nome || p.nome || 'Desconhecido'}
+                                      {p?.expand?.colaborador_id?.nome || p?.nome || 'Desconhecido'}
                                     </TableCell>
                                     <TableCell>
-                                      {p.expand?.colaborador_id?.registro || p.registro || 'N/A'}
+                                      {p?.expand?.colaborador_id?.registro || p?.registro || 'N/A'}
                                     </TableCell>
                                     <TableCell>{getFilialName(p)}</TableCell>
                                     <TableCell className="text-forest font-medium text-left">
@@ -948,7 +950,7 @@ export default function Dashboard() {
                       Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
                         const totalLines = filteredStatsData.filter(
                           (c) =>
-                            (c.expand?.colaborador_id?.nome || c.nome || 'Desconhecido') === nome,
+                            (c?.expand?.colaborador_id?.nome || c?.nome || 'Desconhecido') === nome,
                         ).length
                         return (
                           <div key={nome} className="space-y-4">
@@ -961,16 +963,18 @@ export default function Dashboard() {
                                 <CardContent className="p-4 flex flex-col gap-2">
                                   <div className="flex justify-between font-bold">
                                     <span className="truncate">
-                                      {p.expand?.colaborador_id?.nome || p.nome || 'Desconhecido'}
+                                      {p?.expand?.colaborador_id?.nome || p?.nome || 'Desconhecido'}
                                     </span>
                                     <span className="text-forest">
-                                      {formatBRL(p.valor_pago || p.valor_a_receber || p.valor || 0)}
+                                      {formatBRL(
+                                        p?.valor_pago || p?.valor_a_receber || p?.valor || 0,
+                                      )}
                                     </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
                                     <span>
                                       Reg:{' '}
-                                      {p.expand?.colaborador_id?.registro || p.registro || 'N/A'}
+                                      {p?.expand?.colaborador_id?.registro || p?.registro || 'N/A'}
                                     </span>
                                     <span>{getFilialName(p)}</span>
                                   </div>
