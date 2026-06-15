@@ -85,7 +85,7 @@ export default function RelatorioRecebedoria() {
   // Filter Options State
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
-  const [garagens, setGaragens] = useState<string[]>([])
+  const [filiaisOptions, setFiliaisOptions] = useState<{ label: string; value: number }[]>([])
   const [tiposPagamento, setTiposPagamento] = useState<string[]>([])
 
   useEffect(() => {
@@ -99,10 +99,17 @@ export default function RelatorioRecebedoria() {
         const allUsersRes = await pb.collection('users').getFullList()
         setAllUsers(allUsersRes)
 
-        const uniqueGaragens = Array.from(
-          new Set(allUsersRes.map((u: any) => u.garagem).filter(Boolean)),
-        )
-        setGaragens(uniqueGaragens as string[])
+        const colabRes = await pb.collection('colaboradores').getFullList({
+          fields: 'filial,filial_id',
+        })
+        const map = new Map<string, number>()
+        colabRes.forEach((c: any) => {
+          if (c.filial && c.filial_id != null) {
+            map.set(c.filial, c.filial_id)
+          }
+        })
+        const options = Array.from(map.entries()).map(([label, value]) => ({ label, value }))
+        setFiliaisOptions(options.sort((a, b) => a.label.localeCompare(b.label)))
 
         const pagamentosRes = await pb
           .collection('pagamentos')
@@ -163,7 +170,14 @@ export default function RelatorioRecebedoria() {
       }
 
       if (garagemFilter && garagemFilter !== 'Todos') {
-        conditions.push(`user_id.garagem = "${garagemFilter}"`)
+        const selectedFilial = filiaisOptions.find((f) => f.value.toString() === garagemFilter)
+        if (selectedFilial) {
+          conditions.push(
+            `(filial = ${selectedFilial.value} || colaborador_id.filial = "${selectedFilial.label}")`,
+          )
+        } else {
+          conditions.push(`filial = ${garagemFilter}`)
+        }
       }
 
       if (tipoPagamentoFilter && tipoPagamentoFilter !== 'Todos') {
@@ -219,6 +233,7 @@ export default function RelatorioRecebedoria() {
     garagemFilter,
     tipoPagamentoFilter,
     allUsers.length,
+    filiaisOptions.length,
   ])
 
   useRealtime('pagamentos', () => {
@@ -363,9 +378,9 @@ export default function RelatorioRecebedoria() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Todos">Todas</SelectItem>
-                {garagens.map((g) => (
-                  <SelectItem key={g} value={g}>
-                    {g}
+                {filiaisOptions.map((f) => (
+                  <SelectItem key={f.value.toString()} value={f.value.toString()}>
+                    {f.label}
                   </SelectItem>
                 ))}
               </SelectContent>
