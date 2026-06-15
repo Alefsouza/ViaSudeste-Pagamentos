@@ -829,7 +829,7 @@ export default function RelatorioRecebedoria() {
                           <TableCell className="print:text-black">
                             {item.hora_pagamento || '-'}
                           </TableCell>
-                          <TableCell className="text-right font-medium print:text-black">
+                          <TableCell className="font-medium print:text-black text-left">
                             {formatBRL(
                               item.expand?.colaborador_id?.valor_a_receber ||
                                 item.valor_pago ||
