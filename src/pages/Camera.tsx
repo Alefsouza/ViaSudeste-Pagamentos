@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import pb from '@/lib/pocketbase/client'
 import { getColaboradorByRegistro, updateColaborador } from '@/services/colaboradores'
 import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
@@ -59,6 +59,28 @@ export default function Camera() {
 
   const { toast } = useToast()
   const { user } = useAuth()
+
+  const sortedRecords = useMemo(() => {
+    if (!colaborador) return []
+    const arr =
+      colaborador.records && colaborador.records.length > 0
+        ? [...colaborador.records]
+        : [{ ...colaborador }]
+    return arr.sort((a, b) => {
+      const parseDate = (dStr: string) => {
+        if (!dStr) return 0
+        const matchBr = dStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
+        if (matchBr) return new Date(`${matchBr[3]}-${matchBr[2]}-${matchBr[1]}`).getTime()
+        return new Date(dStr).getTime()
+      }
+      const da = parseDate(a.data)
+      const db = parseDate(b.data)
+      if (isNaN(da) && isNaN(db)) return String(a.data || '').localeCompare(String(b.data || ''))
+      if (isNaN(da)) return -1
+      if (isNaN(db)) return 1
+      return da - db
+    })
+  }, [colaborador])
 
   const stopCamera = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -138,10 +160,17 @@ export default function Camera() {
 
   const formatDateSafe = (dStr?: string) => {
     if (!dStr) return 'Data não informada'
-    const match = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
-    if (match) return `${match[3]}/${match[2]}/${match[1]}`
+    const matchIso = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (matchIso) return `${matchIso[2]}/${matchIso[3]}/${matchIso[1]}`
+    const matchBr = dStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
+    if (matchBr) return `${matchBr[2]}/${matchBr[1]}/${matchBr[3]}`
     const d = new Date(dStr)
-    if (!isNaN(d.getTime())) return d.toLocaleDateString('pt-BR')
+    if (!isNaN(d.getTime())) {
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      const year = d.getFullYear()
+      return `${month}/${day}/${year}`
+    }
     return dStr
   }
 
@@ -719,10 +748,7 @@ export default function Camera() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(colaborador.records && colaborador.records.length > 0
-                      ? colaborador.records
-                      : [colaborador]
-                    ).map((record: any, idx: number) => (
+                    {sortedRecords.map((record: any, idx: number) => (
                       <TableRow
                         key={record.id || idx}
                         className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -758,10 +784,7 @@ export default function Camera() {
                       Subtotais por Tipo
                     </h4>
                     {Object.entries(
-                      (colaborador.records && colaborador.records.length > 0
-                        ? colaborador.records
-                        : [colaborador]
-                      ).reduce((acc: any, record: any) => {
+                      sortedRecords.reduce((acc: any, record: any) => {
                         const type = getTipoPagamentoDesc(record.idtipopgto)
                         const val = record.valor_a_receber || record.valor || 0
                         acc[type] = (acc[type] || 0) + val
