@@ -69,16 +69,12 @@ export default function RelatorioRecebedoria() {
   const [totalItems, setTotalItems] = useState(0)
 
   // Filters State
-  const [datePreset, setDatePreset] = useState('Últimos 30 dias')
   const [startDate, setStartDate] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() - 30)
     return d.toISOString().split('T')[0]
   })
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0])
-
-  const [customStartDate, setCustomStartDate] = useState(startDate)
-  const [customEndDate, setCustomEndDate] = useState(endDate)
 
   const [statusFilter, setStatusFilter] = useState('Todos')
   const [searchTerm, setSearchTerm] = useState('')
@@ -102,8 +98,8 @@ export default function RelatorioRecebedoria() {
     setError(false)
     try {
       const filters = {
-        startDate: datePreset === 'Data customizada' ? customStartDate : startDate,
-        endDate: datePreset === 'Data customizada' ? customEndDate : endDate,
+        startDate,
+        endDate,
         search: debouncedSearchTerm,
         status: statusFilter,
       }
@@ -144,16 +140,7 @@ export default function RelatorioRecebedoria() {
 
   useEffect(() => {
     loadData()
-  }, [
-    page,
-    startDate,
-    endDate,
-    customStartDate,
-    customEndDate,
-    datePreset,
-    debouncedSearchTerm,
-    statusFilter,
-  ])
+  }, [page, startDate, endDate, debouncedSearchTerm, statusFilter])
 
   useRealtime('pagamentos', () => {
     loadData()
@@ -162,33 +149,13 @@ export default function RelatorioRecebedoria() {
     loadData()
   })
 
-  const handlePresetChange = (preset: string) => {
-    setDatePreset(preset)
-    if (preset === 'Data customizada') return
-
-    const today = new Date()
-    const start = new Date()
-
-    if (preset === 'Ontem') {
-      start.setDate(today.getDate() - 1)
-      today.setDate(today.getDate() - 1)
-    } else if (preset === 'Últimos 7 dias') {
-      start.setDate(today.getDate() - 7)
-    } else if (preset === 'Últimos 30 dias') {
-      start.setDate(today.getDate() - 30)
-    } else if (preset === 'Mês atual') {
-      start.setDate(1)
-    }
-
-    setStartDate(start.toISOString().split('T')[0])
-    setEndDate(today.toISOString().split('T')[0])
-    setPage(1)
-  }
-
   const clearFilters = () => {
     setStatusFilter('Todos')
     setSearchTerm('')
-    handlePresetChange('Últimos 30 dias')
+    const start = new Date()
+    start.setDate(start.getDate() - 30)
+    setStartDate(start.toISOString().split('T')[0])
+    setEndDate(new Date().toISOString().split('T')[0])
     setPage(1)
   }
 
@@ -207,6 +174,9 @@ export default function RelatorioRecebedoria() {
   // Summary Data grouping
   const summaryArray = React.useMemo(() => {
     const summary = summaryData.reduce((acc: any, item: any) => {
+      const isConfirmado = item.status === 'Confirmado' || !!item.foto_confirmacao_url
+      if (!isConfirmado) return acc
+
       const nome = item.nome || 'Desconhecido'
       const tipo = item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || 'Outros'
       const key = `${nome}_${tipo}`
@@ -275,42 +245,23 @@ export default function RelatorioRecebedoria() {
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border space-y-4 print:hidden">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="space-y-2 lg:col-span-1">
-            <Label>Período</Label>
-            <Select value={datePreset} onValueChange={handlePresetChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Hoje">Hoje</SelectItem>
-                <SelectItem value="Ontem">Ontem</SelectItem>
-                <SelectItem value="Últimos 7 dias">Últimos 7 dias</SelectItem>
-                <SelectItem value="Últimos 30 dias">Últimos 30 dias</SelectItem>
-                <SelectItem value="Mês atual">Mês atual</SelectItem>
-                <SelectItem value="Data customizada">Data customizada</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Data Inicial</Label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-white dark:bg-slate-950"
+            />
           </div>
-
-          {datePreset === 'Data customizada' && (
-            <>
-              <div className="space-y-2">
-                <Label>Data Inicial</Label>
-                <Input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Data Final</Label>
-                <Input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                />
-              </div>
-            </>
-          )}
+          <div className="space-y-2 lg:col-span-1">
+            <Label>Data Final</Label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-white dark:bg-slate-950"
+            />
+          </div>
 
           <div className="space-y-2 lg:col-span-1">
             <Label>Busca</Label>
