@@ -337,7 +337,10 @@ export default function RelatorioRecebedoria() {
       { name: 'VR', keywords: ['vr', 'vale refeição', 'vale refeicao', 'vale-refeição'] },
     ]
 
-    const typeTotals: Record<string, { tipo: string; data: string; total: number }> = {}
+    const typeGroups: Record<
+      string,
+      { tipo: string; rows: { data: string; total: number }[]; subtotal: number }
+    > = {}
 
     summaryData.forEach((item) => {
       const tipoRaw = (item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || '').toLowerCase()
@@ -350,27 +353,33 @@ export default function RelatorioRecebedoria() {
         ? matchedCategory.name
         : item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || 'Outros'
       const dataPagamento = item.data_pagamento ? item.data_pagamento.split(' ')[0] : '-'
-      const key = `${tipoName}_${dataPagamento}`
 
       const val = item.valor_pago || item.valor_a_receber || item.valor || 0
 
-      if (!typeTotals[key]) {
-        typeTotals[key] = { tipo: tipoName, data: dataPagamento, total: 0 }
+      if (!typeGroups[tipoName]) {
+        typeGroups[tipoName] = { tipo: tipoName, rows: [], subtotal: 0 }
       }
-      typeTotals[key].total += val
+
+      let dataRow = typeGroups[tipoName].rows.find((r) => r.data === dataPagamento)
+      if (!dataRow) {
+        dataRow = { data: dataPagamento, total: 0 }
+        typeGroups[tipoName].rows.push(dataRow)
+      }
+      dataRow.total += val
+      typeGroups[tipoName].subtotal += val
     })
 
-    const rows = Object.values(typeTotals).filter((row) => row.total > 0)
+    const groups = Object.values(typeGroups).filter((g) => g.subtotal > 0)
 
-    rows.sort((a, b) => {
-      const cmp = a.tipo.localeCompare(b.tipo)
-      if (cmp !== 0) return cmp
-      return a.data.localeCompare(b.data)
+    groups.sort((a, b) => a.tipo.localeCompare(b.tipo))
+
+    let totalGeral = 0
+    groups.forEach((g) => {
+      g.rows.sort((a, b) => a.data.localeCompare(b.data))
+      totalGeral += g.subtotal
     })
 
-    const totalGeral = rows.reduce((sum, row) => sum + row.total, 0)
-
-    return { rows, totalGeral }
+    return { groups, totalGeral }
   }, [summaryData])
 
   return (
@@ -971,7 +980,7 @@ export default function RelatorioRecebedoria() {
                           </TableCell>
                         </TableRow>
                       ))
-                    ) : consolidatedSummary.rows.length === 0 ? (
+                    ) : consolidatedSummary.groups.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={3} className="h-24 text-center py-8">
                           <p className="text-sm text-slate-500 font-medium">
@@ -980,25 +989,40 @@ export default function RelatorioRecebedoria() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      consolidatedSummary.rows.map((item, idx) => (
-                        <TableRow
-                          key={idx}
-                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:border-b print:border-slate-200"
-                        >
-                          <TableCell className="py-3 font-medium text-sm print:text-black">
-                            {item.tipo}
-                          </TableCell>
-                          <TableCell className="py-3 font-medium text-sm print:text-black">
-                            {formatDateStringSafe(item.data)}
-                          </TableCell>
-                          <TableCell className="py-3 text-sm text-right font-medium print:text-black">
-                            {formatBRL(item.total)}
-                          </TableCell>
-                        </TableRow>
+                      consolidatedSummary.groups.map((group, gIdx) => (
+                        <React.Fragment key={gIdx}>
+                          {group.rows.map((row, rIdx) => (
+                            <TableRow
+                              key={`${gIdx}-${rIdx}`}
+                              className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:border-b print:border-slate-200"
+                            >
+                              <TableCell className="py-3 font-medium text-sm print:text-black">
+                                {group.tipo}
+                              </TableCell>
+                              <TableCell className="py-3 font-medium text-sm print:text-black">
+                                {formatDateStringSafe(row.data)}
+                              </TableCell>
+                              <TableCell className="py-3 text-sm text-right font-medium print:text-black">
+                                {formatBRL(row.total)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-slate-100/80 dark:bg-slate-800/80 print:bg-slate-100 border-t-2 border-slate-200 dark:border-slate-700 print:border-slate-400">
+                            <TableCell
+                              colSpan={2}
+                              className="py-3 font-bold text-sm text-slate-800 dark:text-slate-200 print:text-black uppercase"
+                            >
+                              Total {group.tipo}
+                            </TableCell>
+                            <TableCell className="py-3 text-sm text-right font-bold text-slate-900 dark:text-white print:text-black">
+                              {formatBRL(group.subtotal)}
+                            </TableCell>
+                          </TableRow>
+                        </React.Fragment>
                       ))
                     )}
                   </TableBody>
-                  {!loading && consolidatedSummary.rows.length > 0 && (
+                  {!loading && consolidatedSummary.groups.length > 0 && (
                     <tfoot className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent border-t-2 border-slate-300 print:border-slate-800">
                       <tr>
                         <td
