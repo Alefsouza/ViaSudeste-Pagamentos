@@ -329,11 +329,11 @@ export default function RelatorioRecebedoria() {
     }[]
   }, [summaryData])
 
-  // Consolidated Summary for target types (Hora Extra, Férias Trabalhada, VR)
+  // Consolidated Summary for target types (Hora Extra, Férias, VR)
   const consolidatedSummary = React.useMemo(() => {
     const targetCategories = [
       { name: 'Hora Extra', keywords: ['hora extra', 'hora extras', 'horas extras'] },
-      { name: 'Férias Trabalhada', keywords: ['férias', 'ferias'] },
+      { name: 'Férias', keywords: ['férias', 'ferias', 'férias trabalhada', 'ferias trabalhada'] },
       { name: 'VR', keywords: ['vr', 'vale refeição', 'vale refeicao', 'vale-refeição'] },
     ]
 
@@ -635,81 +635,82 @@ export default function RelatorioRecebedoria() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
+                    Object.entries(groupedByName).flatMap(([nome, records]: [string, any]) => {
                       const totalLines = summaryData.filter(
                         (c) => (c.nome || 'Desconhecido') === nome,
                       ).length
-                      return (
-                        <React.Fragment key={nome}>
-                          <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 print:bg-slate-100">
-                            <TableCell
-                              colSpan={9}
-                              className="font-semibold text-slate-700 dark:text-slate-300 print:text-black"
-                            >
-                              {nome} - {totalLines}{' '}
-                              {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
-                            </TableCell>
-                          </TableRow>
-                          {records.map((item: any) => {
-                            const isConfirmado = !!item.foto_confirmacao_url
-                            const statusBadge = isConfirmado ? (
-                              <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
-                                Confirmado
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
-                                Pendente
-                              </Badge>
-                            )
+                      return [
+                        <TableRow
+                          key={`header-${nome}`}
+                          className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 print:bg-slate-100"
+                        >
+                          <TableCell
+                            colSpan={9}
+                            className="font-semibold text-slate-700 dark:text-slate-300 print:text-black"
+                          >
+                            {nome} - {totalLines}{' '}
+                            {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
+                          </TableCell>
+                        </TableRow>,
+                        ...records.map((item: any) => {
+                          const isConfirmado = !!item.foto_confirmacao_url
+                          const statusBadge = isConfirmado ? (
+                            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                              Confirmado
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                              Pendente
+                            </Badge>
+                          )
 
-                            return (
-                              <TableRow
-                                key={item.id}
-                                className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
-                              >
-                                <TableCell className="font-medium pl-8 print:text-black">
-                                  {item.registro}
-                                </TableCell>
-                                <TableCell className="print:text-black">{item.nome}</TableCell>
-                                <TableCell className="print:text-black">
-                                  {item.data_pagamento || '-'}
-                                </TableCell>
-                                <TableCell className="print:text-black">
-                                  {item.hora_pagamento || '-'}
-                                </TableCell>
-                                <TableCell className="text-right font-medium print:text-black">
-                                  {formatBRL(item.valor_pago || item.valor_a_receber || item.valor)}
-                                </TableCell>
-                                <TableCell className="text-left print:text-black">
-                                  {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
-                                </TableCell>
-                                <TableCell className="text-center">{statusBadge}</TableCell>
-                                <TableCell className="text-center print:hidden">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!isConfirmado}
-                                    onClick={() => setPhotoModal(item.foto_confirmacao_url)}
-                                    className="text-slate-600 print:hidden"
-                                  >
-                                    <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
-                                  </Button>
-                                </TableCell>
-                                <TableCell className="text-right print:hidden">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setDetailsModal(item)}
-                                    className="print:hidden"
-                                  >
-                                    <FileText className="h-4 w-4 mr-2" /> Detalhes
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })}
-                        </React.Fragment>
-                      )
+                          return (
+                            <TableRow
+                              key={item.id}
+                              className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
+                            >
+                              <TableCell className="font-medium pl-8 print:text-black">
+                                {item.registro}
+                              </TableCell>
+                              <TableCell className="print:text-black">{item.nome}</TableCell>
+                              <TableCell className="print:text-black">
+                                {item.data_pagamento || '-'}
+                              </TableCell>
+                              <TableCell className="print:text-black">
+                                {item.hora_pagamento || '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-medium print:text-black">
+                                {formatBRL(item.valor_pago || item.valor_a_receber || item.valor)}
+                              </TableCell>
+                              <TableCell className="text-left print:text-black">
+                                {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
+                              </TableCell>
+                              <TableCell className="text-center">{statusBadge}</TableCell>
+                              <TableCell className="text-center print:hidden">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={!isConfirmado}
+                                  onClick={() => setPhotoModal(item.foto_confirmacao_url)}
+                                  className="text-slate-600 print:hidden"
+                                >
+                                  <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
+                                </Button>
+                              </TableCell>
+                              <TableCell className="text-right print:hidden">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDetailsModal(item)}
+                                  className="print:hidden"
+                                >
+                                  <FileText className="h-4 w-4 mr-2" /> Detalhes
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        }),
+                      ]
                     })
                   )}
                 </TableBody>
@@ -908,7 +909,7 @@ export default function RelatorioRecebedoria() {
 
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 print:text-black">
-                Resumo Consolidado (Hora Extra, Férias Trabalhada, VR)
+                Resumo Consolidado (Hora Extra, Férias, VR)
               </h3>
               <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
                 <Table className="print:text-sm">
