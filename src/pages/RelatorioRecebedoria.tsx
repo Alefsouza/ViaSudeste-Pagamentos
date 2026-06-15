@@ -44,13 +44,7 @@ import {
   SearchX,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  formatDataString,
-  formatHoraString,
-  formatHoras,
-  getTipoPagamento,
-  formatBRL,
-} from '@/lib/formatters'
+import { formatHoraString, formatHoras, getTipoPagamento, formatBRL } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 
 export default function RelatorioRecebedoria() {
@@ -181,7 +175,9 @@ export default function RelatorioRecebedoria() {
         conditions.push(`hora_pagamento <= "${endTime}"`)
       }
       if (debouncedSearchTerm) {
-        conditions.push(`(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}")`)
+        conditions.push(
+          `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}" || colaborador_id.nome ~ "${debouncedSearchTerm}" || colaborador_id.registro ~ "${debouncedSearchTerm}")`,
+        )
       }
 
       if (statusFilter && statusFilter !== 'Todos') {
@@ -214,10 +210,12 @@ export default function RelatorioRecebedoria() {
         pb.collection('pagamentos').getList(page, 20, {
           filter: filterString,
           sort: '-created',
+          expand: 'colaborador_id,user_id',
         }),
         pb.collection('pagamentos').getFullList({
           filter: filterString,
           sort: '-created',
+          expand: 'colaborador_id,user_id',
         }),
       ])
 
@@ -265,9 +263,6 @@ export default function RelatorioRecebedoria() {
   useRealtime('pagamentos', () => {
     loadData()
   })
-  useRealtime('colaboradores', () => {
-    loadData()
-  })
 
   const clearFilters = () => {
     setStatusFilter('Todos')
@@ -293,7 +288,7 @@ export default function RelatorioRecebedoria() {
     if (!dateStr || dateStr === '-') return '-'
     if (dateStr.includes('/')) return dateStr
     if (dateStr.includes('-')) {
-      const parts = dateStr.split('-')
+      const parts = dateStr.split(' ')[0].split('-')
       if (parts.length >= 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
     }
     return dateStr
@@ -301,7 +296,7 @@ export default function RelatorioRecebedoria() {
 
   // Group items by name
   const groupedByName = data.reduce((acc: any, item: any) => {
-    const n = item.nome || 'Desconhecido'
+    const n = item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'
     if (!acc[n]) acc[n] = []
     acc[n].push(item)
     return acc
@@ -313,13 +308,13 @@ export default function RelatorioRecebedoria() {
       const isConfirmado = item.status === 'Confirmado' || !!item.foto_confirmacao_url
       if (!isConfirmado) return acc
 
-      const nome = item.nome || 'Desconhecido'
+      const nome = item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'
       const tipo = item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || 'Outros'
       const key = `${nome}_${tipo}`
       if (!acc[key]) {
         acc[key] = { nome, tipo, total: 0 }
       }
-      acc[key].total += item.valor_pago || 0
+      acc[key].total += item.valor_pago || item.valor_a_receber || item.valor || 0
       return acc
     }, {})
     return Object.values(summary).sort((a: any, b: any) => a.nome.localeCompare(b.nome)) as {
@@ -343,6 +338,9 @@ export default function RelatorioRecebedoria() {
     > = {}
 
     summaryData.forEach((item) => {
+      const isConfirmado = item.status === 'Confirmado' || !!item.foto_confirmacao_url
+      if (!isConfirmado) return
+
       const tipoRaw = (item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || '').toLowerCase()
 
       const matchedCategory = targetCategories.find((cat) =>
@@ -685,7 +683,8 @@ export default function RelatorioRecebedoria() {
                   ) : (
                     Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
                       const totalLines = summaryData.filter(
-                        (c) => (c.nome || 'Desconhecido') === nome,
+                        (c) =>
+                          (c.expand?.colaborador_id?.nome || c.nome || 'Desconhecido') === nome,
                       ).length
                       return (
                         <React.Fragment key={nome}>
@@ -716,11 +715,13 @@ export default function RelatorioRecebedoria() {
                                 className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
                               >
                                 <TableCell className="font-medium pl-8 print:text-black">
-                                  {item.registro}
+                                  {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
                                 </TableCell>
-                                <TableCell className="print:text-black">{item.nome}</TableCell>
                                 <TableCell className="print:text-black">
-                                  {item.data_pagamento || '-'}
+                                  {item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'}
+                                </TableCell>
+                                <TableCell className="print:text-black">
+                                  {formatDateStringSafe(item.data_pagamento) || '-'}
                                 </TableCell>
                                 <TableCell className="print:text-black">
                                   {item.hora_pagamento || '-'}
@@ -779,7 +780,7 @@ export default function RelatorioRecebedoria() {
               ) : (
                 Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
                   const totalLines = summaryData.filter(
-                    (c) => (c.nome || 'Desconhecido') === nome,
+                    (c) => (c.expand?.colaborador_id?.nome || c.nome || 'Desconhecido') === nome,
                   ).length
                   return (
                     <div key={nome} className="space-y-4">
@@ -805,10 +806,15 @@ export default function RelatorioRecebedoria() {
                               <div className="flex justify-between items-start">
                                 <div>
                                   <div className="font-semibold text-slate-900 dark:text-slate-100">
-                                    {item.nome}
+                                    {item.expand?.colaborador_id?.nome ||
+                                      item.nome ||
+                                      'Desconhecido'}
                                   </div>
                                   <div className="text-xs text-slate-500 mt-1">
-                                    Reg: {item.registro}
+                                    Reg:{' '}
+                                    {item.expand?.colaborador_id?.registro ||
+                                      item.registro ||
+                                      'N/A'}
                                   </div>
                                 </div>
                                 <div className="text-right">
@@ -827,7 +833,8 @@ export default function RelatorioRecebedoria() {
                               </div>
                               <div className="flex justify-between items-center pt-3 border-t">
                                 <div className="text-xs text-slate-500">
-                                  {item.data_pagamento || '-'} {item.hora_pagamento || ''}
+                                  {formatDateStringSafe(item.data_pagamento) || '-'}{' '}
+                                  {item.hora_pagamento || ''}
                                 </div>
                                 <div className="flex gap-2">
                                   <Button
@@ -1029,7 +1036,7 @@ export default function RelatorioRecebedoria() {
                           colSpan={2}
                           className="p-3 font-bold text-sm text-slate-900 dark:text-slate-100 print:text-black uppercase"
                         >
-                          Valor Total
+                          Valor Total Geral
                         </td>
                         <td className="p-3 text-sm text-right font-bold text-indigo-700 dark:text-indigo-400 print:text-black double-underline">
                           {formatBRL(consolidatedSummary.totalGeral)}
@@ -1057,20 +1064,29 @@ export default function RelatorioRecebedoria() {
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Registro
                   </span>
-                  <p className="font-medium">{detailsModal.registro}</p>
+                  <p className="font-medium">
+                    {detailsModal.expand?.colaborador_id?.registro ||
+                      detailsModal.registro ||
+                      'N/A'}
+                  </p>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Nome
                   </span>
-                  <p className="font-medium">{detailsModal.nome}</p>
+                  <p className="font-medium">
+                    {detailsModal.expand?.colaborador_id?.nome ||
+                      detailsModal.nome ||
+                      'Desconhecido'}
+                  </p>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Data e Hora
                   </span>
                   <p className="font-medium">
-                    {detailsModal.data_pagamento || '-'} {detailsModal.hora_pagamento || ''}
+                    {formatDateStringSafe(detailsModal.data_pagamento) || '-'}{' '}
+                    {detailsModal.hora_pagamento || ''}
                   </p>
                 </div>
                 <div>
@@ -1129,7 +1145,9 @@ export default function RelatorioRecebedoria() {
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Filial ID
                   </span>
-                  <p className="font-medium">{detailsModal.filial}</p>
+                  <p className="font-medium">
+                    {detailsModal.expand?.colaborador_id?.filial || detailsModal.filial || 'N/A'}
+                  </p>
                 </div>
               </div>
               {detailsModal.foto_confirmacao_url && (

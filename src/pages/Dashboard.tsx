@@ -37,7 +37,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
 import { useAuth } from '@/hooks/use-auth'
@@ -45,7 +44,7 @@ import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
-import { formatDataString, formatBRL, getTipoPagamento } from '@/lib/formatters'
+import { formatBRL, getTipoPagamento } from '@/lib/formatters'
 
 export default function Dashboard() {
   const { toast } = useToast()
@@ -73,9 +72,35 @@ export default function Dashboard() {
   const [tableData, setTableData] = useState<any>(null)
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
 
+  const [filialMap, setFilialMap] = useState<Map<string, number>>(new Map())
+  const [filialIdToNameMap, setFilialIdToNameMap] = useState<Map<number, string>>(new Map())
+
   // Chart Interactive Filters
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
   const [selectedChartDate, setSelectedChartDate] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadMaps = async () => {
+      try {
+        const colabRes = await pb.collection('colaboradores').getFullList({
+          fields: 'filial,filial_id',
+        })
+        const mapStrToId = new Map<string, number>()
+        const mapIdToStr = new Map<number, string>()
+        colabRes.forEach((c: any) => {
+          if (c.filial && c.filial_id != null) {
+            mapStrToId.set(c.filial, c.filial_id)
+            mapIdToStr.set(c.filial_id, c.filial)
+          }
+        })
+        setFilialMap(mapStrToId)
+        setFilialIdToNameMap(mapIdToStr)
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+    loadMaps()
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -90,25 +115,72 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [filters])
 
-  const loadStats = async () => {
+  const buildPagamentosFilter = useCallback(
+    (f: typeof filters) => {
+      const conditions: string[] = []
+      if (f.startDate && f.endDate) {
+        conditions.push(
+          `data_pagamento >= "${f.startDate} 00:00:00" && data_pagamento <= "${f.endDate} 23:59:59"`,
+        )
+      }
+      if (f.search) {
+        conditions.push(
+          `(nome ~ "${f.search}" || registro ~ "${f.search}" || colaborador_id.nome ~ "${f.search}" || colaborador_id.registro ~ "${f.search}")`,
+        )
+      }
+      if (f.status && f.status !== 'Todos') {
+        if (f.status === 'Confirmado') {
+          conditions.push(`(status = "Confirmado" || foto_confirmacao_url != "")`)
+        } else if (f.status === 'Pendente') {
+          conditions.push(`(status = "Pendente" || status = "")`)
+        } else if (f.status === 'Cancelado') {
+          conditions.push(`status = "Cancelado"`)
+        }
+      }
+      if (f.tipoPagamento && f.tipoPagamento !== 'Todos') {
+        conditions.push(
+          `(tipo_pagamento = "${f.tipoPagamento}" || idtipopgto = ${f.tipoPagamento})`,
+        )
+      }
+      if (f.filial && f.filial !== 'Todas') {
+        const filialId = filialMap.get(f.filial)
+        if (filialId !== undefined) {
+          conditions.push(`(filial = ${filialId} || colaborador_id.filial = "${f.filial}")`)
+        } else {
+          conditions.push(`colaborador_id.filial = "${f.filial}"`)
+        }
+      }
+      return conditions.length > 0 ? conditions.join(' && ') : ''
+    },
+    [filialMap],
+  )
+
+  const loadStats = useCallback(async () => {
     setStatsLoading(true)
     setError(false)
     try {
-      const stats = await getColaboradoresAnalytics(debouncedFilters)
+      const filterStr = buildPagamentosFilter(debouncedFilters)
+      const stats = await pb.collection('pagamentos').getFullList({
+        filter: filterStr,
+        sort: '-data_pagamento',
+        expand: 'colaborador_id',
+      })
       setStatsData(stats)
     } catch (e: any) {
-      setError(true)
-      toast({
-        title: 'Erro de conexão',
-        description: e.response?.message || 'Falha ao carregar as estatísticas.',
-        variant: 'destructive',
-      })
+      if (!e.isAbort) {
+        setError(true)
+        toast({
+          title: 'Erro de conexão',
+          description: e.response?.message || 'Falha ao carregar as estatísticas.',
+          variant: 'destructive',
+        })
+      }
     } finally {
       setStatsLoading(false)
     }
-  }
+  }, [debouncedFilters, buildPagamentosFilter, toast])
 
-  const loadTable = async () => {
+  const loadTable = useCallback(async () => {
     setTableLoading(true)
     try {
       const tableFiltersForAPI = { ...debouncedFilters }
@@ -122,47 +194,37 @@ export default function Dashboard() {
         tableFiltersForAPI.endDate = selectedChartDate
       }
 
-      const paginated = await getColaboradoresPaginated(page, 20, tableFiltersForAPI)
+      const filterStr = buildPagamentosFilter(tableFiltersForAPI)
+      const paginated = await pb.collection('pagamentos').getList(page, 20, {
+        filter: filterStr,
+        sort: '-created',
+        expand: 'colaborador_id',
+      })
       setTableData(paginated)
     } catch (e: any) {
-      // Error is caught by loadStats generally, preventing double toast
+      // Error handled in loadStats
     } finally {
       setTableLoading(false)
     }
-  }
+  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate, buildPagamentosFilter])
 
   useEffect(() => {
     loadStats()
-  }, [debouncedFilters])
+  }, [loadStats])
 
   useEffect(() => {
     loadTable()
-  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
+  }, [loadTable])
 
   const refreshAll = useCallback(() => {
     loadStats()
     loadTable()
-  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
+  }, [loadStats, loadTable])
 
   const handleCancelPayment = async () => {
     if (!paymentToCancel) return
     try {
-      let targetId = paymentToCancel.id
-      try {
-        await pb.collection('pagamentos').getOne(targetId)
-      } catch {
-        const records = await pb.collection('pagamentos').getList(1, 1, {
-          filter: `colaborador_id = "${paymentToCancel.id}" || registro = "${paymentToCancel.registro}"`,
-          sort: '-created',
-        })
-        if (records.items.length > 0) {
-          targetId = records.items[0].id
-        } else {
-          throw new Error('Pagamento não encontrado na coleção pagamentos.')
-        }
-      }
-
-      await pb.collection('pagamentos').update(targetId, { status: 'Cancelado' })
+      await pb.collection('pagamentos').update(paymentToCancel.id, { status: 'Cancelado' })
       toast({ title: 'Pagamento cancelado com sucesso.' })
       setPaymentToCancel(null)
       refreshAll()
@@ -187,46 +249,45 @@ export default function Dashboard() {
   }, [statsData])
 
   useRealtime('pagamentos', refreshAll)
-  useRealtime('colaboradores', refreshAll)
-  useRealtime('fotos_colaboradores', refreshAll)
 
   const availableTipos = Array.from(knownTipos).sort()
 
-  // Derived filtered stats for Summary Cards based on interactive chart selections
+  const getFilialName = useCallback(
+    (curr: any) => {
+      const fromRel = curr.expand?.colaborador_id?.filial
+      if (fromRel) return fromRel
+      if (curr.filial != null && filialIdToNameMap.has(curr.filial)) {
+        return filialIdToNameMap.get(curr.filial)
+      }
+      return 'Outra'
+    },
+    [filialIdToNameMap],
+  )
+
   const filteredStatsData = useMemo(() => {
     return statsData.filter((curr) => {
-      if (selectedChartFilial && (curr.filial || 'Outra') !== selectedChartFilial) return false
+      if (selectedChartFilial) {
+        const f = getFilialName(curr)
+        if (f !== selectedChartFilial) return false
+      }
 
       if (selectedChartDate) {
-        if (
-          !curr.data_pagamento ||
-          curr.data_pagamento.trim() === '-' ||
-          curr.data_pagamento.trim() === ''
-        )
-          return false
-        const dStr = curr.data_pagamento.split(',')[0].trim()
-
-        let dateKey = dStr
-        if (dStr.includes('/')) {
-          const p = dStr.split('/')
-          dateKey = `${p[2]}-${p[1]}-${p[0]}`
-        }
-
-        if (dateKey !== selectedChartDate) return false
+        const dStr = curr.data_pagamento ? curr.data_pagamento.split(' ')[0] : '-'
+        if (dStr !== selectedChartDate) return false
       }
 
       return true
     })
-  }, [statsData, selectedChartFilial, selectedChartDate])
+  }, [statsData, selectedChartFilial, selectedChartDate, getFilialName])
 
   const pagamentosTotals = useMemo(() => {
     return filteredStatsData.reduce(
       (acc, curr) => {
-        const val = curr.valor_a_receber || curr.valor || 0
+        const val = curr.valor_pago || curr.valor_a_receber || curr.valor || 0
         const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
         if (status === 'Confirmado') {
           acc.pago += val
-        } else {
+        } else if (status !== 'Cancelado') {
           acc.pendente += val
         }
         return acc
@@ -248,21 +309,24 @@ export default function Dashboard() {
   }
 
   // Calculations
-  const totalValor = filteredStatsData.reduce(
-    (acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0),
-    0,
+  const confirmados = filteredStatsData.filter(
+    (c) => c.status === 'Confirmado' || !!c.foto_confirmacao_url,
   )
-  const uniqueColabs = new Set(filteredStatsData.map((c) => c.registro).filter(Boolean)).size
-  const values = filteredStatsData.map((c) => c.valor_a_receber || c.valor || 0)
+  const uniqueColabs = new Set(
+    confirmados.map((c) => c.expand?.colaborador_id?.registro || c.registro).filter(Boolean),
+  ).size
+  const values = confirmados.map((c) => c.valor_pago || c.valor_a_receber || c.valor || 0)
   const maxPago = values.length ? Math.max(...values) : 0
   const minPago = values.length ? Math.min(...values) : 0
-  const avgPago = values.length ? totalValor / values.length : 0
+  const avgPago = values.length ? pagamentosTotals.pago / values.length : 0
 
-  // Chart Data Preparation (using full statsData so context remains visible)
   const pieDataMap = statsData.reduce(
     (acc, curr) => {
-      const filial = curr.filial || 'Outra'
-      acc[filial] = (acc[filial] || 0) + (curr.valor_a_receber || curr.valor || 0)
+      const isConfirmado = curr.status === 'Confirmado' || !!curr.foto_confirmacao_url
+      if (!isConfirmado) return acc
+      const filial = getFilialName(curr)
+      acc[filial] =
+        (acc[filial] || 0) + (curr.valor_pago || curr.valor_a_receber || curr.valor || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -272,24 +336,13 @@ export default function Dashboard() {
 
   const dailyDataMap = statsData.reduce(
     (acc, curr) => {
-      const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-      if (status !== 'Confirmado') return acc
+      const isConfirmado = curr.status === 'Confirmado' || !!curr.foto_confirmacao_url
+      if (!isConfirmado) return acc
 
-      if (
-        !curr.data_pagamento ||
-        curr.data_pagamento.trim() === '-' ||
-        curr.data_pagamento.trim() === ''
-      )
-        return acc
-      const dStr = curr.data_pagamento.split(',')[0].trim()
+      const dStr = curr.data_pagamento ? curr.data_pagamento.split(' ')[0] : '-'
+      if (dStr === '-') return acc
 
-      let dateKey = dStr
-      if (dStr.includes('/')) {
-        const p = dStr.split('/')
-        dateKey = `${p[2]}-${p[1]}-${p[0]}`
-      }
-
-      acc[dateKey] = (acc[dateKey] || 0) + (curr.valor_a_receber || curr.valor || 0)
+      acc[dStr] = (acc[dStr] || 0) + (curr.valor_pago || curr.valor_a_receber || curr.valor || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -308,13 +361,22 @@ export default function Dashboard() {
 
   const isEmpty = statsData.length === 0 && !statsLoading
 
-  // Group table items by Name without aggregating their values
   const groupedByName = (tableData?.items || []).reduce((acc: any, item: any) => {
-    const n = item.nome || 'Desconhecido'
+    const n = item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'
     if (!acc[n]) acc[n] = []
     acc[n].push(item)
     return acc
   }, {})
+
+  const formatDateStringSafe = (dateStr: string) => {
+    if (!dateStr || dateStr === '-') return '-'
+    if (dateStr.includes('/')) return dateStr
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split(' ')[0].split('-')
+      if (parts.length >= 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+    }
+    return dateStr
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-8 animate-fade-in-up">
@@ -498,7 +560,7 @@ export default function Dashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Maior Valor</CardTitle>
+            <CardTitle className="text-sm font-medium">Maior Valor (Pago)</CardTitle>
             <ArrowUp className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
@@ -513,7 +575,7 @@ export default function Dashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Menor Valor</CardTitle>
+            <CardTitle className="text-sm font-medium">Menor Valor (Pago)</CardTitle>
             <ArrowDown className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
@@ -722,7 +784,9 @@ export default function Dashboard() {
                         ) : (
                           Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
                             const totalLines = filteredStatsData.filter(
-                              (c) => (c.nome || 'Desconhecido') === nome,
+                              (c) =>
+                                (c.expand?.colaborador_id?.nome || c.nome || 'Desconhecido') ===
+                                nome,
                             ).length
                             return (
                               <React.Fragment key={nome}>
@@ -739,14 +803,22 @@ export default function Dashboard() {
                                 </TableRow>
                                 {records.map((p: any) => (
                                   <TableRow key={p.id}>
-                                    <TableCell className="font-medium pl-8">{p.nome}</TableCell>
-                                    <TableCell>{p.registro}</TableCell>
-                                    <TableCell>{p.filial}</TableCell>
-                                    <TableCell className="text-forest font-medium text-left">
-                                      {formatBRL(p.valor_a_receber || p.valor)}
+                                    <TableCell className="font-medium pl-8">
+                                      {p.expand?.colaborador_id?.nome || p.nome || 'Desconhecido'}
                                     </TableCell>
-                                    <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-                                    <TableCell>{p.data_pagamento || 'Pendente'}</TableCell>
+                                    <TableCell>
+                                      {p.expand?.colaborador_id?.registro || p.registro || 'N/A'}
+                                    </TableCell>
+                                    <TableCell>{getFilialName(p)}</TableCell>
+                                    <TableCell className="text-forest font-medium text-left">
+                                      {formatBRL(p.valor_pago || p.valor_a_receber || p.valor || 0)}
+                                    </TableCell>
+                                    <TableCell>
+                                      {getTipoPagamento(p.idtipopgto) || p.tipo_pagamento}
+                                    </TableCell>
+                                    <TableCell>
+                                      {formatDateStringSafe(p.data_pagamento) || 'Pendente'}
+                                    </TableCell>
                                     <TableCell>
                                       {(() => {
                                         const status =
@@ -826,7 +898,8 @@ export default function Dashboard() {
                     ) : (
                       Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
                         const totalLines = filteredStatsData.filter(
-                          (c) => (c.nome || 'Desconhecido') === nome,
+                          (c) =>
+                            (c.expand?.colaborador_id?.nome || c.nome || 'Desconhecido') === nome,
                         ).length
                         return (
                           <div key={nome} className="space-y-4">
@@ -838,21 +911,30 @@ export default function Dashboard() {
                               <Card key={p.id} className="shadow-sm">
                                 <CardContent className="p-4 flex flex-col gap-2">
                                   <div className="flex justify-between font-bold">
-                                    <span className="truncate">{p.nome}</span>
+                                    <span className="truncate">
+                                      {p.expand?.colaborador_id?.nome || p.nome || 'Desconhecido'}
+                                    </span>
                                     <span className="text-forest">
-                                      {formatBRL(p.valor_a_receber || p.valor)}
+                                      {formatBRL(p.valor_pago || p.valor_a_receber || p.valor || 0)}
                                     </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
-                                    <span>Reg: {p.registro}</span>
-                                    <span>{p.filial}</span>
+                                    <span>
+                                      Reg:{' '}
+                                      {p.expand?.colaborador_id?.registro || p.registro || 'N/A'}
+                                    </span>
+                                    <span>{getFilialName(p)}</span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
-                                    <span>{getTipoPagamento(p.idtipopgto)}</span>
+                                    <span>
+                                      {getTipoPagamento(p.idtipopgto) || p.tipo_pagamento}
+                                    </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
                                     <span>Data de Pagamento:</span>
-                                    <span>{p.data_pagamento || 'Pendente'}</span>
+                                    <span>
+                                      {formatDateStringSafe(p.data_pagamento) || 'Pendente'}
+                                    </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
                                     <div>
@@ -989,7 +1071,9 @@ export default function Dashboard() {
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md space-y-2 text-sm border">
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Colaborador:</span>
-                <span>{paymentToCancel?.nome}</span>
+                <span>
+                  {paymentToCancel?.expand?.colaborador_id?.nome || paymentToCancel?.nome}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Valor:</span>
@@ -1006,11 +1090,11 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Data de Pagamento:</span>
-                <span>{paymentToCancel?.data_pagamento || 'Pendente'}</span>
+                <span>{formatDateStringSafe(paymentToCancel?.data_pagamento) || 'Pendente'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Filial:</span>
-                <span>{paymentToCancel?.filial}</span>
+                <span>{getFilialName(paymentToCancel)}</span>
               </div>
             </div>
           </div>
