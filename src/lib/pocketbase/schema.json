@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-15T21:40:56.675Z",
+  "generatedAt": "2026-06-15T21:42:43.455Z",
   "collections": [
     {
       "name": "users",
@@ -29,21 +29,30 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "tipo_usuario",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Administrador", "recebedoria", "DP"]
+          "selectValues": [
+            "Administrador",
+            "recebedoria",
+            "DP"
+          ]
         },
         {
           "name": "garagem",
@@ -91,21 +100,29 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Cursino", "Sapopemba"]
+          "selectValues": [
+            "Cursino",
+            "Sapopemba"
+          ]
         },
         {
           "name": "created",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "foto_confirmacao_url",
@@ -186,7 +203,9 @@
           "system": false
         }
       ],
-      "indexes": ["CREATE INDEX `idx_colab_referencia` ON `colaboradores` (referencia)"]
+      "indexes": [
+        "CREATE INDEX `idx_colab_referencia` ON `colaboradores` (referencia)"
+      ]
     },
     {
       "name": "pagamentos",
@@ -229,14 +248,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "hora_pagamento",
@@ -255,7 +279,11 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Confirmado", "Pendente", "Cancelado"]
+          "selectValues": [
+            "Confirmado",
+            "Pendente",
+            "Cancelado"
+          ]
         },
         {
           "name": "tipo_pagamento",
@@ -337,7 +365,10 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Cursino", "Sapopemba"]
+          "selectValues": [
+            "Cursino",
+            "Sapopemba"
+          ]
         },
         {
           "name": "foto",
@@ -362,14 +393,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -411,14 +447,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": []
