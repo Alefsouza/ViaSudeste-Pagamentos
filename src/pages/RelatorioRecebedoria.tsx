@@ -73,6 +73,9 @@ export default function RelatorioRecebedoria() {
     return d.toISOString().split('T')[0]
   })
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
+  const [timeError, setTimeError] = useState('')
 
   const [statusFilter, setStatusFilter] = useState('Todos')
   const [usuarioFilter, setUsuarioFilter] = useState('Todos')
@@ -85,7 +88,7 @@ export default function RelatorioRecebedoria() {
   // Filter Options State
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
-  const [filiaisOptions, setFiliaisOptions] = useState<{ label: string; value: number }[]>([])
+  const [filiaisOptions, setFiliaisOptions] = useState<{ label: string; value: string }[]>([])
   const [tiposPagamento, setTiposPagamento] = useState<string[]>([])
 
   useEffect(() => {
@@ -99,25 +102,38 @@ export default function RelatorioRecebedoria() {
         const allUsersRes = await pb.collection('users').getFullList()
         setAllUsers(allUsersRes)
 
+        // Get proper Filial Names
         const colabRes = await pb.collection('colaboradores').getFullList({
           fields: 'filial,filial_id',
         })
-        const map = new Map<string, number>()
+        const mapNomes = new Map<number, string>()
         colabRes.forEach((c: any) => {
           if (c.filial && c.filial_id != null) {
-            map.set(c.filial, c.filial_id)
+            mapNomes.set(c.filial_id, c.filial)
           }
         })
-        const options = Array.from(map.entries()).map(([label, value]) => ({ label, value }))
-        setFiliaisOptions(options.sort((a, b) => a.label.localeCompare(b.label)))
 
         const pagamentosRes = await pb
           .collection('pagamentos')
-          .getFullList({ fields: 'tipo_pagamento' })
+          .getFullList({ fields: 'tipo_pagamento,filial' })
+
         const uniqueTipos = Array.from(
           new Set(pagamentosRes.map((p: any) => p.tipo_pagamento).filter(Boolean)),
         )
         setTiposPagamento(uniqueTipos as string[])
+
+        const uniqueFiliais = Array.from(
+          new Set(
+            pagamentosRes
+              .map((p: any) => p.filial)
+              .filter((f) => f !== null && f !== undefined && f !== ''),
+          ),
+        )
+        const options = uniqueFiliais.map((f) => ({
+          label: mapNomes.get(Number(f)) || String(f),
+          value: String(f),
+        }))
+        setFiliaisOptions(options.sort((a, b) => a.label.localeCompare(b.label)))
       } catch (err) {
         console.error('Error fetching filter options:', err)
       }
@@ -139,6 +155,15 @@ export default function RelatorioRecebedoria() {
 
   const loadData = async () => {
     if (!user) return
+
+    if (startTime && endTime && endTime < startTime) {
+      setTimeError('Horário Final não pode ser menor que o Horário Inicial.')
+      setLoading(false)
+      return
+    } else {
+      setTimeError('')
+    }
+
     setLoading(true)
     setError(false)
     try {
@@ -148,6 +173,12 @@ export default function RelatorioRecebedoria() {
         conditions.push(
           `data_pagamento >= "${startDate} 00:00:00" && data_pagamento <= "${endDate} 23:59:59"`,
         )
+      }
+      if (startTime) {
+        conditions.push(`hora_pagamento >= "${startTime}"`)
+      }
+      if (endTime) {
+        conditions.push(`hora_pagamento <= "${endTime}"`)
       }
       if (debouncedSearchTerm) {
         conditions.push(`(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}")`)
@@ -170,14 +201,7 @@ export default function RelatorioRecebedoria() {
       }
 
       if (garagemFilter && garagemFilter !== 'Todos') {
-        const selectedFilial = filiaisOptions.find((f) => f.value.toString() === garagemFilter)
-        if (selectedFilial) {
-          conditions.push(
-            `(filial = ${selectedFilial.value} || colaborador_id.filial = "${selectedFilial.label}")`,
-          )
-        } else {
-          conditions.push(`filial = ${garagemFilter}`)
-        }
+        conditions.push(`filial = ${garagemFilter}`)
       }
 
       if (tipoPagamentoFilter && tipoPagamentoFilter !== 'Todos') {
@@ -227,6 +251,8 @@ export default function RelatorioRecebedoria() {
     page,
     startDate,
     endDate,
+    startTime,
+    endTime,
     debouncedSearchTerm,
     statusFilter,
     usuarioFilter,
@@ -249,6 +275,9 @@ export default function RelatorioRecebedoria() {
     setGaragemFilter('Todos')
     setTipoPagamentoFilter('Todos')
     setSearchTerm('')
+    setStartTime('')
+    setEndTime('')
+    setTimeError('')
     const start = new Date()
     start.setDate(start.getDate() - 30)
     setStartDate(start.toISOString().split('T')[0])
@@ -260,6 +289,16 @@ export default function RelatorioRecebedoria() {
     window.print()
   }
 
+  const formatDateStringSafe = (dateStr: string) => {
+    if (!dateStr || dateStr === '-') return '-'
+    if (dateStr.includes('/')) return dateStr
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-')
+      if (parts.length >= 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+    }
+    return dateStr
+  }
+
   // Group items by name
   const groupedByName = data.reduce((acc: any, item: any) => {
     const n = item.nome || 'Desconhecido'
@@ -268,7 +307,7 @@ export default function RelatorioRecebedoria() {
     return acc
   }, {})
 
-  // Summary Data grouping
+  // Summary Data grouping for simple table
   const summaryArray = React.useMemo(() => {
     const summary = summaryData.reduce((acc: any, item: any) => {
       const isConfirmado = item.status === 'Confirmado' || !!item.foto_confirmacao_url
@@ -288,6 +327,45 @@ export default function RelatorioRecebedoria() {
       tipo: string
       total: number
     }[]
+  }, [summaryData])
+
+  // Consolidated Summary for target types (Hora Extra, Férias Trabalhada, VR)
+  const consolidatedSummary = React.useMemo(() => {
+    const targetTypes = ['Hora Extra', 'Férias Trabalhada', 'VR']
+
+    const typeTotals: Record<string, number> = {}
+    targetTypes.forEach((t) => (typeTotals[t] = 0))
+
+    const dateTypeSums: Record<string, { tipo: string; data: string; valor: number }> = {}
+
+    summaryData.forEach((item) => {
+      const tipoRaw = item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || ''
+      const matchedType = targetTypes.find((t) => tipoRaw.toLowerCase().includes(t.toLowerCase()))
+      if (!matchedType) return
+
+      const dateStr = item.data_pagamento ? item.data_pagamento.split(' ')[0] : '-'
+      const key = `${matchedType}_${dateStr}`
+
+      const val = item.valor_pago || 0
+
+      if (!dateTypeSums[key]) {
+        dateTypeSums[key] = { tipo: matchedType, data: dateStr, valor: 0 }
+      }
+      dateTypeSums[key].valor += val
+      typeTotals[matchedType] += val
+    })
+
+    const rows = Object.values(dateTypeSums).map((row) => ({
+      ...row,
+      total: typeTotals[row.tipo],
+    }))
+
+    rows.sort((a, b) => {
+      if (a.tipo !== b.tipo) return a.tipo.localeCompare(b.tipo)
+      return a.data.localeCompare(b.data)
+    })
+
+    return rows
   }, [summaryData])
 
   return (
@@ -340,8 +418,8 @@ export default function RelatorioRecebedoria() {
 
       {/* Filters */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border space-y-4 print:hidden">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
-          <div className="space-y-2 xl:col-span-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="space-y-2">
             <Label>Data Inicial</Label>
             <Input
               type="date"
@@ -350,7 +428,7 @@ export default function RelatorioRecebedoria() {
               className="bg-white dark:bg-slate-950"
             />
           </div>
-          <div className="space-y-2 xl:col-span-1">
+          <div className="space-y-2">
             <Label>Data Final</Label>
             <Input
               type="date"
@@ -360,7 +438,32 @@ export default function RelatorioRecebedoria() {
             />
           </div>
 
-          <div className="space-y-2 xl:col-span-1">
+          <div className="space-y-2">
+            <Label>Horário Inicial</Label>
+            <Input
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="bg-white dark:bg-slate-950"
+            />
+          </div>
+          <div className="space-y-2 relative">
+            <Label>Horário Final</Label>
+            <Input
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className={cn(
+                'bg-white dark:bg-slate-950',
+                timeError && 'border-red-500 focus-visible:ring-red-500',
+              )}
+            />
+            {timeError && (
+              <p className="text-[10px] text-red-500 absolute -bottom-4 left-0">{timeError}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
             <Label>Busca</Label>
             <Input
               placeholder="Buscar..."
@@ -370,7 +473,7 @@ export default function RelatorioRecebedoria() {
             />
           </div>
 
-          <div className="space-y-2 xl:col-span-1">
+          <div className="space-y-2">
             <Label>Garagem</Label>
             <Select value={garagemFilter} onValueChange={setGaragemFilter}>
               <SelectTrigger>
@@ -379,7 +482,7 @@ export default function RelatorioRecebedoria() {
               <SelectContent>
                 <SelectItem value="Todos">Todas</SelectItem>
                 {filiaisOptions.map((f) => (
-                  <SelectItem key={f.value.toString()} value={f.value.toString()}>
+                  <SelectItem key={f.value} value={f.value}>
                     {f.label}
                   </SelectItem>
                 ))}
@@ -387,7 +490,7 @@ export default function RelatorioRecebedoria() {
             </Select>
           </div>
 
-          <div className="space-y-2 xl:col-span-1">
+          <div className="space-y-2">
             <Label>Usuário</Label>
             <Select value={usuarioFilter} onValueChange={setUsuarioFilter}>
               <SelectTrigger>
@@ -404,7 +507,7 @@ export default function RelatorioRecebedoria() {
             </Select>
           </div>
 
-          <div className="space-y-2 xl:col-span-1">
+          <div className="space-y-2">
             <Label>Tipo Pagamento</Label>
             <Select value={tipoPagamentoFilter} onValueChange={setTipoPagamentoFilter}>
               <SelectTrigger>
@@ -421,8 +524,8 @@ export default function RelatorioRecebedoria() {
             </Select>
           </div>
 
-          <div className="flex flex-col gap-2 xl:col-span-1">
-            <div className="hidden xl:block h-5"></div>
+          <div className="flex flex-col gap-2">
+            <div className="hidden sm:block h-5"></div>
             <Button
               variant="ghost"
               onClick={clearFilters}
@@ -466,6 +569,7 @@ export default function RelatorioRecebedoria() {
                     <TableHead className="print:text-black print:font-bold">Registro</TableHead>
                     <TableHead className="print:text-black print:font-bold">Nome</TableHead>
                     <TableHead className="print:text-black print:font-bold">Data</TableHead>
+                    <TableHead className="print:text-black print:font-bold">Horário</TableHead>
                     <TableHead className="text-right print:text-black print:font-bold">
                       Valor
                     </TableHead>
@@ -493,6 +597,9 @@ export default function RelatorioRecebedoria() {
                           <Skeleton className="h-4 w-32" />
                         </TableCell>
                         <TableCell>
+                          <Skeleton className="h-4 w-16" />
+                        </TableCell>
+                        <TableCell>
                           <Skeleton className="h-4 w-24 ml-auto" />
                         </TableCell>
                         <TableCell>
@@ -511,7 +618,7 @@ export default function RelatorioRecebedoria() {
                     ))
                   ) : data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-48 text-center">
+                      <TableCell colSpan={9} className="h-48 text-center">
                         <SearchX className="mx-auto h-10 w-10 text-slate-300 mb-3" />
                         <p className="text-slate-500 font-medium">Nenhum pagamento encontrado.</p>
                         <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4">
@@ -528,7 +635,7 @@ export default function RelatorioRecebedoria() {
                         <React.Fragment key={nome}>
                           <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 print:bg-slate-100">
                             <TableCell
-                              colSpan={8}
+                              colSpan={9}
                               className="font-semibold text-slate-700 dark:text-slate-300 print:text-black"
                             >
                               {nome} - {totalLines}{' '}
@@ -559,11 +666,14 @@ export default function RelatorioRecebedoria() {
                                 <TableCell className="print:text-black">
                                   {item.data_pagamento || '-'}
                                 </TableCell>
+                                <TableCell className="print:text-black">
+                                  {item.hora_pagamento || '-'}
+                                </TableCell>
                                 <TableCell className="text-right font-medium print:text-black">
                                   {formatBRL(item.valor_pago || item.valor_a_receber || item.valor)}
                                 </TableCell>
                                 <TableCell className="text-left print:text-black">
-                                  {getTipoPagamento(item.idtipopgto)}
+                                  {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
                                 </TableCell>
                                 <TableCell className="text-center">{statusBadge}</TableCell>
                                 <TableCell className="text-center print:hidden">
@@ -656,12 +766,12 @@ export default function RelatorioRecebedoria() {
                               </div>
                               <div className="flex flex-col gap-1 text-xs text-slate-500">
                                 <span className="font-medium text-slate-700 dark:text-slate-300">
-                                  {getTipoPagamento(item.idtipopgto)}
+                                  {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
                                 </span>
                               </div>
                               <div className="flex justify-between items-center pt-3 border-t">
                                 <div className="text-xs text-slate-500">
-                                  {item.data_pagamento || '-'}
+                                  {item.data_pagamento || '-'} {item.hora_pagamento || ''}
                                 </div>
                                 <div className="flex gap-2">
                                   <Button
@@ -721,66 +831,145 @@ export default function RelatorioRecebedoria() {
             )}
           </TabsContent>
 
-          <TabsContent value="resumido" className="mt-0 space-y-6">
-            <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
-              <Table className="print:text-sm">
-                <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent print:border-b-2 print:border-slate-800">
-                  <TableRow className="print:border-none">
-                    <TableHead className="h-8 py-2 print:text-black print:font-bold">
-                      Colaborador
-                    </TableHead>
-                    <TableHead className="h-8 py-2 print:text-black print:font-bold">
-                      Tipo de Pagamento
-                    </TableHead>
-                    <TableHead className="h-8 py-2 text-right print:text-black print:font-bold">
-                      Total Acumulado
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    [...Array(5)].map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="py-2">
-                          <Skeleton className="h-4 w-40" />
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <Skeleton className="h-4 w-24" />
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <Skeleton className="h-4 w-24 ml-auto" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : summaryArray.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="h-32 text-center py-8">
-                        <SearchX className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-                        <p className="text-sm text-slate-500 font-medium">
-                          Nenhum registro encontrado para os filtros selecionados.
-                        </p>
-                      </TableCell>
+          <TabsContent value="resumido" className="mt-0 space-y-8">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 print:text-black">
+                Total por Colaborador
+              </h3>
+              <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
+                <Table className="print:text-sm">
+                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent print:border-b-2 print:border-slate-800">
+                    <TableRow className="print:border-none">
+                      <TableHead className="h-8 py-2 print:text-black print:font-bold">
+                        Colaborador
+                      </TableHead>
+                      <TableHead className="h-8 py-2 print:text-black print:font-bold">
+                        Tipo de Pagamento
+                      </TableHead>
+                      <TableHead className="h-8 py-2 text-right print:text-black print:font-bold">
+                        Total Acumulado
+                      </TableHead>
                     </TableRow>
-                  ) : (
-                    summaryArray.map((item, idx) => (
-                      <TableRow
-                        key={idx}
-                        className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
-                      >
-                        <TableCell className="py-2 font-medium text-sm print:text-black">
-                          {item.nome}
-                        </TableCell>
-                        <TableCell className="py-2 text-sm text-slate-600 dark:text-slate-400 print:text-black">
-                          {item.tipo}
-                        </TableCell>
-                        <TableCell className="py-2 text-sm text-right font-semibold text-emerald-600 dark:text-emerald-400 print:text-black">
-                          {formatBRL(item.total)}
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      [...Array(5)].map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="py-2">
+                            <Skeleton className="h-4 w-40" />
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Skeleton className="h-4 w-24 ml-auto" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : summaryArray.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="h-32 text-center py-8">
+                          <SearchX className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                          <p className="text-sm text-slate-500 font-medium">
+                            Nenhum registro encontrado para os filtros selecionados.
+                          </p>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      summaryArray.map((item, idx) => (
+                        <TableRow
+                          key={idx}
+                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
+                        >
+                          <TableCell className="py-2 font-medium text-sm print:text-black">
+                            {item.nome}
+                          </TableCell>
+                          <TableCell className="py-2 text-sm text-slate-600 dark:text-slate-400 print:text-black">
+                            {item.tipo}
+                          </TableCell>
+                          <TableCell className="py-2 text-sm text-right font-semibold text-emerald-600 dark:text-emerald-400 print:text-black">
+                            {formatBRL(item.total)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 print:text-black">
+                Resumo Consolidado (Hora Extra, Férias Trabalhada, VR)
+              </h3>
+              <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
+                <Table className="print:text-sm">
+                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent print:border-b-2 print:border-slate-800">
+                    <TableRow className="print:border-none">
+                      <TableHead className="h-8 py-2 print:text-black print:font-bold">
+                        Tipo de Pagamento
+                      </TableHead>
+                      <TableHead className="h-8 py-2 print:text-black print:font-bold">
+                        Data
+                      </TableHead>
+                      <TableHead className="h-8 py-2 text-right print:text-black print:font-bold">
+                        Valor
+                      </TableHead>
+                      <TableHead className="h-8 py-2 text-right print:text-black print:font-bold">
+                        Total
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      [...Array(3)].map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="py-2">
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Skeleton className="h-4 w-20 ml-auto" />
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Skeleton className="h-4 w-20 ml-auto" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : consolidatedSummary.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="h-24 text-center py-8">
+                          <p className="text-sm text-slate-500 font-medium">
+                            Nenhum registro encontrado para estas categorias.
+                          </p>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      consolidatedSummary.map((item, idx) => (
+                        <TableRow
+                          key={idx}
+                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
+                        >
+                          <TableCell className="py-2 font-medium text-sm print:text-black">
+                            {item.tipo}
+                          </TableCell>
+                          <TableCell className="py-2 text-sm text-slate-600 dark:text-slate-400 print:text-black">
+                            {formatDateStringSafe(item.data)}
+                          </TableCell>
+                          <TableCell className="py-2 text-sm text-right print:text-black">
+                            {formatBRL(item.valor)}
+                          </TableCell>
+                          <TableCell className="py-2 text-sm text-right font-semibold text-indigo-600 dark:text-indigo-400 print:text-black">
+                            {formatBRL(item.total)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
@@ -811,7 +1000,9 @@ export default function RelatorioRecebedoria() {
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Data e Hora
                   </span>
-                  <p className="font-medium">{detailsModal.data_pagamento || '-'}</p>
+                  <p className="font-medium">
+                    {detailsModal.data_pagamento || '-'} {detailsModal.hora_pagamento || ''}
+                  </p>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
@@ -845,7 +1036,9 @@ export default function RelatorioRecebedoria() {
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                     Tipo de Pagamento
                   </span>
-                  <p className="font-medium">{getTipoPagamento(detailsModal.idtipopgto)}</p>
+                  <p className="font-medium">
+                    {getTipoPagamento(detailsModal.idtipopgto) || detailsModal.tipo_pagamento}
+                  </p>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
@@ -865,7 +1058,7 @@ export default function RelatorioRecebedoria() {
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
-                    Filial
+                    Filial ID
                   </span>
                   <p className="font-medium">{detailsModal.filial}</p>
                 </div>
