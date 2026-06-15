@@ -416,7 +416,6 @@ export default function RelatorioRecebedoria() {
             table {
               page-break-inside: auto;
               width: 100% !important;
-              font-size: 14pt !important;
               border-collapse: collapse !important;
             }
             tr {
@@ -424,12 +423,12 @@ export default function RelatorioRecebedoria() {
               page-break-after: auto;
             }
             th {
-              font-size: 15pt !important;
-              padding: 12px 8px !important;
+              font-size: 16pt !important;
+              padding: 16px 8px !important;
             }
             td {
               font-size: 14pt !important;
-              padding: 10px 8px !important;
+              padding: 12px 8px !important;
             }
             .text-lg {
               font-size: 16pt !important;
@@ -645,26 +644,107 @@ export default function RelatorioRecebedoria() {
           </TabsList>
 
           <TabsContent value="detalhado" className="mt-0 space-y-6">
-            {/* Desktop Table */}
-            <div className="hidden md:block print:block rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
-              <Table>
-                <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent print:border-b-2 print:border-slate-800">
-                  <TableRow className="print:border-none">
-                    <TableHead className="print:text-black print:font-bold">Registro</TableHead>
-                    <TableHead className="print:text-black print:font-bold">Nome</TableHead>
-                    <TableHead className="print:text-black print:font-bold">Data</TableHead>
-                    <TableHead className="print:text-black print:font-bold">Horário</TableHead>
-                    <TableHead className="text-right print:text-black print:font-bold">
-                      Valor
-                    </TableHead>
-                    <TableHead className="text-left w-[150px] print:text-black print:font-bold">
+            {/* Print Detailed Table */}
+            <div className="hidden print:block w-full">
+              <Table className="w-full text-[14pt]">
+                <TableHeader className="border-b-2 border-slate-800">
+                  <TableRow className="border-none">
+                    <TableHead className="text-black font-bold py-3">Registro</TableHead>
+                    <TableHead className="text-black font-bold py-3">Data/Hora Pagamento</TableHead>
+                    <TableHead className="text-black font-bold py-3">Dt. Ref</TableHead>
+                    <TableHead className="text-black font-bold py-3">Inicio</TableHead>
+                    <TableHead className="text-black font-bold py-3">Término</TableHead>
+                    <TableHead className="text-black font-bold py-3">Horas</TableHead>
+                    <TableHead className="text-right text-black font-bold py-3">Valor</TableHead>
+                    <TableHead className="text-left text-black font-bold py-3">
                       Tipo de Pagamento
                     </TableHead>
-                    <TableHead className="text-center print:text-black print:font-bold">
-                      Status
-                    </TableHead>
-                    <TableHead className="text-center print:hidden">Foto</TableHead>
-                    <TableHead className="text-right print:hidden">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {summaryData.map((item: any, idx: number) => {
+                    const val =
+                      item.valor_pago ||
+                      item.expand?.colaborador_id?.valor_a_receber ||
+                      item.valor_a_receber ||
+                      item.valor ||
+                      0
+                    return (
+                      <TableRow
+                        key={`print-${item.id || idx}`}
+                        className="border-b border-slate-200 break-inside-avoid"
+                      >
+                        <TableCell className="text-black py-2">
+                          {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-black py-2">
+                          {formatDateStringSafe(item.data_pagamento) || '-'}{' '}
+                          {item.hora_pagamento || ''}
+                        </TableCell>
+                        <TableCell className="text-black py-2">
+                          {formatDateStringSafe(item.expand?.colaborador_id?.data) || '-'}
+                        </TableCell>
+                        <TableCell className="text-black py-2">
+                          {formatHoraString(item.inicio) || '-'}
+                        </TableCell>
+                        <TableCell className="text-black py-2">
+                          {formatHoraString(item.termino) || '-'}
+                        </TableCell>
+                        <TableCell className="text-black py-2">
+                          {formatHoras(item.horas) || '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-black py-2">
+                          {formatBRL(val)}
+                        </TableCell>
+                        <TableCell className="text-left text-black py-2">
+                          {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento || 'Outros'}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+                <tfoot className="border-t-2 border-slate-800">
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="py-3 font-bold text-lg text-black text-right uppercase"
+                    >
+                      Total
+                    </td>
+                    <td className="py-3 text-lg text-right font-bold text-black double-underline">
+                      {formatBRL(
+                        summaryData.reduce((acc: any, item: any) => {
+                          return (
+                            acc +
+                            (item.valor_pago ||
+                              item.expand?.colaborador_id?.valor_a_receber ||
+                              item.valor_a_receber ||
+                              item.valor ||
+                              0)
+                          )
+                        }, 0),
+                      )}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </Table>
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block print:hidden rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+              <Table>
+                <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
+                  <TableRow>
+                    <TableHead>Registro</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Horário</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-left w-[150px]">Tipo de Pagamento</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-center">Foto</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
