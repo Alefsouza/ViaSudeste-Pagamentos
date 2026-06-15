@@ -85,7 +85,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .catch(() => null)
 
   if (!anyColab) {
-    throw new Error('Colaborador não encontrado')
+    throw new Error('Não há valor pendente para receber para este colaborador.')
   }
 
   const fotoRecord = await pb
