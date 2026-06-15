@@ -77,8 +77,45 @@ export default function RelatorioRecebedoria() {
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0])
 
   const [statusFilter, setStatusFilter] = useState('Todos')
+  const [usuarioFilter, setUsuarioFilter] = useState('Todos')
+  const [garagemFilter, setGaragemFilter] = useState('Todos')
+  const [tipoPagamentoFilter, setTipoPagamentoFilter] = useState('Todos')
+
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+
+  // Filter Options State
+  const [allUsers, setAllUsers] = useState<any[]>([])
+  const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
+  const [garagens, setGaragens] = useState<string[]>([])
+  const [tiposPagamento, setTiposPagamento] = useState<string[]>([])
+
+  useEffect(() => {
+    async function fetchFilterOptions() {
+      try {
+        const usersRes = await pb.collection('users').getFullList()
+        setAllUsers(usersRes)
+        const usersReceb = usersRes.filter((u: any) => u.tipo_usuario === 'recebedoria')
+        setUsuariosRecebedoria(usersReceb)
+
+        const uniqueGaragens = Array.from(
+          new Set(usersRes.map((u: any) => u.garagem).filter(Boolean)),
+        )
+        setGaragens(uniqueGaragens as string[])
+
+        const pagamentosRes = await pb
+          .collection('pagamentos')
+          .getFullList({ fields: 'tipo_pagamento' })
+        const uniqueTipos = Array.from(
+          new Set(pagamentosRes.map((p: any) => p.tipo_pagamento).filter(Boolean)),
+        )
+        setTiposPagamento(uniqueTipos as string[])
+      } catch (err) {
+        console.error('Error fetching filter options:', err)
+      }
+    }
+    fetchFilterOptions()
+  }, [])
 
   // Modals
   const [photoModal, setPhotoModal] = useState<string | null>(null)
@@ -102,7 +139,11 @@ export default function RelatorioRecebedoria() {
         endDate,
         search: debouncedSearchTerm,
         status: statusFilter,
+        usuario: usuarioFilter,
+        garagem: garagemFilter,
+        tipoPagamento: tipoPagamentoFilter,
       }
+
       const [result, stats] = await Promise.all([
         getColaboradoresPaginated(page, 20, filters),
         getColaboradoresAnalytics(filters),
@@ -125,6 +166,22 @@ export default function RelatorioRecebedoria() {
       if (filters.status && filters.status !== 'Todos') {
         conditions.push(`status = "${filters.status}"`)
       }
+      if (filters.usuario && filters.usuario !== 'Todos') {
+        conditions.push(`user_id = "${filters.usuario}"`)
+      }
+      if (filters.garagem && filters.garagem !== 'Todos') {
+        const matchedUsers = allUsers
+          .filter((u: any) => u.garagem === filters.garagem)
+          .map((u: any) => u.id)
+        if (matchedUsers.length > 0) {
+          conditions.push(`(${matchedUsers.map((id) => `user_id = "${id}"`).join(' || ')})`)
+        } else {
+          conditions.push(`id = "null"`)
+        }
+      }
+      if (filters.tipoPagamento && filters.tipoPagamento !== 'Todos') {
+        conditions.push(`tipo_pagamento = "${filters.tipoPagamento}"`)
+      }
 
       const pagamentosRes = await pb.collection('pagamentos').getFullList({
         filter: conditions.join(' && '),
@@ -140,7 +197,17 @@ export default function RelatorioRecebedoria() {
 
   useEffect(() => {
     loadData()
-  }, [page, startDate, endDate, debouncedSearchTerm, statusFilter])
+  }, [
+    page,
+    startDate,
+    endDate,
+    debouncedSearchTerm,
+    statusFilter,
+    usuarioFilter,
+    garagemFilter,
+    tipoPagamentoFilter,
+    allUsers.length,
+  ])
 
   useRealtime('pagamentos', () => {
     loadData()
@@ -151,6 +218,9 @@ export default function RelatorioRecebedoria() {
 
   const clearFilters = () => {
     setStatusFilter('Todos')
+    setUsuarioFilter('Todos')
+    setGaragemFilter('Todos')
+    setTipoPagamentoFilter('Todos')
     setSearchTerm('')
     const start = new Date()
     start.setDate(start.getDate() - 30)
@@ -243,8 +313,8 @@ export default function RelatorioRecebedoria() {
 
       {/* Filters */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border space-y-4 print:hidden">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <div className="space-y-2 lg:col-span-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
+          <div className="space-y-2 xl:col-span-1">
             <Label>Data Inicial</Label>
             <Input
               type="date"
@@ -253,7 +323,7 @@ export default function RelatorioRecebedoria() {
               className="bg-white dark:bg-slate-950"
             />
           </div>
-          <div className="space-y-2 lg:col-span-1">
+          <div className="space-y-2 xl:col-span-1">
             <Label>Data Final</Label>
             <Input
               type="date"
@@ -263,38 +333,76 @@ export default function RelatorioRecebedoria() {
             />
           </div>
 
-          <div className="space-y-2 lg:col-span-1">
+          <div className="space-y-2 xl:col-span-1">
             <Label>Busca</Label>
             <Input
-              placeholder="Buscar por Registro ou Nome..."
+              placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-white dark:bg-slate-950"
             />
           </div>
 
-          <div className="space-y-2 lg:col-span-1">
-            <Label>Status</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <div className="space-y-2 xl:col-span-1">
+            <Label>Garagem</Label>
+            <Select value={garagemFilter} onValueChange={setGaragemFilter}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todos">Todas</SelectItem>
+                {garagens.map((g) => (
+                  <SelectItem key={g} value={g}>
+                    {g}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2 xl:col-span-1">
+            <Label>Usuário</Label>
+            <Select value={usuarioFilter} onValueChange={setUsuarioFilter}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Todos">Todos</SelectItem>
-                <SelectItem value="Confirmado">Confirmado</SelectItem>
-                <SelectItem value="Pendente">Pendente</SelectItem>
+                {usuariosRecebedoria.map((u: any) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name || u.email || 'Usuário'}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="flex items-end lg:col-span-1">
+          <div className="space-y-2 xl:col-span-1">
+            <Label>Tipo Pagamento</Label>
+            <Select value={tipoPagamentoFilter} onValueChange={setTipoPagamentoFilter}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todos">Todos</SelectItem>
+                {tiposPagamento.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2 xl:col-span-1">
+            <div className="hidden xl:block h-5"></div>
             <Button
               variant="ghost"
               onClick={clearFilters}
-              className="text-slate-500 w-full sm:w-auto h-10 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="text-slate-500 w-full h-10 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <FilterX className="h-4 w-4 mr-2" />
-              Limpar Filtros
+              Limpar
             </Button>
           </div>
         </div>
@@ -620,7 +728,7 @@ export default function RelatorioRecebedoria() {
                       <TableCell colSpan={3} className="h-32 text-center py-8">
                         <SearchX className="mx-auto h-8 w-8 text-slate-300 mb-2" />
                         <p className="text-sm text-slate-500 font-medium">
-                          Nenhum registro encontrado.
+                          Nenhum registro encontrado para os filtros selecionados.
                         </p>
                       </TableCell>
                     </TableRow>
