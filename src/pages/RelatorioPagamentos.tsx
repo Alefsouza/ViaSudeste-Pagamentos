@@ -4,6 +4,7 @@ import {
   getColaboradoresStats,
   getColaboradoresAnalytics,
 } from '@/services/colaboradores'
+import { getPagamentosTotals } from '@/services/pagamentos'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useToast } from '@/hooks/use-toast'
@@ -101,11 +102,12 @@ export default function RelatorioPagamentos() {
     setError(false)
     try {
       const filters = { search: debouncedSearch, startDate, endDate, filial }
-      const [newStats, paginated] = await Promise.all([
+      const [newStats, pagamentosTotals, paginated] = await Promise.all([
         getColaboradoresStats(filters),
+        getPagamentosTotals(filters),
         getColaboradoresPaginated(page, 20, filters),
       ])
-      setStats(newStats)
+      setStats({ count: newStats.count, total: pagamentosTotals.pago })
       setData(paginated.items)
       setTotalPages(paginated.totalPages || 1)
     } catch (err: any) {
@@ -125,6 +127,7 @@ export default function RelatorioPagamentos() {
     loadData()
   }, [page, debouncedSearch, startDate, endDate, filial])
   useRealtime('colaboradores', loadData)
+  useRealtime('pagamentos', loadData)
 
   const handleGeneratePDF = async (type: 'table' | 'charts') => {
     setReportType(type)
@@ -258,17 +261,20 @@ export default function RelatorioPagamentos() {
               <Skeleton className="h-5 w-64 mt-1 bg-blue-200/50 dark:bg-blue-800/50" />
             ) : (
               <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                Total de pagamentos: <span className="font-bold">{stats.count}</span>{' '}
-                <span className="mx-1 opacity-50">|</span> Total pago:{' '}
-                <span className="font-bold">{formatBRL(stats.total)}</span>
+                Total de pagamentos na lista: <span className="font-bold">{stats.count}</span>
               </p>
             )}
           </div>
           {loading ? (
             <Skeleton className="h-8 w-40 mt-2 sm:mt-0 bg-blue-200/50 dark:bg-blue-800/50" />
           ) : (
-            <div className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-2 sm:mt-0">
-              {formatBRL(stats.total)}
+            <div className="flex flex-col items-start sm:items-end mt-2 sm:mt-0">
+              <span className="text-xs font-semibold text-blue-800/70 dark:text-blue-200/70 uppercase tracking-wider">
+                Total Pago (Confirmados)
+              </span>
+              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                {formatBRL(stats.total)}
+              </div>
             </div>
           )}
         </div>
