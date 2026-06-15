@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
-import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
 import { useRealtime } from '@/hooks/use-realtime'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -59,7 +58,6 @@ export default function RelatorioRecebedoria() {
   const { toast } = useToast()
 
   const [data, setData] = useState<any[]>([])
-  const [statsData, setStatsData] = useState<any[]>([])
   const [summaryData, setSummaryData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('detalhado')
@@ -93,13 +91,16 @@ export default function RelatorioRecebedoria() {
   useEffect(() => {
     async function fetchFilterOptions() {
       try {
-        const usersRes = await pb.collection('users').getFullList()
-        setAllUsers(usersRes)
-        const usersReceb = usersRes.filter((u: any) => u.tipo_usuario === 'recebedoria')
-        setUsuariosRecebedoria(usersReceb)
+        const usersRes = await pb.collection('users').getFullList({
+          filter: 'tipo_usuario = "recebedoria"',
+        })
+        setUsuariosRecebedoria(usersRes)
+
+        const allUsersRes = await pb.collection('users').getFullList()
+        setAllUsers(allUsersRes)
 
         const uniqueGaragens = Array.from(
-          new Set(usersRes.map((u: any) => u.garagem).filter(Boolean)),
+          new Set(allUsersRes.map((u: any) => u.garagem).filter(Boolean)),
         )
         setGaragens(uniqueGaragens as string[])
 
@@ -134,59 +135,70 @@ export default function RelatorioRecebedoria() {
     setLoading(true)
     setError(false)
     try {
-      const filters = {
-        startDate,
-        endDate,
-        search: debouncedSearchTerm,
-        status: statusFilter,
-        usuario: usuarioFilter,
-        garagem: garagemFilter,
-        tipoPagamento: tipoPagamentoFilter,
-      }
-
-      const [result, stats] = await Promise.all([
-        getColaboradoresPaginated(page, 20, filters),
-        getColaboradoresAnalytics(filters),
-      ])
-      setData(result.items)
-      setStatsData(stats)
-      setTotalPages(result.totalPages || 1)
-      setTotalItems(result.totalItems || 0)
-
-      // Load summary data from pagamentos
       const conditions: string[] = []
-      if (filters.startDate && filters.endDate) {
+
+      if (startDate && endDate) {
         conditions.push(
-          `data_pagamento >= "${filters.startDate} 00:00:00" && data_pagamento <= "${filters.endDate} 23:59:59"`,
+          `data_pagamento >= "${startDate} 00:00:00" && data_pagamento <= "${endDate} 23:59:59"`,
         )
       }
-      if (filters.search) {
-        conditions.push(`(nome ~ "${filters.search}" || registro ~ "${filters.search}")`)
-      }
-      if (filters.status && filters.status !== 'Todos') {
-        conditions.push(`status = "${filters.status}"`)
-      }
-      if (filters.usuario && filters.usuario !== 'Todos') {
-        conditions.push(`user_id = "${filters.usuario}"`)
-      }
-      if (filters.garagem && filters.garagem !== 'Todos') {
-        const matchedUsers = allUsers
-          .filter((u: any) => u.garagem === filters.garagem)
-          .map((u: any) => u.id)
-        if (matchedUsers.length > 0) {
-          conditions.push(`(${matchedUsers.map((id) => `user_id = "${id}"`).join(' || ')})`)
-        } else {
-          conditions.push(`id = "null"`)
-        }
-      }
-      if (filters.tipoPagamento && filters.tipoPagamento !== 'Todos') {
-        conditions.push(`tipo_pagamento = "${filters.tipoPagamento}"`)
+      if (debouncedSearchTerm) {
+        conditions.push(`(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}")`)
       }
 
-      const pagamentosRes = await pb.collection('pagamentos').getFullList({
-        filter: conditions.join(' && '),
-      })
-      setSummaryData(pagamentosRes)
+      if (statusFilter && statusFilter !== 'Todos') {
+        if (statusFilter === 'Confirmado') {
+          conditions.push(`(status = "Confirmado" || foto_confirmacao_url != "")`)
+        } else if (statusFilter === 'Pendente') {
+          conditions.push(`(status = "Pendente" || status = "")`)
+        } else if (statusFilter === 'Cancelado') {
+          conditions.push(`status = "Cancelado"`)
+        } else {
+          conditions.push(`status = "${statusFilter}"`)
+        }
+      }
+
+      if (usuarioFilter && usuarioFilter !== 'Todos') {
+        conditions.push(`user_id = "${usuarioFilter}"`)
+      }
+
+      if (garagemFilter && garagemFilter !== 'Todos') {
+        conditions.push(`user_id.garagem = "${garagemFilter}"`)
+      }
+
+      if (tipoPagamentoFilter && tipoPagamentoFilter !== 'Todos') {
+        conditions.push(`tipo_pagamento = "${tipoPagamentoFilter}"`)
+      }
+
+      const filterString = conditions.length > 0 ? conditions.join(' && ') : ''
+
+      const results = await Promise.allSettled([
+        pb.collection('pagamentos').getList(page, 20, {
+          filter: filterString,
+          sort: '-created',
+        }),
+        pb.collection('pagamentos').getFullList({
+          filter: filterString,
+          sort: '-created',
+        }),
+      ])
+
+      const paginatedRes = results[0]
+      const fullRes = results[1]
+
+      if (paginatedRes.status === 'fulfilled') {
+        setData(paginatedRes.value.items)
+        setTotalPages(paginatedRes.value.totalPages || 1)
+        setTotalItems(paginatedRes.value.totalItems || 0)
+      } else {
+        throw new Error('Falha ao carregar pagamentos paginados')
+      }
+
+      if (fullRes.status === 'fulfilled') {
+        setSummaryData(fullRes.value)
+      } else {
+        setSummaryData([])
+      }
     } catch (err: any) {
       console.error(err)
       setError(true)
@@ -494,7 +506,7 @@ export default function RelatorioRecebedoria() {
                     </TableRow>
                   ) : (
                     Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
-                      const totalLines = statsData.filter(
+                      const totalLines = summaryData.filter(
                         (c) => (c.nome || 'Desconhecido') === nome,
                       ).length
                       return (
@@ -533,7 +545,7 @@ export default function RelatorioRecebedoria() {
                                   {item.data_pagamento || '-'}
                                 </TableCell>
                                 <TableCell className="text-right font-medium print:text-black">
-                                  {formatBRL(item.valor_a_receber || item.valor)}
+                                  {formatBRL(item.valor_pago || item.valor_a_receber || item.valor)}
                                 </TableCell>
                                 <TableCell className="text-left print:text-black">
                                   {getTipoPagamento(item.idtipopgto)}
@@ -585,7 +597,7 @@ export default function RelatorioRecebedoria() {
                 </div>
               ) : (
                 Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
-                  const totalLines = statsData.filter(
+                  const totalLines = summaryData.filter(
                     (c) => (c.nome || 'Desconhecido') === nome,
                   ).length
                   return (
@@ -620,7 +632,9 @@ export default function RelatorioRecebedoria() {
                                 </div>
                                 <div className="text-right">
                                   <div className="font-bold text-slate-900 dark:text-slate-100">
-                                    {formatBRL(item.valor_a_receber || item.valor)}
+                                    {formatBRL(
+                                      item.valor_pago || item.valor_a_receber || item.valor,
+                                    )}
                                   </div>
                                   <div className="mt-1">{statusBadge}</div>
                                 </div>
@@ -789,7 +803,9 @@ export default function RelatorioRecebedoria() {
                     Valor
                   </span>
                   <p className="font-medium text-emerald-600 dark:text-emerald-400">
-                    {formatBRL(detailsModal.valor_a_receber || detailsModal.valor)}
+                    {formatBRL(
+                      detailsModal.valor_pago || detailsModal.valor_a_receber || detailsModal.valor,
+                    )}
                   </p>
                 </div>
                 <div>
