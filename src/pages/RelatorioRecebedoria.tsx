@@ -170,10 +170,7 @@ export default function RelatorioRecebedoria() {
   }
 
   const handleExport = () => {
-    toast({
-      title: 'Em breve',
-      description: 'A funcionalidade de exportação CSV será implementada em breve.',
-    })
+    window.print()
   }
 
   // Group items by name
@@ -185,23 +182,55 @@ export default function RelatorioRecebedoria() {
   }, {})
 
   return (
-    <div className="container mx-auto py-8 px-4 space-y-6">
+    <div className="container mx-auto py-8 px-4 space-y-6 print:py-0 print:px-0">
+      <style>
+        {`
+          @media print {
+            @page { margin: 10mm; }
+            body, html {
+              background-color: white !important;
+              color: black !important;
+            }
+            aside, header, nav, [data-sidebar] {
+              display: none !important;
+            }
+            main {
+              padding: 0 !important;
+              margin: 0 !important;
+              overflow: visible !important;
+            }
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            table {
+              page-break-inside: auto;
+            }
+            tr {
+              page-break-inside: avoid;
+              page-break-after: auto;
+            }
+          }
+        `}
+      </style>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white print:text-black">
             Relatórios de Pagamentos
           </h1>
-          <p className="text-muted-foreground mt-1">Meus pagamentos processados.</p>
+          <p className="text-muted-foreground mt-1 print:text-slate-700">
+            Meus pagamentos processados.
+          </p>
         </div>
-        <Button onClick={handleExport} className="w-full sm:w-auto">
+        <Button onClick={handleExport} className="w-full sm:w-auto print:hidden">
           <Download className="mr-2 h-4 w-4" />
           Exportar
         </Button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border space-y-4">
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border space-y-4 print:hidden">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="space-y-2 lg:col-span-1">
             <Label>Período</Label>
@@ -296,18 +325,24 @@ export default function RelatorioRecebedoria() {
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden md:block rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-            <Table>
-              <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
-                <TableRow>
-                  <TableHead>Registro</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-left w-[150px]">Tipo de Pagamento</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Foto</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+          <div className="hidden md:block print:block rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
+            <Table className="print:text-sm">
+              <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent print:border-b-2 print:border-slate-800">
+                <TableRow className="print:border-none">
+                  <TableHead className="print:text-black print:font-bold">Registro</TableHead>
+                  <TableHead className="print:text-black print:font-bold">Nome</TableHead>
+                  <TableHead className="print:text-black print:font-bold">Data</TableHead>
+                  <TableHead className="text-right print:text-black print:font-bold">
+                    Valor
+                  </TableHead>
+                  <TableHead className="text-left w-[150px] print:text-black print:font-bold">
+                    Tipo de Pagamento
+                  </TableHead>
+                  <TableHead className="text-center print:text-black print:font-bold">
+                    Status
+                  </TableHead>
+                  <TableHead className="text-center print:hidden">Foto</TableHead>
+                  <TableHead className="text-right print:hidden">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -357,10 +392,10 @@ export default function RelatorioRecebedoria() {
                     ).length
                     return (
                       <React.Fragment key={nome}>
-                        <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 print:bg-slate-100">
                           <TableCell
                             colSpan={8}
-                            className="font-semibold text-slate-700 dark:text-slate-300"
+                            className="font-semibold text-slate-700 dark:text-slate-300 print:text-black"
                           >
                             {nome} - {totalLines}{' '}
                             {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
@@ -381,34 +416,39 @@ export default function RelatorioRecebedoria() {
                           return (
                             <TableRow
                               key={item.id}
-                              className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
+                              className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
                             >
-                              <TableCell className="font-medium pl-8">{item.registro}</TableCell>
-                              <TableCell>{item.nome}</TableCell>
-                              <TableCell>{item.data_pagamento || '-'}</TableCell>
-                              <TableCell className="text-right font-medium">
+                              <TableCell className="font-medium pl-8 print:text-black">
+                                {item.registro}
+                              </TableCell>
+                              <TableCell className="print:text-black">{item.nome}</TableCell>
+                              <TableCell className="print:text-black">
+                                {item.data_pagamento || '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-medium print:text-black">
                                 {formatBRL(item.valor_a_receber || item.valor)}
                               </TableCell>
-                              <TableCell className="text-left">
+                              <TableCell className="text-left print:text-black">
                                 {getTipoPagamento(item.idtipopgto)}
                               </TableCell>
                               <TableCell className="text-center">{statusBadge}</TableCell>
-                              <TableCell className="text-center">
+                              <TableCell className="text-center print:hidden">
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   disabled={!isConfirmado}
                                   onClick={() => setPhotoModal(item.foto_confirmacao_url)}
-                                  className="text-slate-600"
+                                  className="text-slate-600 print:hidden"
                                 >
                                   <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
                                 </Button>
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className="text-right print:hidden">
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => setDetailsModal(item)}
+                                  className="print:hidden"
                                 >
                                   <FileText className="h-4 w-4 mr-2" /> Detalhes
                                 </Button>
@@ -425,7 +465,7 @@ export default function RelatorioRecebedoria() {
           </div>
 
           {/* Mobile Cards */}
-          <div className="md:hidden space-y-6">
+          <div className="md:hidden print:hidden space-y-6">
             {loading ? (
               [...Array(4)].map((_, i) => <Skeleton key={i} className="h-36 w-full rounded-xl" />)
             ) : data.length === 0 ? (
@@ -519,7 +559,7 @@ export default function RelatorioRecebedoria() {
 
           {/* Pagination Info */}
           {!loading && totalItems > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 print:hidden">
               <p className="text-sm text-muted-foreground">
                 Mostrando {data.length} de {totalItems} pagamentos (Página {page} de {totalPages})
               </p>
