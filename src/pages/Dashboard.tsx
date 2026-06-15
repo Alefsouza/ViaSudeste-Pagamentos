@@ -22,6 +22,7 @@ import {
   Info,
   Image as ImageIcon,
   FilterX,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -785,15 +786,25 @@ export default function Dashboard() {
                                     </TableCell>
                                     {isAlcimara && (
                                       <TableCell className="text-center">
-                                        {(!p.status || p.status !== 'Cancelado') && (
-                                          <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => setPaymentToCancel(p)}
-                                          >
-                                            Cancelar
-                                          </Button>
-                                        )}
+                                        {(() => {
+                                          const status =
+                                            p.status ||
+                                            (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                          if (status === 'Pendente') {
+                                            return (
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+                                                onClick={() => setPaymentToCancel(p)}
+                                                title="Cancelar Pagamento"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            )
+                                          }
+                                          return null
+                                        })()}
                                       </TableCell>
                                     )}
                                   </TableRow>
@@ -880,15 +891,27 @@ export default function Dashboard() {
                                           Foto
                                         </Button>
                                       )}
-                                      {isAlcimara && (!p.status || p.status !== 'Cancelado') && (
-                                        <Button
-                                          variant="destructive"
-                                          size="sm"
-                                          onClick={() => setPaymentToCancel(p)}
-                                        >
-                                          Cancelar
-                                        </Button>
-                                      )}
+                                      {isAlcimara &&
+                                        (() => {
+                                          const status =
+                                            p.status ||
+                                            (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                          if (status === 'Pendente') {
+                                            return (
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 px-2"
+                                                onClick={() => setPaymentToCancel(p)}
+                                                title="Cancelar Pagamento"
+                                              >
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Cancelar
+                                              </Button>
+                                            )
+                                          }
+                                          return null
+                                        })()}
                                     </div>
                                   </div>
                                 </CardContent>
@@ -980,6 +1003,10 @@ export default function Dashboard() {
                       )
                     : ''}
                 </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold text-muted-foreground">Data de Pagamento:</span>
+                <span>{paymentToCancel?.data_pagamento || 'Pendente'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Filial:</span>
