@@ -329,7 +329,7 @@ export default function RelatorioRecebedoria() {
     }[]
   }, [summaryData])
 
-  // Consolidated Summary for target types (Hora Extra, Férias, VR)
+  // Consolidated Summary grouped by Payment Type
   const consolidatedSummary = React.useMemo(() => {
     const targetCategories = [
       { name: 'Hora Extra', keywords: ['hora extra', 'hora extras', 'horas extras'] },
@@ -338,9 +338,6 @@ export default function RelatorioRecebedoria() {
     ]
 
     const typeTotals: Record<string, number> = {}
-    targetCategories.forEach((t) => (typeTotals[t.name] = 0))
-
-    const dateTypeSums: Record<string, { tipo: string; data: string; valor: number }> = {}
 
     summaryData.forEach((item) => {
       const tipoRaw = (item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || '').toLowerCase()
@@ -349,31 +346,27 @@ export default function RelatorioRecebedoria() {
         cat.keywords.some((keyword) => tipoRaw.includes(keyword)),
       )
 
-      if (!matchedCategory) return
+      const val = item.valor_pago || item.valor_a_receber || item.valor || 0
 
-      const dateStr = item.data_pagamento ? item.data_pagamento.split(' ')[0] : '-'
-      const key = `${matchedCategory.name}_${dateStr}`
-
-      const val = item.valor_pago || 0
-
-      if (!dateTypeSums[key]) {
-        dateTypeSums[key] = { tipo: matchedCategory.name, data: dateStr, valor: 0 }
+      if (matchedCategory) {
+        if (!typeTotals[matchedCategory.name]) typeTotals[matchedCategory.name] = 0
+        typeTotals[matchedCategory.name] += val
+      } else {
+        const tipoName = item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || 'Outros'
+        if (!typeTotals[tipoName]) typeTotals[tipoName] = 0
+        typeTotals[tipoName] += val
       }
-      dateTypeSums[key].valor += val
-      typeTotals[matchedCategory.name] += val
     })
 
-    const rows = Object.values(dateTypeSums).map((row) => ({
-      ...row,
-      total: typeTotals[row.tipo],
-    }))
+    const rows = Object.entries(typeTotals)
+      .map(([tipo, total]) => ({ tipo, total }))
+      .filter((row) => row.total > 0)
 
-    rows.sort((a, b) => {
-      if (a.tipo !== b.tipo) return a.tipo.localeCompare(b.tipo)
-      return a.data.localeCompare(b.data)
-    })
+    rows.sort((a, b) => a.tipo.localeCompare(b.tipo))
 
-    return rows
+    const totalGeral = rows.reduce((sum, row) => sum + row.total, 0)
+
+    return { rows, totalGeral }
   }, [summaryData])
 
   return (
@@ -381,12 +374,12 @@ export default function RelatorioRecebedoria() {
       <style>
         {`
           @media print {
-            @page { margin: 10mm; }
+            @page { margin: 15mm; }
             body, html {
               background-color: white !important;
               color: black !important;
             }
-            aside, header, nav, [data-sidebar] {
+            aside, header, nav, [data-sidebar], .print\\:hidden {
               display: none !important;
             }
             main {
@@ -400,16 +393,58 @@ export default function RelatorioRecebedoria() {
             }
             table {
               page-break-inside: auto;
+              width: 100% !important;
             }
             tr {
               page-break-inside: avoid;
               page-break-after: auto;
             }
+            .double-underline {
+              text-decoration: underline double !important;
+              text-underline-offset: 4px !important;
+            }
           }
         `}
       </style>
+
+      {/* Print Header */}
+      <div className="hidden print:block mb-8">
+        <div className="flex justify-between items-end border-b-2 border-slate-800 pb-4 mb-4">
+          <div>
+            <h1 className="text-2xl font-bold uppercase tracking-wider text-black">
+              Relatório de Pagamentos Consolidados
+            </h1>
+          </div>
+          <div className="text-right text-sm text-black">
+            <p>
+              <span className="font-bold">Data de Emissão:</span>{' '}
+              {new Date().toLocaleDateString('pt-BR')}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-sm text-black">
+          <div>
+            <p>
+              <span className="font-bold">Período:</span> {formatDateStringSafe(startDate)} a{' '}
+              {formatDateStringSafe(endDate)}
+            </p>
+            <p>
+              <span className="font-bold">Filial:</span>{' '}
+              {garagemFilter === 'Todos'
+                ? 'Todas'
+                : filiaisOptions.find((f) => f.value === garagemFilter)?.label || garagemFilter}
+            </p>
+          </div>
+          <div className="text-right">
+            <p>
+              <span className="font-bold">Usuário:</span> {user?.name || user?.email || 'N/A'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white print:text-black">
             Relatórios de Pagamentos
@@ -548,7 +583,7 @@ export default function RelatorioRecebedoria() {
 
       {/* Main Content */}
       {error ? (
-        <div className="text-center py-12 bg-rose-50 dark:bg-rose-950/20 rounded-xl border border-rose-100 dark:border-rose-900/50">
+        <div className="text-center py-12 bg-rose-50 dark:bg-rose-950/20 rounded-xl border border-rose-100 dark:border-rose-900/50 print:hidden">
           <AlertCircle className="mx-auto h-12 w-12 mb-4 text-rose-500 opacity-80" />
           <h3 className="text-lg font-semibold text-rose-700 dark:text-rose-400">
             Erro ao carregar pagamentos
@@ -635,82 +670,81 @@ export default function RelatorioRecebedoria() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    Object.entries(groupedByName).flatMap(([nome, records]: [string, any]) => {
+                    Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
                       const totalLines = summaryData.filter(
                         (c) => (c.nome || 'Desconhecido') === nome,
                       ).length
-                      return [
-                        <TableRow
-                          key={`header-${nome}`}
-                          className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 print:bg-slate-100"
-                        >
-                          <TableCell
-                            colSpan={9}
-                            className="font-semibold text-slate-700 dark:text-slate-300 print:text-black"
-                          >
-                            {nome} - {totalLines}{' '}
-                            {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
-                          </TableCell>
-                        </TableRow>,
-                        ...records.map((item: any) => {
-                          const isConfirmado = !!item.foto_confirmacao_url
-                          const statusBadge = isConfirmado ? (
-                            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
-                              Confirmado
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
-                              Pendente
-                            </Badge>
-                          )
-
-                          return (
-                            <TableRow
-                              key={item.id}
-                              className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
+                      return (
+                        <React.Fragment key={nome}>
+                          <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 print:bg-slate-100">
+                            <TableCell
+                              colSpan={9}
+                              className="font-semibold text-slate-700 dark:text-slate-300 print:text-black"
                             >
-                              <TableCell className="font-medium pl-8 print:text-black">
-                                {item.registro}
-                              </TableCell>
-                              <TableCell className="print:text-black">{item.nome}</TableCell>
-                              <TableCell className="print:text-black">
-                                {item.data_pagamento || '-'}
-                              </TableCell>
-                              <TableCell className="print:text-black">
-                                {item.hora_pagamento || '-'}
-                              </TableCell>
-                              <TableCell className="text-right font-medium print:text-black">
-                                {formatBRL(item.valor_pago || item.valor_a_receber || item.valor)}
-                              </TableCell>
-                              <TableCell className="text-left print:text-black">
-                                {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
-                              </TableCell>
-                              <TableCell className="text-center">{statusBadge}</TableCell>
-                              <TableCell className="text-center print:hidden">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={!isConfirmado}
-                                  onClick={() => setPhotoModal(item.foto_confirmacao_url)}
-                                  className="text-slate-600 print:hidden"
-                                >
-                                  <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
-                                </Button>
-                              </TableCell>
-                              <TableCell className="text-right print:hidden">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDetailsModal(item)}
-                                  className="print:hidden"
-                                >
-                                  <FileText className="h-4 w-4 mr-2" /> Detalhes
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        }),
-                      ]
+                              {nome} - {totalLines}{' '}
+                              {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
+                            </TableCell>
+                          </TableRow>
+                          {records.map((item: any) => {
+                            const isConfirmado = !!item.foto_confirmacao_url
+                            const statusBadge = isConfirmado ? (
+                              <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                                Confirmado
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                                Pendente
+                              </Badge>
+                            )
+
+                            return (
+                              <TableRow
+                                key={item.id}
+                                className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
+                              >
+                                <TableCell className="font-medium pl-8 print:text-black">
+                                  {item.registro}
+                                </TableCell>
+                                <TableCell className="print:text-black">{item.nome}</TableCell>
+                                <TableCell className="print:text-black">
+                                  {item.data_pagamento || '-'}
+                                </TableCell>
+                                <TableCell className="print:text-black">
+                                  {item.hora_pagamento || '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-medium print:text-black">
+                                  {formatBRL(item.valor_pago || item.valor_a_receber || item.valor)}
+                                </TableCell>
+                                <TableCell className="text-left print:text-black">
+                                  {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
+                                </TableCell>
+                                <TableCell className="text-center">{statusBadge}</TableCell>
+                                <TableCell className="text-center print:hidden">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!isConfirmado}
+                                    onClick={() => setPhotoModal(item.foto_confirmacao_url)}
+                                    className="text-slate-600 print:hidden"
+                                  >
+                                    <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
+                                  </Button>
+                                </TableCell>
+                                <TableCell className="text-right print:hidden">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setDetailsModal(item)}
+                                    className="print:hidden"
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" /> Detalhes
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </React.Fragment>
+                      )
                     })
                   )}
                 </TableBody>
@@ -841,23 +875,17 @@ export default function RelatorioRecebedoria() {
           </TabsContent>
 
           <TabsContent value="resumido" className="mt-0 space-y-8">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 print:text-black">
+            <div className="print:hidden">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
                 Total por Colaborador
               </h3>
-              <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
-                <Table className="print:text-sm">
-                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent print:border-b-2 print:border-slate-800">
-                    <TableRow className="print:border-none">
-                      <TableHead className="h-8 py-2 print:text-black print:font-bold">
-                        Colaborador
-                      </TableHead>
-                      <TableHead className="h-8 py-2 print:text-black print:font-bold">
-                        Tipo de Pagamento
-                      </TableHead>
-                      <TableHead className="h-8 py-2 text-right print:text-black print:font-bold">
-                        Total Acumulado
-                      </TableHead>
+              <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+                <Table>
+                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
+                    <TableRow>
+                      <TableHead className="h-8 py-2">Colaborador</TableHead>
+                      <TableHead className="h-8 py-2">Tipo de Pagamento</TableHead>
+                      <TableHead className="h-8 py-2 text-right">Total Acumulado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -888,15 +916,13 @@ export default function RelatorioRecebedoria() {
                       summaryArray.map((item, idx) => (
                         <TableRow
                           key={idx}
-                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
+                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                         >
-                          <TableCell className="py-2 font-medium text-sm print:text-black">
-                            {item.nome}
-                          </TableCell>
-                          <TableCell className="py-2 text-sm text-slate-600 dark:text-slate-400 print:text-black">
+                          <TableCell className="py-2 font-medium text-sm">{item.nome}</TableCell>
+                          <TableCell className="py-2 text-sm text-slate-600 dark:text-slate-400">
                             {item.tipo}
                           </TableCell>
-                          <TableCell className="py-2 text-sm text-right font-semibold text-emerald-600 dark:text-emerald-400 print:text-black">
+                          <TableCell className="py-2 text-sm text-right font-semibold text-emerald-600 dark:text-emerald-400">
                             {formatBRL(item.total)}
                           </TableCell>
                         </TableRow>
@@ -908,24 +934,18 @@ export default function RelatorioRecebedoria() {
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 print:text-black">
-                Resumo Consolidado (Hora Extra, Férias, VR)
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 print:hidden">
+                Resumo Consolidado
               </h3>
               <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
                 <Table className="print:text-sm">
-                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent print:border-b-2 print:border-slate-800">
-                    <TableRow className="print:border-none">
-                      <TableHead className="h-8 py-2 print:text-black print:font-bold">
+                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent">
+                    <TableRow className="print:border-b print:border-slate-300">
+                      <TableHead className="h-8 py-3 print:text-black print:font-bold print:uppercase">
                         Tipo de Pagamento
                       </TableHead>
-                      <TableHead className="h-8 py-2 print:text-black print:font-bold">
-                        Data
-                      </TableHead>
-                      <TableHead className="h-8 py-2 text-right print:text-black print:font-bold">
-                        Valor
-                      </TableHead>
-                      <TableHead className="h-8 py-2 text-right print:text-black print:font-bold">
-                        Total
+                      <TableHead className="h-8 py-3 text-right print:text-black print:font-bold print:uppercase">
+                        Valor Total
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -933,50 +953,50 @@ export default function RelatorioRecebedoria() {
                     {loading ? (
                       [...Array(3)].map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell className="py-2">
-                            <Skeleton className="h-4 w-24" />
+                          <TableCell className="py-3">
+                            <Skeleton className="h-4 w-32" />
                           </TableCell>
-                          <TableCell className="py-2">
-                            <Skeleton className="h-4 w-24" />
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <Skeleton className="h-4 w-20 ml-auto" />
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <Skeleton className="h-4 w-20 ml-auto" />
+                          <TableCell className="py-3">
+                            <Skeleton className="h-4 w-24 ml-auto" />
                           </TableCell>
                         </TableRow>
                       ))
-                    ) : consolidatedSummary.length === 0 ? (
+                    ) : consolidatedSummary.rows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center py-8">
+                        <TableCell colSpan={2} className="h-24 text-center py-8">
                           <p className="text-sm text-slate-500 font-medium">
                             Nenhum registro encontrado.
                           </p>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      consolidatedSummary.map((item, idx) => (
+                      consolidatedSummary.rows.map((item, idx) => (
                         <TableRow
                           key={idx}
-                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
+                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:border-b print:border-slate-200"
                         >
-                          <TableCell className="py-2 font-medium text-sm print:text-black">
+                          <TableCell className="py-3 font-medium text-sm print:text-black">
                             {item.tipo}
                           </TableCell>
-                          <TableCell className="py-2 text-sm text-slate-600 dark:text-slate-400 print:text-black">
-                            {formatDateStringSafe(item.data)}
-                          </TableCell>
-                          <TableCell className="py-2 text-sm text-right print:text-black">
-                            {formatBRL(item.valor)}
-                          </TableCell>
-                          <TableCell className="py-2 text-sm text-right font-semibold text-indigo-600 dark:text-indigo-400 print:text-black">
+                          <TableCell className="py-3 text-sm text-right font-medium print:text-black">
                             {formatBRL(item.total)}
                           </TableCell>
                         </TableRow>
                       ))
                     )}
                   </TableBody>
+                  {!loading && consolidatedSummary.rows.length > 0 && (
+                    <tfoot className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent border-t-2 border-slate-300 print:border-slate-800">
+                      <tr>
+                        <td className="p-3 font-bold text-sm text-slate-900 dark:text-slate-100 print:text-black uppercase">
+                          Total Geral
+                        </td>
+                        <td className="p-3 text-sm text-right font-bold text-indigo-700 dark:text-indigo-400 print:text-black double-underline">
+                          {formatBRL(consolidatedSummary.totalGeral)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </Table>
               </div>
             </div>
