@@ -94,7 +94,7 @@ export default function Camera() {
     try {
       const result = await getColaboradorByRegistro(registro)
       if (!result || !result.colab) {
-        const msg = 'Não há valor pendente para receber para este colaborador.'
+        const msg = 'Todos os pagamentos deste colaborador estão em dia.'
         setViewState('SEARCH_FAILED')
         setErrorMsg(msg)
         toast({
@@ -110,7 +110,7 @@ export default function Camera() {
       setViewState('CAPTURING')
     } catch (err: any) {
       setViewState('SEARCH_FAILED')
-      const msg = err.message || 'Não há valor pendente para receber para este colaborador.'
+      const msg = err.message || 'Todos os pagamentos deste colaborador estão em dia.'
       setErrorMsg(msg)
       toast({
         title: 'Aviso',
@@ -533,7 +533,7 @@ export default function Camera() {
                         <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                         <span className="leading-snug">
                           {viewState === 'SEARCH_FAILED' && !errorMsg
-                            ? 'Não há valor pendente para receber para este colaborador.'
+                            ? 'Todos os pagamentos deste colaborador estão em dia.'
                             : errorMsg}
                         </span>
                       </div>

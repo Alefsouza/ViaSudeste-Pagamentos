@@ -85,7 +85,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .catch(() => null)
 
   if (!anyColab) {
-    throw new Error('Não há valor pendente para receber para este colaborador.')
+    throw new Error('Todos os pagamentos deste colaborador estão em dia.')
   }
 
   const fotoRecord = await pb
@@ -103,7 +103,9 @@ export const getColaboradorByRegistro = async (registro: string) => {
   }
 
   if (!fotoRecord || !fotoUrl) {
-    throw new Error('Não há foto cadastrada no sistema para realizar o reconhecimento facial.')
+    throw new Error(
+      'Foto não encontrada para o reconhecimento facial. Vá até o guichê para realizar o seu cadastro.',
+    )
   }
 
   const allRecords = await pb
@@ -120,7 +122,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
   }, 0)
 
   if (allRecords.length === 0 || totalValor === 0) {
-    throw new Error('Não há valor pendente para receber para este colaborador.')
+    throw new Error('Todos os pagamentos deste colaborador estão em dia.')
   }
 
   const firstColab = allRecords[0]
