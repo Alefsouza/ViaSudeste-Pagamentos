@@ -657,7 +657,7 @@ export default function RelatorioRecebedoria() {
                     <TableHead className="text-black font-bold py-3">Inicio</TableHead>
                     <TableHead className="text-black font-bold py-3">Término</TableHead>
                     <TableHead className="text-black font-bold py-3">Horas</TableHead>
-                    <TableHead className="text-right text-black font-bold py-3">Valor</TableHead>
+                    <TableHead className="text-left text-black font-bold py-3">Valor</TableHead>
                     <TableHead className="text-left text-black font-bold py-3">
                       Tipo de Pagamento
                     </TableHead>
@@ -695,7 +695,7 @@ export default function RelatorioRecebedoria() {
                         <TableCell className="text-black py-2">
                           {formatHoras(item.horas) || '-'}
                         </TableCell>
-                        <TableCell className="text-right font-medium text-black py-2">
+                        <TableCell className="text-left font-medium text-black py-2">
                           {formatBRL(val)}
                         </TableCell>
                         <TableCell className="text-left text-black py-2">
@@ -713,7 +713,7 @@ export default function RelatorioRecebedoria() {
                     >
                       Total
                     </td>
-                    <td className="py-3 text-lg text-right font-bold text-black double-underline">
+                    <td className="py-3 text-lg text-left font-bold text-black double-underline">
                       {formatBRL(
                         summaryData.reduce((acc: any, item: any) => {
                           return (
