@@ -9,6 +9,7 @@ import Camera from './pages/Camera'
 import RelatorioPagamentos from './pages/RelatorioPagamentos'
 import RelatorioRecebedoria from './pages/RelatorioRecebedoria'
 import Usuarios from './pages/Usuarios'
+import GestaoRegistros from './pages/GestaoRegistros'
 import DPFotos from './pages/DPFotos'
 import Layout from './components/Layout'
 
@@ -49,6 +50,14 @@ const AppRoutes = () => (
         element={
           <ProtectedRoute allowedRoles={['Administrador']}>
             <Usuarios />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/gestao-registros"
+        element={
+          <ProtectedRoute allowedRoles={['Administrador']}>
+            <GestaoRegistros />
           </ProtectedRoute>
         }
       />

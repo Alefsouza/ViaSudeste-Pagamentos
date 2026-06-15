@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   FilterX,
   Trash2,
+  Link as LinkIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +44,7 @@ import { useAuth } from '@/hooks/use-auth'
 import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
+import { Link } from 'react-router-dom'
 import { useToast } from '@/hooks/use-toast'
 import { formatBRL, getTipoPagamento } from '@/lib/formatters'
 
@@ -69,6 +71,7 @@ export default function Dashboard() {
   const [error, setError] = useState(false)
 
   const [statsData, setStatsData] = useState<any[]>([])
+  const [colaboradoresStatsData, setColaboradoresStatsData] = useState<any[]>([])
   const [tableData, setTableData] = useState<any>(null)
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
 
@@ -165,7 +168,33 @@ export default function Dashboard() {
         sort: '-data_pagamento',
         expand: 'colaborador_id',
       })
+
+      const colabConditions: string[] = []
+      if (debouncedFilters.startDate && debouncedFilters.endDate) {
+        colabConditions.push(
+          `(data_pagamento_v2 >= "${debouncedFilters.startDate} 00:00:00" && data_pagamento_v2 <= "${debouncedFilters.endDate} 23:59:59" || data_pagamento >= "${debouncedFilters.startDate}" && data_pagamento <= "${debouncedFilters.endDate}")`,
+        )
+      }
+      if (debouncedFilters.search) {
+        colabConditions.push(
+          `(nome ~ "${debouncedFilters.search}" || registro ~ "${debouncedFilters.search}")`,
+        )
+      }
+      if (debouncedFilters.filial && debouncedFilters.filial !== 'Todas') {
+        const filialId = filialMap.get(debouncedFilters.filial)
+        if (filialId !== undefined) {
+          colabConditions.push(`(filial = "${debouncedFilters.filial}" || filial_id = ${filialId})`)
+        } else {
+          colabConditions.push(`filial = "${debouncedFilters.filial}"`)
+        }
+      }
+      const colabFilter = colabConditions.length > 0 ? colabConditions.join(' && ') : ''
+      const colabStats = await pb.collection('colaboradores').getFullList({
+        filter: colabFilter,
+      })
+
       setStatsData(stats)
+      setColaboradoresStatsData(colabStats)
     } catch (e: any) {
       if (!e.isAbort) {
         setError(true)
@@ -280,21 +309,25 @@ export default function Dashboard() {
     })
   }, [statsData, selectedChartFilial, selectedChartDate, getFilialName])
 
-  const pagamentosTotals = useMemo(() => {
-    return filteredStatsData.reduce(
-      (acc, curr) => {
-        const val = curr.valor_pago || curr.valor_a_receber || curr.valor || 0
-        const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-        if (status === 'Confirmado') {
-          acc.pago += val
-        } else if (status !== 'Cancelado') {
-          acc.pendente += val
-        }
-        return acc
-      },
-      { pago: 0, pendente: 0 },
-    )
-  }, [filteredStatsData])
+  const filteredColaboradoresStatsData = useMemo(() => {
+    return colaboradoresStatsData.filter((curr) => {
+      if (selectedChartFilial) {
+        const f = curr.filial || 'Outra'
+        if (f !== selectedChartFilial) return false
+      }
+
+      if (selectedChartDate) {
+        const dStr = curr.data_pagamento_v2
+          ? curr.data_pagamento_v2.split(' ')[0]
+          : curr.data_pagamento
+            ? curr.data_pagamento.split(' ')[0]
+            : '-'
+        if (dStr !== selectedChartDate) return false
+      }
+
+      return true
+    })
+  }, [colaboradoresStatsData, selectedChartFilial, selectedChartDate])
 
   if (error) {
     return (
@@ -309,24 +342,29 @@ export default function Dashboard() {
   }
 
   // Calculations
-  const confirmados = filteredStatsData.filter(
-    (c) => c.status === 'Confirmado' || !!c.foto_confirmacao_url,
+  const confirmados = filteredColaboradoresStatsData.filter(
+    (c) => c.foto_confirmacao_url && c.foto_confirmacao_url.trim() !== '',
   )
-  const uniqueColabs = new Set(
-    confirmados.map((c) => c.expand?.colaborador_id?.registro || c.registro).filter(Boolean),
-  ).size
-  const values = confirmados.map((c) => c.valor_pago || c.valor_a_receber || c.valor || 0)
+  const uniqueColabs = confirmados.length
+  const values = confirmados.map((c) => c.valor_a_receber || c.valor || 0)
   const maxPago = values.length ? Math.max(...values) : 0
   const minPago = values.length ? Math.min(...values) : 0
+
+  const pagamentosTotals = {
+    pago: values.reduce((a, b) => a + b, 0),
+    pendente: filteredColaboradoresStatsData
+      .filter((c) => !c.foto_confirmacao_url || c.foto_confirmacao_url.trim() === '')
+      .reduce((acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0), 0),
+  }
+
   const avgPago = values.length ? pagamentosTotals.pago / values.length : 0
 
-  const pieDataMap = statsData.reduce(
+  const pieDataMap = colaboradoresStatsData.reduce(
     (acc, curr) => {
-      const isConfirmado = curr.status === 'Confirmado' || !!curr.foto_confirmacao_url
+      const isConfirmado = curr.foto_confirmacao_url && curr.foto_confirmacao_url.trim() !== ''
       if (!isConfirmado) return acc
-      const filial = getFilialName(curr)
-      acc[filial] =
-        (acc[filial] || 0) + (curr.valor_pago || curr.valor_a_receber || curr.valor || 0)
+      const filial = curr.filial || 'Outra'
+      acc[filial] = (acc[filial] || 0) + (curr.valor_a_receber || curr.valor || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -334,15 +372,19 @@ export default function Dashboard() {
 
   const pieData = Object.entries(pieDataMap).map(([name, value]) => ({ name, value }))
 
-  const dailyDataMap = statsData.reduce(
+  const dailyDataMap = colaboradoresStatsData.reduce(
     (acc, curr) => {
-      const isConfirmado = curr.status === 'Confirmado' || !!curr.foto_confirmacao_url
+      const isConfirmado = curr.foto_confirmacao_url && curr.foto_confirmacao_url.trim() !== ''
       if (!isConfirmado) return acc
 
-      const dStr = curr.data_pagamento ? curr.data_pagamento.split(' ')[0] : '-'
+      const dStr = curr.data_pagamento_v2
+        ? curr.data_pagamento_v2.split(' ')[0]
+        : curr.data_pagamento
+          ? curr.data_pagamento.split(' ')[0]
+          : '-'
       if (dStr === '-') return acc
 
-      acc[dStr] = (acc[dStr] || 0) + (curr.valor_pago || curr.valor_a_receber || curr.valor || 0)
+      acc[dStr] = (acc[dStr] || 0) + (curr.valor_a_receber || curr.valor || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -389,21 +431,28 @@ export default function Dashboard() {
             Analise a distribuição de pagamentos e monitore as filiais.
           </p>
         </div>
-        {(selectedChartFilial || selectedChartDate) && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSelectedChartFilial(null)
-              setSelectedChartDate(null)
-              setPage(1)
-            }}
-            className="animate-fade-in text-muted-foreground"
-          >
-            <FilterX className="h-4 w-4 mr-2" />
-            Limpar Filtros de Gráfico
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/gestao-registros">
+              <LinkIcon className="h-4 w-4 mr-2" /> Gestão de Órfãos
+            </Link>
           </Button>
-        )}
+          {(selectedChartFilial || selectedChartDate) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedChartFilial(null)
+                setSelectedChartDate(null)
+                setPage(1)
+              }}
+              className="animate-fade-in text-muted-foreground"
+            >
+              <FilterX className="h-4 w-4 mr-2" />
+              Limpar Filtros
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}

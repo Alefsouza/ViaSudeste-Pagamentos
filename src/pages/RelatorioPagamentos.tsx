@@ -1,10 +1,4 @@
 import { useState, useEffect } from 'react'
-import {
-  getColaboradoresPaginated,
-  getColaboradoresStats,
-  getColaboradoresAnalytics,
-} from '@/services/colaboradores'
-import { getPagamentosTotals } from '@/services/pagamentos'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useToast } from '@/hooks/use-toast'
@@ -101,13 +95,36 @@ export default function RelatorioPagamentos() {
     setLoading(true)
     setError(false)
     try {
-      const filters = { search: debouncedSearch, startDate, endDate, filial }
-      const [newStats, pagamentosTotals, paginated] = await Promise.all([
-        getColaboradoresStats(filters),
-        getPagamentosTotals(filters),
-        getColaboradoresPaginated(page, 20, filters),
+      const conditions: string[] = []
+      if (startDate && endDate) {
+        conditions.push(
+          `(data_pagamento_v2 >= "${startDate} 00:00:00" && data_pagamento_v2 <= "${endDate} 23:59:59" || data_pagamento >= "${startDate}" && data_pagamento <= "${endDate}")`,
+        )
+      }
+      if (debouncedSearch) {
+        conditions.push(`(nome ~ "${debouncedSearch}" || registro ~ "${debouncedSearch}")`)
+      }
+      if (filial && filial !== 'Todas') {
+        conditions.push(`filial = "${filial}"`)
+      }
+      const filterStr = conditions.join(' && ')
+
+      const [paginated, allForStats] = await Promise.all([
+        pb.collection('colaboradores').getList(page, 20, {
+          filter: filterStr,
+          sort: '-created',
+        }),
+        pb.collection('colaboradores').getFullList({
+          filter: filterStr,
+          fields: 'valor_a_receber,valor,foto_confirmacao_url',
+        }),
       ])
-      setStats({ count: newStats.count, total: pagamentosTotals.pago })
+
+      const totalPago = allForStats
+        .filter((c) => c.foto_confirmacao_url && c.foto_confirmacao_url.trim() !== '')
+        .reduce((acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0), 0)
+
+      setStats({ count: paginated.totalItems, total: totalPago })
       setData(paginated.items)
       setTotalPages(paginated.totalPages || 1)
     } catch (err: any) {
@@ -133,8 +150,22 @@ export default function RelatorioPagamentos() {
     setReportType(type)
     setIsGenerating(true)
     try {
-      const filters = { search: debouncedSearch, startDate, endDate, filial }
-      const allData = await getColaboradoresAnalytics(filters)
+      const conditions: string[] = []
+      if (startDate && endDate) {
+        conditions.push(
+          `(data_pagamento_v2 >= "${startDate} 00:00:00" && data_pagamento_v2 <= "${endDate} 23:59:59" || data_pagamento >= "${startDate}" && data_pagamento <= "${endDate}")`,
+        )
+      }
+      if (debouncedSearch) {
+        conditions.push(`(nome ~ "${debouncedSearch}" || registro ~ "${debouncedSearch}")`)
+      }
+      if (filial && filial !== 'Todas') {
+        conditions.push(`filial = "${filial}"`)
+      }
+      const filterStr = conditions.join(' && ')
+      const allData = await pb
+        .collection('colaboradores')
+        .getFullList({ filter: filterStr, sort: '-created' })
       setReportData(allData)
       setReportModalOpen(false)
       setIsGenerating(false)
