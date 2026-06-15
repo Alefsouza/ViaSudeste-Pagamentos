@@ -155,18 +155,6 @@ export default function Dashboard() {
 
   const availableTipos = Array.from(knownTipos).sort()
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center p-12 space-y-4 h-full">
-        <AlertCircle className="h-12 w-12 text-rose-500" />
-        <p className="text-lg font-medium">Erro ao carregar dados</p>
-        <Button onClick={refreshAll} variant="outline">
-          Tentar novamente
-        </Button>
-      </div>
-    )
-  }
-
   // Derived filtered stats for Summary Cards based on interactive chart selections
   const filteredStatsData = useMemo(() => {
     return statsData.filter((curr) => {
@@ -211,6 +199,18 @@ export default function Dashboard() {
       { pago: 0, pendente: 0 },
     )
   }, [filteredStatsData])
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 space-y-4 h-full">
+        <AlertCircle className="h-12 w-12 text-rose-500" />
+        <p className="text-lg font-medium">Erro ao carregar dados</p>
+        <Button onClick={refreshAll} variant="outline">
+          Tentar novamente
+        </Button>
+      </div>
+    )
+  }
 
   // Calculations
   const totalValor = filteredStatsData.reduce(
