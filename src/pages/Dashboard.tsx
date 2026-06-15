@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   FilterX,
   Trash2,
+  Unlock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -53,6 +54,8 @@ export default function Dashboard() {
   const isAlcimara = user?.email === 'alcimara.cabral@viasudeste.com'
 
   const [paymentToCancel, setPaymentToCancel] = useState<any>(null)
+  const [paymentToRelease, setPaymentToRelease] = useState<any>(null)
+  const [maxRef, setMaxRef] = useState<number>(0)
   const [filters, setFilters] = useState({
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
@@ -135,6 +138,21 @@ export default function Dashboard() {
     loadStats()
   }, [debouncedFilters])
 
+  const loadMaxRef = async () => {
+    try {
+      const rec = await pb
+        .collection('colaboradores')
+        .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
+      setMaxRef(rec.referencia || 0)
+    } catch (e) {
+      setMaxRef(0)
+    }
+  }
+
+  useEffect(() => {
+    loadMaxRef()
+  }, [])
+
   useEffect(() => {
     loadTable()
   }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
@@ -142,7 +160,23 @@ export default function Dashboard() {
   const refreshAll = useCallback(() => {
     loadStats()
     loadTable()
+    loadMaxRef()
   }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
+
+  const handleReleasePayment = async () => {
+    if (!paymentToRelease) return
+    try {
+      await pb.collection('colaboradores').update(paymentToRelease.id, { liberado_pagamento: true })
+      toast({ title: 'Pagamento liberado com sucesso.' })
+      setPaymentToRelease(null)
+      refreshAll()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao liberar o pagamento. Tente novamente.',
+        variant: 'destructive',
+      })
+    }
+  }
 
   const handleCancelPayment = async () => {
     if (!paymentToCancel) return
@@ -704,6 +738,7 @@ export default function Dashboard() {
                           <TableHead>Colaborador</TableHead>
                           <TableHead>Registro</TableHead>
                           <TableHead>Filial</TableHead>
+                          <TableHead>Ref</TableHead>
                           <TableHead className="text-left">Valor</TableHead>
                           <TableHead>Tipo de Pagamento</TableHead>
                           <TableHead>Data de Pagamento</TableHead>
@@ -716,7 +751,7 @@ export default function Dashboard() {
                         {Object.keys(groupedByName).length === 0 ? (
                           <TableRow>
                             <TableCell
-                              colSpan={isAlcimara ? 9 : 8}
+                              colSpan={isAlcimara ? 10 : 9}
                               className="h-24 text-center text-muted-foreground"
                             >
                               Nenhum pagamento encontrado com os filtros atuais.
@@ -735,7 +770,7 @@ export default function Dashboard() {
                               <React.Fragment key={nome}>
                                 <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                   <TableCell
-                                    colSpan={isAlcimara ? 9 : 8}
+                                    colSpan={isAlcimara ? 10 : 9}
                                     className="font-semibold text-slate-700 dark:text-slate-300"
                                   >
                                     {nome} - {totalLines}{' '}
@@ -754,6 +789,9 @@ export default function Dashboard() {
                                     </TableCell>
                                     <TableCell>
                                       {p.filial || p.expand?.colaborador_id?.filial || '-'}
+                                    </TableCell>
+                                    <TableCell>
+                                      {p.referencia || p.expand?.colaborador_id?.referencia || '-'}
                                     </TableCell>
                                     <TableCell className="text-forest font-medium text-left">
                                       {formatBRL(p.valor_a_receber || p.valor)}
@@ -803,20 +841,39 @@ export default function Dashboard() {
                                           const status =
                                             p.status ||
                                             (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-                                          if (status === 'Pendente') {
-                                            return (
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
-                                                onClick={() => setPaymentToCancel(p)}
-                                                title="Cancelar Pagamento"
-                                              >
-                                                <Trash2 className="h-4 w-4" />
-                                              </Button>
-                                            )
-                                          }
-                                          return null
+
+                                          const isOutsideValidity =
+                                            p.referencia &&
+                                            maxRef > 0 &&
+                                            p.referencia < maxRef - 3 &&
+                                            !p.liberado_pagamento
+
+                                          return (
+                                            <div className="flex justify-center gap-1">
+                                              {status === 'Pendente' && isOutsideValidity && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="text-amber-500 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                                                  onClick={() => setPaymentToRelease(p)}
+                                                  title="Liberar Pagamento"
+                                                >
+                                                  <Unlock className="h-4 w-4" />
+                                                </Button>
+                                              )}
+                                              {status === 'Pendente' && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+                                                  onClick={() => setPaymentToCancel(p)}
+                                                  title="Cancelar Pagamento"
+                                                >
+                                                  <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                              )}
+                                            </div>
+                                          )
                                         })()}
                                       </TableCell>
                                     )}
@@ -868,6 +925,7 @@ export default function Dashboard() {
                                     </span>
                                     <span>
                                       {p.filial || p.expand?.colaborador_id?.filial || '-'}
+                                      {p.referencia ? ` (Ref: ${p.referencia})` : ''}
                                     </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
@@ -919,21 +977,41 @@ export default function Dashboard() {
                                           const status =
                                             p.status ||
                                             (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-                                          if (status === 'Pendente') {
-                                            return (
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 px-2"
-                                                onClick={() => setPaymentToCancel(p)}
-                                                title="Cancelar Pagamento"
-                                              >
-                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                Cancelar
-                                              </Button>
-                                            )
-                                          }
-                                          return null
+
+                                          const isOutsideValidity =
+                                            p.referencia &&
+                                            maxRef > 0 &&
+                                            p.referencia < maxRef - 3 &&
+                                            !p.liberado_pagamento
+
+                                          return (
+                                            <>
+                                              {status === 'Pendente' && isOutsideValidity && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="text-amber-500 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2"
+                                                  onClick={() => setPaymentToRelease(p)}
+                                                  title="Liberar Pagamento"
+                                                >
+                                                  <Unlock className="h-4 w-4 mr-2" />
+                                                  Liberar
+                                                </Button>
+                                              )}
+                                              {status === 'Pendente' && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 px-2"
+                                                  onClick={() => setPaymentToCancel(p)}
+                                                  title="Cancelar Pagamento"
+                                                >
+                                                  <Trash2 className="h-4 w-4 mr-2" />
+                                                  Cancelar
+                                                </Button>
+                                              )}
+                                            </>
+                                          )
                                         })()}
                                     </div>
                                   </div>
@@ -998,6 +1076,64 @@ export default function Dashboard() {
                 className="max-w-full max-h-[70vh] object-contain rounded-md shadow-sm"
               />
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!paymentToRelease} onOpenChange={(open) => !open && setPaymentToRelease(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Liberar Pagamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p>
+              Este pagamento está fora da janela de validade (mais antigo que as 4 últimas
+              importações). Deseja liberá-lo manualmente?
+            </p>
+            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md space-y-2 text-sm border">
+              <div className="flex justify-between">
+                <span className="font-semibold text-muted-foreground">Colaborador:</span>
+                <span>
+                  {paymentToRelease?.nome ||
+                    paymentToRelease?.expand?.colaborador_id?.nome ||
+                    'Desconhecido'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold text-muted-foreground">Registro:</span>
+                <span>
+                  {paymentToRelease?.registro || paymentToRelease?.expand?.colaborador_id?.registro}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold text-muted-foreground">Valor:</span>
+                <span className="text-forest font-medium">
+                  {paymentToRelease
+                    ? formatBRL(
+                        paymentToRelease.valor_pago ||
+                          paymentToRelease.valor_a_receber ||
+                          paymentToRelease.valor ||
+                          0,
+                      )
+                    : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold text-muted-foreground">Referência:</span>
+                <span>{paymentToRelease?.referencia}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPaymentToRelease(null)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={handleReleasePayment}
+            >
+              Confirmar Liberação
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

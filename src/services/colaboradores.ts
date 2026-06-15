@@ -2,8 +2,10 @@ import pb from '@/lib/pocketbase/client'
 
 export const getColaboradores = () => pb.collection('colaboradores').getFullList({ sort: 'nome' })
 
-export const updateColaborador = (id: string, data: Partial<{ foto_confirmacao_url: string }>) =>
-  pb.collection('colaboradores').update(id, data)
+export const updateColaborador = (
+  id: string,
+  data: Partial<{ foto_confirmacao_url: string; liberado_pagamento: boolean }>,
+) => pb.collection('colaboradores').update(id, data)
 
 const colabCache = new Map<string, { data: any; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
@@ -75,9 +77,10 @@ export const getColaboradorByRegistro = async (registro: string) => {
   const now = Date.now()
   const cached = colabCache.get(registro)
 
-  if (cached && now - cached.timestamp < CACHE_TTL) {
-    return cached.data
-  }
+  // Disable cache to ensure validity check is always fresh, especially for manual releases.
+  // if (cached && now - cached.timestamp < CACHE_TTL) {
+  //   return cached.data
+  // }
 
   const anyColab = await pb
     .collection('colaboradores')
@@ -116,23 +119,43 @@ export const getColaboradorByRegistro = async (registro: string) => {
     })
     .catch(() => [])
 
-  const totalValor = allRecords.reduce((acc, curr) => {
+  if (allRecords.length === 0) {
+    throw new Error('Todos os pagamentos deste colaborador estão em dia.')
+  }
+
+  const lastColab = await pb
+    .collection('colaboradores')
+    .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
+    .catch(() => null)
+
+  const maxRef = lastColab?.referencia || 0
+  const minValidRef = Math.max(1, maxRef - 3)
+
+  const validRecords = allRecords.filter(
+    (r) => (r.referencia && r.referencia >= minValidRef) || r.liberado_pagamento,
+  )
+
+  if (validRecords.length === 0) {
+    throw new Error('Pagamento bloqueado: Referência expirada. Requer liberação manual.')
+  }
+
+  const totalValor = validRecords.reduce((acc, curr) => {
     const v = curr.valor_a_receber || curr.valor || 0
     return acc + v
   }, 0)
 
-  if (allRecords.length === 0 || totalValor === 0) {
+  if (totalValor === 0) {
     throw new Error('Todos os pagamentos deste colaborador estão em dia.')
   }
 
-  const firstColab = allRecords[0]
+  const firstColab = validRecords[0]
 
   const colab = {
     ...firstColab,
     valor_a_receber: totalValor,
     valor: totalValor,
-    all_records_ids: allRecords.map((r) => r.id),
-    records: allRecords,
+    all_records_ids: validRecords.map((r) => r.id),
+    records: validRecords,
   }
 
   const result = { colab, fotoUrl, hasFotoRecord: true }

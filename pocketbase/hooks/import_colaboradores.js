@@ -11,6 +11,22 @@ routerAdd(
     let count = 0
     let errors = []
 
+    let nextRef = 1
+    try {
+      const records = $app.findRecordsByFilter(
+        'colaboradores',
+        'referencia > 0',
+        '-referencia',
+        1,
+        0,
+      )
+      if (records && records.length > 0) {
+        nextRef = records[0].getInt('referencia') + 1
+      }
+    } catch (_) {
+      // Ignora erro se não houver registros
+    }
+
     $app.runInTransaction((txApp) => {
       for (let i = 0; i < body.data.length; i++) {
         const row = body.data[i]
@@ -41,6 +57,8 @@ routerAdd(
           const filial_id =
             row.filial_id !== undefined ? row.filial_id : row.FILIAL !== undefined ? row.FILIAL : ''
 
+          record.set('referencia', nextRef)
+          record.set('liberado_pagamento', false)
           record.set('registro', registro)
           record.set('nome', nome)
           record.set('data', dataStr)
