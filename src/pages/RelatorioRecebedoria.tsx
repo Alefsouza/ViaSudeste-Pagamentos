@@ -331,28 +331,36 @@ export default function RelatorioRecebedoria() {
 
   // Consolidated Summary for target types (Hora Extra, Férias Trabalhada, VR)
   const consolidatedSummary = React.useMemo(() => {
-    const targetTypes = ['Hora Extra', 'Férias Trabalhada', 'VR']
+    const targetCategories = [
+      { name: 'Hora Extra', keywords: ['hora extra', 'hora extras', 'horas extras'] },
+      { name: 'Férias Trabalhada', keywords: ['férias', 'ferias'] },
+      { name: 'VR', keywords: ['vr', 'vale refeição', 'vale refeicao', 'vale-refeição'] },
+    ]
 
     const typeTotals: Record<string, number> = {}
-    targetTypes.forEach((t) => (typeTotals[t] = 0))
+    targetCategories.forEach((t) => (typeTotals[t.name] = 0))
 
     const dateTypeSums: Record<string, { tipo: string; data: string; valor: number }> = {}
 
     summaryData.forEach((item) => {
-      const tipoRaw = item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || ''
-      const matchedType = targetTypes.find((t) => tipoRaw.toLowerCase().includes(t.toLowerCase()))
-      if (!matchedType) return
+      const tipoRaw = (item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || '').toLowerCase()
+
+      const matchedCategory = targetCategories.find((cat) =>
+        cat.keywords.some((keyword) => tipoRaw.includes(keyword)),
+      )
+
+      if (!matchedCategory) return
 
       const dateStr = item.data_pagamento ? item.data_pagamento.split(' ')[0] : '-'
-      const key = `${matchedType}_${dateStr}`
+      const key = `${matchedCategory.name}_${dateStr}`
 
       const val = item.valor_pago || 0
 
       if (!dateTypeSums[key]) {
-        dateTypeSums[key] = { tipo: matchedType, data: dateStr, valor: 0 }
+        dateTypeSums[key] = { tipo: matchedCategory.name, data: dateStr, valor: 0 }
       }
       dateTypeSums[key].valor += val
-      typeTotals[matchedType] += val
+      typeTotals[matchedCategory.name] += val
     })
 
     const rows = Object.values(dateTypeSums).map((row) => ({
@@ -942,7 +950,7 @@ export default function RelatorioRecebedoria() {
                       <TableRow>
                         <TableCell colSpan={4} className="h-24 text-center py-8">
                           <p className="text-sm text-slate-500 font-medium">
-                            Nenhum registro encontrado para estas categorias.
+                            Nenhum registro encontrado.
                           </p>
                         </TableCell>
                       </TableRow>
