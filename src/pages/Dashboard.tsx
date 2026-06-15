@@ -39,6 +39,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
+import { useAuth } from '@/hooks/use-auth'
+import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
@@ -46,6 +48,10 @@ import { formatDataString, formatBRL, getTipoPagamento } from '@/lib/formatters'
 
 export default function Dashboard() {
   const { toast } = useToast()
+  const { user } = useAuth()
+  const isAlcimara = user?.email === 'alcimara.cabral@viasudeste.com'
+
+  const [paymentToCancel, setPaymentToCancel] = useState<any>(null)
   const [filters, setFilters] = useState({
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
@@ -136,6 +142,36 @@ export default function Dashboard() {
     loadStats()
     loadTable()
   }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
+
+  const handleCancelPayment = async () => {
+    if (!paymentToCancel) return
+    try {
+      let targetId = paymentToCancel.id
+      try {
+        await pb.collection('pagamentos').getOne(targetId)
+      } catch {
+        const records = await pb.collection('pagamentos').getList(1, 1, {
+          filter: `colaborador_id = "${paymentToCancel.id}" || registro = "${paymentToCancel.registro}"`,
+          sort: '-created',
+        })
+        if (records.items.length > 0) {
+          targetId = records.items[0].id
+        } else {
+          throw new Error('Pagamento não encontrado na coleção pagamentos.')
+        }
+      }
+
+      await pb.collection('pagamentos').update(targetId, { status: 'Cancelado' })
+      toast({ title: 'Pagamento cancelado com sucesso.' })
+      setPaymentToCancel(null)
+      refreshAll()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao cancelar o pagamento. Tente novamente.',
+        variant: 'destructive',
+      })
+    }
+  }
 
   useEffect(() => {
     if (statsData.length > 0) {
@@ -669,13 +705,14 @@ export default function Dashboard() {
                           <TableHead>Data de Pagamento</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-center">Foto</TableHead>
+                          {isAlcimara && <TableHead className="text-center">Ações</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {Object.keys(groupedByName).length === 0 ? (
                           <TableRow>
                             <TableCell
-                              colSpan={8}
+                              colSpan={isAlcimara ? 9 : 8}
                               className="h-24 text-center text-muted-foreground"
                             >
                               Nenhum pagamento encontrado com os filtros atuais.
@@ -690,7 +727,7 @@ export default function Dashboard() {
                               <React.Fragment key={nome}>
                                 <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                   <TableCell
-                                    colSpan={8}
+                                    colSpan={isAlcimara ? 9 : 8}
                                     className="font-semibold text-slate-700 dark:text-slate-300"
                                   >
                                     {nome} - {totalLines}{' '}
@@ -746,6 +783,19 @@ export default function Dashboard() {
                                         </Button>
                                       )}
                                     </TableCell>
+                                    {isAlcimara && (
+                                      <TableCell className="text-center">
+                                        {(!p.status || p.status !== 'Cancelado') && (
+                                          <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => setPaymentToCancel(p)}
+                                          >
+                                            Cancelar
+                                          </Button>
+                                        )}
+                                      </TableCell>
+                                    )}
                                   </TableRow>
                                 ))}
                               </React.Fragment>
@@ -817,16 +867,29 @@ export default function Dashboard() {
                                         return <Badge variant="outline">{status}</Badge>
                                       })()}
                                     </div>
-                                    {p.foto_confirmacao_url && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setSelectedPhotoUrl(p.foto_confirmacao_url)}
-                                      >
-                                        <ImageIcon className="w-4 h-4 mr-2" />
-                                        Foto
-                                      </Button>
-                                    )}
+                                    <div className="flex gap-2">
+                                      {p.foto_confirmacao_url && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            setSelectedPhotoUrl(p.foto_confirmacao_url)
+                                          }
+                                        >
+                                          <ImageIcon className="w-4 h-4 mr-2" />
+                                          Foto
+                                        </Button>
+                                      )}
+                                      {isAlcimara && (!p.status || p.status !== 'Cancelado') && (
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          onClick={() => setPaymentToCancel(p)}
+                                        >
+                                          Cancelar
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
                                 </CardContent>
                               </Card>
@@ -889,6 +952,48 @@ export default function Dashboard() {
                 className="max-w-full max-h-[70vh] object-contain rounded-md shadow-sm"
               />
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!paymentToCancel} onOpenChange={(open) => !open && setPaymentToCancel(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar Pagamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p>Tem certeza que deseja cancelar este pagamento?</p>
+            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md space-y-2 text-sm border">
+              <div className="flex justify-between">
+                <span className="font-semibold text-muted-foreground">Colaborador:</span>
+                <span>{paymentToCancel?.nome}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold text-muted-foreground">Valor:</span>
+                <span className="text-forest font-medium">
+                  {paymentToCancel
+                    ? formatBRL(
+                        paymentToCancel.valor_pago ||
+                          paymentToCancel.valor_a_receber ||
+                          paymentToCancel.valor ||
+                          0,
+                      )
+                    : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold text-muted-foreground">Filial:</span>
+                <span>{paymentToCancel?.filial}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPaymentToCancel(null)}>
+              Voltar
+            </Button>
+            <Button variant="destructive" onClick={handleCancelPayment}>
+              Confirmar Cancelamento
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
