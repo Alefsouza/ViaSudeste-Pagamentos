@@ -21,6 +21,7 @@ routerAdd(
           const registro = row.registro || row.REGISTRO || ''
           const nome = row.nome || row.NOME || ''
           const dataStr = row.data || row.DATA || ''
+          const dataPagamentoV2 = row.data_pagamento_v2 || ''
           const idtipopgto =
             Number(row.idtipopgto !== undefined ? row.idtipopgto : row.IDTIPOPGTO) || 0
           const inicio = row.inicio || row.INICIO || ''
@@ -43,6 +44,16 @@ routerAdd(
           record.set('registro', registro)
           record.set('nome', nome)
           record.set('data', dataStr)
+
+          if (dataPagamentoV2) {
+            record.set('data_pagamento_v2', dataPagamentoV2)
+          } else if (dataStr) {
+            const parts = dataStr.split('/')
+            if (parts.length === 3) {
+              record.set('data_pagamento_v2', `${parts[2]}-${parts[1]}-${parts[0]} 12:00:00.000Z`)
+            }
+          }
+
           record.set('idtipopgto', idtipopgto)
           record.set('inicio', inicio)
           record.set('termino', termino)

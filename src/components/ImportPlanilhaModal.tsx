@@ -115,7 +115,8 @@ export function ImportPlanilhaModal({
 
         const excelDateToJSDate = (serial: any) => {
           if (typeof serial === 'number') {
-            return new Date(Math.round((serial - 25569) * 86400 * 1000))
+            const utcDate = new Date(Math.round((serial - 25569) * 86400 * 1000))
+            return new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate())
           }
           if (typeof serial === 'string') {
             const parts = serial.split('/')
@@ -190,6 +191,10 @@ export function ImportPlanilhaModal({
             ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
             : String(rawData || '')
 
+          const dataPagamentoV2 = !isNaN(d.getTime())
+            ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 12:00:00.000Z`
+            : ''
+
           let rawFilial = row['FILIAL'] !== undefined ? String(row['FILIAL']).trim() : ''
           let filialNumber = 0
           if (!isNaN(Number(rawFilial)) && rawFilial !== '') {
@@ -211,6 +216,7 @@ export function ImportPlanilhaModal({
             valor: parseValor(row['VALOR']),
             filial: filialMapped,
             filial_id: filialNumber,
+            data_pagamento_v2: dataPagamentoV2,
           }
         })
 
