@@ -279,16 +279,25 @@ export default function RelatorioRecebedoria() {
 
   const parseDateForSort = (dateStr: string | undefined | null) => {
     if (!dateStr || dateStr === '-') return 0
-    if (dateStr.includes('/')) {
-      const parts = dateStr.split(' ')[0].split('/')
+    const datePart = dateStr.split(' ')[0]
+
+    if (datePart.includes('/')) {
+      const parts = datePart.split('/')
       if (parts.length >= 3) {
         return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime()
       }
     }
-    if (dateStr.includes('-')) {
-      const parts = dateStr.split(' ')[0].split('-')
+
+    if (datePart.includes('-')) {
+      const parts = datePart.split('-')
       if (parts.length >= 3) {
-        return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getTime()
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD
+          return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getTime()
+        } else {
+          // DD-MM-YYYY
+          return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime()
+        }
       }
     }
     return 0
@@ -709,7 +718,7 @@ export default function RelatorioRecebedoria() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="py-3 font-bold text-lg text-black text-right uppercase"
+                      className="py-3 font-bold text-lg text-black text-left uppercase"
                     >
                       Total
                     </td>
@@ -770,7 +779,7 @@ export default function RelatorioRecebedoria() {
                           <Skeleton className="h-4 w-16" />
                         </TableCell>
                         <TableCell>
-                          <Skeleton className="h-4 w-24 ml-auto" />
+                          <Skeleton className="h-4 w-24" />
                         </TableCell>
                         <TableCell>
                           <Skeleton className="h-4 w-24" />
@@ -911,7 +920,7 @@ export default function RelatorioRecebedoria() {
                               {formatDateStringSafe(item.expand?.colaborador_id?.data) || '-'}
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-left">
                             <div className="font-bold text-lg text-slate-900 dark:text-slate-100">
                               {formatBRL(
                                 item.expand?.colaborador_id?.valor_a_receber ||
@@ -999,7 +1008,7 @@ export default function RelatorioRecebedoria() {
                     <TableRow>
                       <TableHead className="h-10 py-2">Colaborador</TableHead>
                       <TableHead className="h-10 py-2">Tipo de Pagamento</TableHead>
-                      <TableHead className="h-10 py-2 text-right">Total Acumulado</TableHead>
+                      <TableHead className="h-10 py-2 text-left">Total Acumulado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1013,7 +1022,7 @@ export default function RelatorioRecebedoria() {
                             <Skeleton className="h-4 w-24" />
                           </TableCell>
                           <TableCell className="py-2">
-                            <Skeleton className="h-4 w-24 ml-auto" />
+                            <Skeleton className="h-4 w-24" />
                           </TableCell>
                         </TableRow>
                       ))
@@ -1036,7 +1045,7 @@ export default function RelatorioRecebedoria() {
                           <TableCell className="py-3 text-slate-600 dark:text-slate-400">
                             {item.tipo}
                           </TableCell>
-                          <TableCell className="py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          <TableCell className="py-3 text-left font-semibold text-emerald-600 dark:text-emerald-400">
                             {formatBRL(item.total)}
                           </TableCell>
                         </TableRow>
@@ -1061,7 +1070,7 @@ export default function RelatorioRecebedoria() {
                       <TableHead className="h-10 py-3 print:text-black print:font-bold print:uppercase">
                         Data
                       </TableHead>
-                      <TableHead className="h-10 py-3 text-right print:text-black print:font-bold print:uppercase">
+                      <TableHead className="h-10 py-3 text-left print:text-black print:font-bold print:uppercase">
                         Valor
                       </TableHead>
                     </TableRow>
@@ -1077,7 +1086,7 @@ export default function RelatorioRecebedoria() {
                             <Skeleton className="h-4 w-24" />
                           </TableCell>
                           <TableCell className="py-3">
-                            <Skeleton className="h-4 w-24 ml-auto" />
+                            <Skeleton className="h-4 w-24" />
                           </TableCell>
                         </TableRow>
                       ))
@@ -1103,7 +1112,7 @@ export default function RelatorioRecebedoria() {
                               <TableCell className="py-3 font-medium print:text-black">
                                 {formatDateStringSafe(row.data)}
                               </TableCell>
-                              <TableCell className="py-3 text-right font-medium print:text-black">
+                              <TableCell className="py-3 text-left font-medium print:text-black">
                                 {formatBRL(row.total)}
                               </TableCell>
                             </TableRow>
@@ -1111,11 +1120,11 @@ export default function RelatorioRecebedoria() {
                           <TableRow className="bg-slate-100/80 dark:bg-slate-800/80 print:bg-slate-100 border-t-2 border-slate-200 dark:border-slate-700 print:border-slate-400">
                             <TableCell
                               colSpan={2}
-                              className="py-3 font-bold text-slate-800 dark:text-slate-200 print:text-black uppercase"
+                              className="py-3 font-bold text-slate-800 dark:text-slate-200 print:text-black uppercase text-left"
                             >
                               Total {group.tipo}
                             </TableCell>
-                            <TableCell className="py-3 text-right font-bold text-slate-900 dark:text-white print:text-black">
+                            <TableCell className="py-3 text-left font-bold text-slate-900 dark:text-white print:text-black">
                               {formatBRL(group.subtotal)}
                             </TableCell>
                           </TableRow>
@@ -1128,11 +1137,11 @@ export default function RelatorioRecebedoria() {
                       <tr>
                         <td
                           colSpan={2}
-                          className="p-3 font-bold text-lg text-slate-900 dark:text-slate-100 print:text-black uppercase"
+                          className="p-3 font-bold text-lg text-slate-900 dark:text-slate-100 print:text-black uppercase text-left"
                         >
                           Valor Total Geral
                         </td>
-                        <td className="p-3 text-lg text-right font-bold text-indigo-700 dark:text-indigo-400 print:text-black double-underline">
+                        <td className="p-3 text-lg text-left font-bold text-indigo-700 dark:text-indigo-400 print:text-black double-underline">
                           {formatBRL(consolidatedSummary.totalGeral)}
                         </td>
                       </tr>

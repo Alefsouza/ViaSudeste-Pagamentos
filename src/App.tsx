@@ -6,7 +6,6 @@ import { AuthProvider, useAuth, Role } from '@/hooks/use-auth'
 import Index from './pages/Index'
 import Dashboard from './pages/Dashboard'
 import Camera from './pages/Camera'
-import RelatorioPagamentos from './pages/RelatorioPagamentos'
 import RelatorioRecebedoria from './pages/RelatorioRecebedoria'
 import Usuarios from './pages/Usuarios'
 import GestaoRegistros from './pages/GestaoRegistros'
@@ -81,7 +80,7 @@ const AppRoutes = () => (
         path="/relatorio"
         element={
           <ProtectedRoute allowedRoles={['Administrador']}>
-            <RelatorioPagamentos />
+            <RelatorioRecebedoria />
           </ProtectedRoute>
         }
       />
