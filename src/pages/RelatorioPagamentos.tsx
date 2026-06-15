@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useToast } from '@/hooks/use-toast'
@@ -95,36 +96,22 @@ export default function RelatorioPagamentos() {
     setLoading(true)
     setError(false)
     try {
-      const conditions: string[] = []
-      if (startDate && endDate) {
-        conditions.push(
-          `(data_pagamento_v2 >= "${startDate} 00:00:00" && data_pagamento_v2 <= "${endDate} 23:59:59" || data_pagamento >= "${startDate}" && data_pagamento <= "${endDate}")`,
-        )
-      }
-      if (debouncedSearch) {
-        conditions.push(`(nome ~ "${debouncedSearch}" || registro ~ "${debouncedSearch}")`)
-      }
-      if (filial && filial !== 'Todas') {
-        conditions.push(`filial = "${filial}"`)
-      }
-      const filterStr = conditions.join(' && ')
-
-      const [paginated, allForStats] = await Promise.all([
-        pb.collection('colaboradores').getList(page, 20, {
-          filter: filterStr,
-          sort: '-created',
-        }),
-        pb.collection('colaboradores').getFullList({
-          filter: filterStr,
-          fields: 'valor_a_receber,valor,foto_confirmacao_url',
-        }),
+      const filters = { search: debouncedSearch, startDate, endDate, filial }
+      const [allData, paginated] = await Promise.all([
+        getColaboradoresAnalytics(filters),
+        getColaboradoresPaginated(page, 20, filters),
       ])
 
-      const totalPago = allForStats
-        .filter((c) => c.foto_confirmacao_url && c.foto_confirmacao_url.trim() !== '')
-        .reduce((acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0), 0)
+      const confirmedData = allData.filter(
+        (item: any) => item.foto_confirmacao_url && item.foto_confirmacao_url.trim() !== '',
+      )
+      const newTotal = confirmedData.reduce(
+        (acc: number, curr: any) => acc + (curr.valor_a_receber || curr.valor || 0),
+        0,
+      )
+      const newCount = confirmedData.length
 
-      setStats({ count: paginated.totalItems, total: totalPago })
+      setStats({ count: newCount, total: newTotal })
       setData(paginated.items)
       setTotalPages(paginated.totalPages || 1)
     } catch (err: any) {
@@ -144,28 +131,13 @@ export default function RelatorioPagamentos() {
     loadData()
   }, [page, debouncedSearch, startDate, endDate, filial])
   useRealtime('colaboradores', loadData)
-  useRealtime('pagamentos', loadData)
 
   const handleGeneratePDF = async (type: 'table' | 'charts') => {
     setReportType(type)
     setIsGenerating(true)
     try {
-      const conditions: string[] = []
-      if (startDate && endDate) {
-        conditions.push(
-          `(data_pagamento_v2 >= "${startDate} 00:00:00" && data_pagamento_v2 <= "${endDate} 23:59:59" || data_pagamento >= "${startDate}" && data_pagamento <= "${endDate}")`,
-        )
-      }
-      if (debouncedSearch) {
-        conditions.push(`(nome ~ "${debouncedSearch}" || registro ~ "${debouncedSearch}")`)
-      }
-      if (filial && filial !== 'Todas') {
-        conditions.push(`filial = "${filial}"`)
-      }
-      const filterStr = conditions.join(' && ')
-      const allData = await pb
-        .collection('colaboradores')
-        .getFullList({ filter: filterStr, sort: '-created' })
+      const filters = { search: debouncedSearch, startDate, endDate, filial }
+      const allData = await getColaboradoresAnalytics(filters)
       setReportData(allData)
       setReportModalOpen(false)
       setIsGenerating(false)
@@ -292,20 +264,17 @@ export default function RelatorioPagamentos() {
               <Skeleton className="h-5 w-64 mt-1 bg-blue-200/50 dark:bg-blue-800/50" />
             ) : (
               <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                Total de pagamentos na lista: <span className="font-bold">{stats.count}</span>
+                Pagamentos confirmados: <span className="font-bold">{stats.count}</span>{' '}
+                <span className="mx-1 opacity-50">|</span> Total pago:{' '}
+                <span className="font-bold">{formatBRL(stats.total)}</span>
               </p>
             )}
           </div>
           {loading ? (
             <Skeleton className="h-8 w-40 mt-2 sm:mt-0 bg-blue-200/50 dark:bg-blue-800/50" />
           ) : (
-            <div className="flex flex-col items-start sm:items-end mt-2 sm:mt-0">
-              <span className="text-xs font-semibold text-blue-800/70 dark:text-blue-200/70 uppercase tracking-wider">
-                Total Pago (Confirmados)
-              </span>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                {formatBRL(stats.total)}
-              </div>
+            <div className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-2 sm:mt-0">
+              {formatBRL(stats.total)}
             </div>
           )}
         </div>
@@ -383,15 +352,18 @@ export default function RelatorioPagamentos() {
                       const valor = item.valor_a_receber || item.valor || 0
                       const status = item.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
                       const dataPagamento = item.data_pagamento || '-'
+                      const nome = item.nome || item.expand?.colaborador_id?.nome || 'Desconhecido'
+                      const registro = item.registro || item.expand?.colaborador_id?.registro || '-'
+                      const filial = item.filial || item.expand?.colaborador_id?.filial || '-'
 
                       return (
                         <TableRow
                           key={item.id}
                           className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                         >
-                          <TableCell>{item.registro}</TableCell>
-                          <TableCell className="font-medium">{item.nome}</TableCell>
-                          <TableCell>{item.filial}</TableCell>
+                          <TableCell>{registro}</TableCell>
+                          <TableCell className="font-medium">{nome}</TableCell>
+                          <TableCell>{filial}</TableCell>
                           <TableCell>{dataPagamento}</TableCell>
                           <TableCell className="text-right font-medium text-emerald-600">
                             {formatBRL(valor)}
@@ -437,6 +409,8 @@ export default function RelatorioPagamentos() {
                   const valor = item.valor_a_receber || item.valor || 0
                   const status = item.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
                   const dataPagamento = item.data_pagamento || '-'
+                  const nome = item.nome || item.expand?.colaborador_id?.nome || 'Desconhecido'
+                  const registro = item.registro || item.expand?.colaborador_id?.registro || '-'
 
                   return (
                     <Card key={item.id} className="overflow-hidden shadow-sm">
@@ -444,10 +418,10 @@ export default function RelatorioPagamentos() {
                         <div className="flex justify-between items-start">
                           <div>
                             <div className="font-semibold text-base text-slate-900 dark:text-slate-100">
-                              {item.nome}
+                              {nome}
                             </div>
                             <div className="flex items-center text-xs text-muted-foreground mt-1">
-                              <FileDigit className="h-3 w-3 mr-1" /> {item.registro}
+                              <FileDigit className="h-3 w-3 mr-1" /> {registro}
                             </div>
                           </div>
                           <div className="text-right">
@@ -546,13 +520,21 @@ export default function RelatorioPagamentos() {
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                       Registro
                     </span>
-                    <p className="font-medium">{detailsModal.registro}</p>
+                    <p className="font-medium">
+                      {detailsModal.registro ||
+                        detailsModal.expand?.colaborador_id?.registro ||
+                        '-'}
+                    </p>
                   </div>
                   <div>
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                       Nome
                     </span>
-                    <p className="font-medium">{detailsModal.nome}</p>
+                    <p className="font-medium">
+                      {detailsModal.nome ||
+                        detailsModal.expand?.colaborador_id?.nome ||
+                        'Desconhecido'}
+                    </p>
                   </div>
                   <div>
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
@@ -606,7 +588,9 @@ export default function RelatorioPagamentos() {
                     <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
                       Filial
                     </span>
-                    <p className="font-medium">{detailsModal.filial}</p>
+                    <p className="font-medium">
+                      {detailsModal.filial || detailsModal.expand?.colaborador_id?.filial || '-'}
+                    </p>
                   </div>
                 </div>
                 {detailsModal.foto_confirmacao_url && (
