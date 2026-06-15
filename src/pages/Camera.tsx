@@ -678,9 +678,11 @@ export default function Camera() {
                     <TableRow>
                       <TableHead>Registro</TableHead>
                       <TableHead>Nome</TableHead>
+                      <TableHead>Data</TableHead>
                       <TableHead>Início</TableHead>
                       <TableHead>Término</TableHead>
                       <TableHead>Tipo de Pagamento</TableHead>
+                      <TableHead>Total (Horas)</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -692,13 +694,11 @@ export default function Camera() {
                       <TableRow key={record.id || idx}>
                         <TableCell>{record.registro}</TableCell>
                         <TableCell>{record.nome}</TableCell>
-                        <TableCell>
-                          {formatDateSafe(record.data)} {formatTime(record.inicio)}
-                        </TableCell>
-                        <TableCell>
-                          {formatDateSafe(record.data)} {formatTime(record.termino)}
-                        </TableCell>
+                        <TableCell>{formatDateSafe(record.data)}</TableCell>
+                        <TableCell>{formatTime(record.inicio)}</TableCell>
+                        <TableCell>{formatTime(record.termino)}</TableCell>
                         <TableCell>{getTipoPagamentoDesc(record.idtipopgto)}</TableCell>
+                        <TableCell>{formatHoras(record.horas)}</TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(record.valor_a_receber || record.valor || 0)}
                         </TableCell>
