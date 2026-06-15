@@ -399,6 +399,7 @@ export default function RelatorioRecebedoria() {
             body, html {
               background-color: white !important;
               color: black !important;
+              font-size: 14pt !important;
             }
             aside, header, nav, [data-sidebar], .print\\:hidden {
               display: none !important;
@@ -415,10 +416,29 @@ export default function RelatorioRecebedoria() {
             table {
               page-break-inside: auto;
               width: 100% !important;
+              font-size: 14pt !important;
+              border-collapse: collapse !important;
             }
             tr {
               page-break-inside: avoid;
               page-break-after: auto;
+            }
+            th {
+              font-size: 15pt !important;
+              padding: 12px 8px !important;
+            }
+            td {
+              font-size: 14pt !important;
+              padding: 10px 8px !important;
+            }
+            .text-lg {
+              font-size: 16pt !important;
+            }
+            .text-xl {
+              font-size: 18pt !important;
+            }
+            .text-3xl {
+              font-size: 24pt !important;
             }
             .double-underline {
               text-decoration: underline double !important;
@@ -436,14 +456,14 @@ export default function RelatorioRecebedoria() {
               Relatório de Pagamentos Consolidados
             </h1>
           </div>
-          <div className="text-right text-base text-black">
+          <div className="text-right text-black">
             <p>
               <span className="font-bold">Data de Emissão:</span>{' '}
               {new Date().toLocaleDateString('pt-BR')}
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4 text-base text-black">
+        <div className="grid grid-cols-2 gap-4 text-black">
           <div>
             <p>
               <span className="font-bold">Período:</span> {formatDateStringSafe(startDate)} a{' '}
@@ -627,32 +647,24 @@ export default function RelatorioRecebedoria() {
           <TabsContent value="detalhado" className="mt-0 space-y-6">
             {/* Desktop Table */}
             <div className="hidden md:block print:block rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
-              <Table className="text-base print:text-base">
+              <Table>
                 <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent print:border-b-2 print:border-slate-800">
-                  <TableRow className="print:border-none text-base">
-                    <TableHead className="print:text-black print:font-bold text-base">
-                      Registro
-                    </TableHead>
-                    <TableHead className="print:text-black print:font-bold text-base">
-                      Nome
-                    </TableHead>
-                    <TableHead className="print:text-black print:font-bold text-base">
-                      Data
-                    </TableHead>
-                    <TableHead className="print:text-black print:font-bold text-base">
-                      Horário
-                    </TableHead>
-                    <TableHead className="text-right print:text-black print:font-bold text-base">
+                  <TableRow className="print:border-none">
+                    <TableHead className="print:text-black print:font-bold">Registro</TableHead>
+                    <TableHead className="print:text-black print:font-bold">Nome</TableHead>
+                    <TableHead className="print:text-black print:font-bold">Data</TableHead>
+                    <TableHead className="print:text-black print:font-bold">Horário</TableHead>
+                    <TableHead className="text-right print:text-black print:font-bold">
                       Valor
                     </TableHead>
-                    <TableHead className="text-left w-[150px] print:text-black print:font-bold text-base">
+                    <TableHead className="text-left w-[150px] print:text-black print:font-bold">
                       Tipo de Pagamento
                     </TableHead>
-                    <TableHead className="text-center print:text-black print:font-bold text-base">
+                    <TableHead className="text-center print:text-black print:font-bold">
                       Status
                     </TableHead>
-                    <TableHead className="text-center print:hidden text-base">Foto</TableHead>
-                    <TableHead className="text-right print:hidden text-base">Ações</TableHead>
+                    <TableHead className="text-center print:hidden">Foto</TableHead>
+                    <TableHead className="text-right print:hidden">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -730,21 +742,21 @@ export default function RelatorioRecebedoria() {
                             return (
                               <TableRow
                                 key={item.id}
-                                className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid text-base"
+                                className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:break-inside-avoid"
                               >
-                                <TableCell className="font-medium pl-8 print:text-black text-base">
+                                <TableCell className="font-medium pl-8 print:text-black">
                                   {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
                                 </TableCell>
-                                <TableCell className="print:text-black text-base">
+                                <TableCell className="print:text-black">
                                   {item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'}
                                 </TableCell>
-                                <TableCell className="print:text-black text-base">
+                                <TableCell className="print:text-black">
                                   {formatDateStringSafe(item.data_pagamento) || '-'}
                                 </TableCell>
-                                <TableCell className="print:text-black text-base">
+                                <TableCell className="print:text-black">
                                   {item.hora_pagamento || '-'}
                                 </TableCell>
-                                <TableCell className="text-right font-medium print:text-black text-base">
+                                <TableCell className="text-right font-medium print:text-black">
                                   {formatBRL(
                                     item.expand?.colaborador_id?.valor_a_receber ||
                                       item.valor_pago ||
@@ -752,12 +764,10 @@ export default function RelatorioRecebedoria() {
                                       item.valor,
                                   )}
                                 </TableCell>
-                                <TableCell className="text-left print:text-black text-base">
+                                <TableCell className="text-left print:text-black">
                                   {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
                                 </TableCell>
-                                <TableCell className="text-center text-base">
-                                  {statusBadge}
-                                </TableCell>
+                                <TableCell className="text-center">{statusBadge}</TableCell>
                                 <TableCell className="text-center print:hidden">
                                   <Button
                                     variant="outline"
@@ -928,14 +938,12 @@ export default function RelatorioRecebedoria() {
                 Total por Colaborador
               </h3>
               <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-                <Table className="text-base">
-                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50 text-base">
+                <Table>
+                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                     <TableRow>
-                      <TableHead className="h-10 py-2 text-base">Colaborador</TableHead>
-                      <TableHead className="h-10 py-2 text-base">Tipo de Pagamento</TableHead>
-                      <TableHead className="h-10 py-2 text-right text-base">
-                        Total Acumulado
-                      </TableHead>
+                      <TableHead className="h-10 py-2">Colaborador</TableHead>
+                      <TableHead className="h-10 py-2">Tipo de Pagamento</TableHead>
+                      <TableHead className="h-10 py-2 text-right">Total Acumulado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -966,13 +974,13 @@ export default function RelatorioRecebedoria() {
                       summaryArray.map((item, idx) => (
                         <TableRow
                           key={idx}
-                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 text-base"
+                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                         >
-                          <TableCell className="py-3 font-medium text-base">{item.nome}</TableCell>
-                          <TableCell className="py-3 text-base text-slate-600 dark:text-slate-400">
+                          <TableCell className="py-3 font-medium">{item.nome}</TableCell>
+                          <TableCell className="py-3 text-slate-600 dark:text-slate-400">
                             {item.tipo}
                           </TableCell>
-                          <TableCell className="py-3 text-base text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          <TableCell className="py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
                             {formatBRL(item.total)}
                           </TableCell>
                         </TableRow>
@@ -988,16 +996,16 @@ export default function RelatorioRecebedoria() {
                 Resumo Consolidado
               </h3>
               <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm print:border-none print:shadow-none">
-                <Table className="text-base print:text-base">
-                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent text-base">
+                <Table>
+                  <TableHeader className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent">
                     <TableRow className="print:border-b print:border-slate-300">
-                      <TableHead className="h-10 py-3 print:text-black print:font-bold print:uppercase text-base">
+                      <TableHead className="h-10 py-3 print:text-black print:font-bold print:uppercase">
                         Tipo de Pagamento
                       </TableHead>
-                      <TableHead className="h-10 py-3 print:text-black print:font-bold print:uppercase text-base">
+                      <TableHead className="h-10 py-3 print:text-black print:font-bold print:uppercase">
                         Data
                       </TableHead>
-                      <TableHead className="h-10 py-3 text-right print:text-black print:font-bold print:uppercase text-base">
+                      <TableHead className="h-10 py-3 text-right print:text-black print:font-bold print:uppercase">
                         Valor
                       </TableHead>
                     </TableRow>
@@ -1031,27 +1039,27 @@ export default function RelatorioRecebedoria() {
                           {group.rows.map((row, rIdx) => (
                             <TableRow
                               key={`${gIdx}-${rIdx}`}
-                              className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:border-b print:border-slate-200 text-base"
+                              className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 print:border-b print:border-slate-200"
                             >
-                              <TableCell className="py-3 font-medium text-base print:text-black">
+                              <TableCell className="py-3 font-medium print:text-black">
                                 {group.tipo}
                               </TableCell>
-                              <TableCell className="py-3 font-medium text-base print:text-black">
+                              <TableCell className="py-3 font-medium print:text-black">
                                 {formatDateStringSafe(row.data)}
                               </TableCell>
-                              <TableCell className="py-3 text-base text-right font-medium print:text-black">
+                              <TableCell className="py-3 text-right font-medium print:text-black">
                                 {formatBRL(row.total)}
                               </TableCell>
                             </TableRow>
                           ))}
-                          <TableRow className="bg-slate-100/80 dark:bg-slate-800/80 print:bg-slate-100 border-t-2 border-slate-200 dark:border-slate-700 print:border-slate-400 text-base">
+                          <TableRow className="bg-slate-100/80 dark:bg-slate-800/80 print:bg-slate-100 border-t-2 border-slate-200 dark:border-slate-700 print:border-slate-400">
                             <TableCell
                               colSpan={2}
-                              className="py-3 font-bold text-base text-slate-800 dark:text-slate-200 print:text-black uppercase"
+                              className="py-3 font-bold text-slate-800 dark:text-slate-200 print:text-black uppercase"
                             >
                               Total {group.tipo}
                             </TableCell>
-                            <TableCell className="py-3 text-base text-right font-bold text-slate-900 dark:text-white print:text-black">
+                            <TableCell className="py-3 text-right font-bold text-slate-900 dark:text-white print:text-black">
                               {formatBRL(group.subtotal)}
                             </TableCell>
                           </TableRow>
@@ -1060,7 +1068,7 @@ export default function RelatorioRecebedoria() {
                     )}
                   </TableBody>
                   {!loading && consolidatedSummary.groups.length > 0 && (
-                    <tfoot className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent border-t-2 border-slate-300 print:border-slate-800 text-base">
+                    <tfoot className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent border-t-2 border-slate-300 print:border-slate-800">
                       <tr>
                         <td
                           colSpan={2}
