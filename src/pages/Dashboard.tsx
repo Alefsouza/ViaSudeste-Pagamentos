@@ -161,16 +161,13 @@ export default function Dashboard() {
       if (selectedChartFilial && (curr.filial || 'Outra') !== selectedChartFilial) return false
 
       if (selectedChartDate) {
-        let dStr = ''
-        if (curr.data_pagamento) {
-          dStr = curr.data_pagamento.split(',')[0].trim()
-        } else {
-          dStr =
-            formatDataString(curr.data) ||
-            (curr.created ? format(new Date(curr.created), 'dd/MM/yyyy') : '')
-        }
-
-        if (!dStr || dStr === '-') return false
+        if (
+          !curr.data_pagamento ||
+          curr.data_pagamento.trim() === '-' ||
+          curr.data_pagamento.trim() === ''
+        )
+          return false
+        const dStr = curr.data_pagamento.split(',')[0].trim()
 
         let dateKey = dStr
         if (dStr.includes('/')) {
@@ -189,7 +186,8 @@ export default function Dashboard() {
     return filteredStatsData.reduce(
       (acc, curr) => {
         const val = curr.valor_a_receber || curr.valor || 0
-        if (curr.foto_confirmacao_url && curr.foto_confirmacao_url.trim() !== '') {
+        const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+        if (status === 'Confirmado') {
           acc.pago += val
         } else {
           acc.pendente += val
@@ -237,16 +235,16 @@ export default function Dashboard() {
 
   const dailyDataMap = statsData.reduce(
     (acc, curr) => {
-      let dStr = ''
-      if (curr.data_pagamento) {
-        dStr = curr.data_pagamento.split(',')[0].trim()
-      } else {
-        dStr =
-          formatDataString(curr.data) ||
-          (curr.created ? format(new Date(curr.created), 'dd/MM/yyyy') : '')
-      }
+      const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+      if (status !== 'Confirmado') return acc
 
-      if (!dStr || dStr === '-') return acc
+      if (
+        !curr.data_pagamento ||
+        curr.data_pagamento.trim() === '-' ||
+        curr.data_pagamento.trim() === ''
+      )
+        return acc
+      const dStr = curr.data_pagamento.split(',')[0].trim()
 
       let dateKey = dStr
       if (dStr.includes('/')) {
