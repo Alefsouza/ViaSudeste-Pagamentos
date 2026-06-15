@@ -743,7 +743,7 @@ export default function RelatorioRecebedoria() {
                     <TableHead>Dt. Ref.</TableHead>
                     <TableHead>Data Pgto</TableHead>
                     <TableHead>Horário</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-left">Valor</TableHead>
                     <TableHead className="text-left w-[150px]">Tipo de Pagamento</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                     <TableHead className="text-center">Foto</TableHead>
