@@ -157,7 +157,33 @@ export function ImportPlanilhaModal({
           return '00.00'
         }
 
-        const formattedData = jsonData.map((row: any) => {
+        const normalizedData = jsonData.map((row: any) => {
+          const newRow: Record<string, any> = {}
+          Object.keys(row).forEach((k) => {
+            const normalizedKey = String(k).toUpperCase().trim()
+            newRow[normalizedKey] = row[k]
+          })
+          return newRow
+        })
+
+        const parseValor = (val: any): number => {
+          if (typeof val === 'number') return Number(val.toFixed(2))
+          if (!val) return 0
+          const strVal = String(val).trim()
+          // Remove optional currency symbols and spaces (e.g. "R$ ")
+          const cleanCurrency = strVal.replace(/^R\$\s*/i, '')
+          // If there's a comma, treat as decimal separator and remove dots
+          if (cleanCurrency.includes(',')) {
+            const cleanStr = cleanCurrency.replace(/\./g, '').replace(',', '.')
+            const num = parseFloat(cleanStr)
+            return isNaN(num) ? 0 : Number(num.toFixed(2))
+          }
+          // If only dots or no separators, parse directly
+          const num = parseFloat(cleanCurrency)
+          return isNaN(num) ? 0 : Number(num.toFixed(2))
+        }
+
+        const formattedData = normalizedData.map((row: any) => {
           const rawData = row['DATA']
           const d = excelDateToJSDate(rawData)
           const dataFormatted = !isNaN(d.getTime())
@@ -181,8 +207,8 @@ export function ImportPlanilhaModal({
             inicio: excelTimeToHHMM(row['INICIO']),
             termino: excelTimeToHHMM(row['TERMINO']),
             horas: formatHoras(row['HORAS']),
-            valor_a_receber:
-              Number(parseFloat(String(row['VALOR'] || 0).replace(',', '.')).toFixed(2)) || 0,
+            valor_a_receber: parseValor(row['VALOR']),
+            valor: parseValor(row['VALOR']),
             filial: filialMapped,
             filial_id: filialNumber,
           }

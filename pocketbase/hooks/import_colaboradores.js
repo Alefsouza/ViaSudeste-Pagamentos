@@ -30,9 +30,11 @@ routerAdd(
             Number(
               row.valor_a_receber !== undefined
                 ? row.valor_a_receber
-                : row.VALOR !== undefined
-                  ? row.VALOR
-                  : 0,
+                : row.valor !== undefined
+                  ? row.valor
+                  : row.VALOR !== undefined
+                    ? row.VALOR
+                    : 0,
             ) || 0
           const filial = row.filial || ''
           const filial_id =
@@ -46,6 +48,7 @@ routerAdd(
           record.set('termino', termino)
           record.set('horas', horas)
           record.set('valor_a_receber', valor)
+          record.set('valor', valor)
           if (filial) {
             record.set('filial', filial)
           }
