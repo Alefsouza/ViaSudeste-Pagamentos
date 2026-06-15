@@ -174,6 +174,30 @@ export default function Camera() {
     return num.toFixed(2).padStart(5, '0')
   }
 
+  const calcularIntervaloHoras = (
+    inicio?: string,
+    termino?: string,
+    fallbackHoras?: number | string,
+  ) => {
+    const fInicio = formatTime(inicio)
+    const fTermino = formatTime(termino)
+
+    if (fInicio !== '--:--' && fTermino !== '--:--') {
+      const [h1, m1] = fInicio.split(':').map(Number)
+      const [h2, m2] = fTermino.split(':').map(Number)
+
+      if (!isNaN(h1) && !isNaN(m1) && !isNaN(h2) && !isNaN(m2)) {
+        let startMin = h1 * 60 + m1
+        let endMin = h2 * 60 + m2
+        if (endMin < startMin) endMin += 24 * 60 // cross midnight
+
+        const diffHoras = (endMin - startMin) / 60
+        return diffHoras.toFixed(2).padStart(5, '0')
+      }
+    }
+    return formatHoras(fallbackHoras)
+  }
+
   const getTipoPagamentoDesc = (idtipopgto?: number | string) => {
     const id = typeof idtipopgto === 'string' ? parseInt(idtipopgto, 10) : idtipopgto
     switch (id) {
@@ -651,8 +675,8 @@ export default function Camera() {
           if (!open && viewState !== 'CONFIRMING_PAYMENT') handleReset()
         }}
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="w-[95vw] max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden p-4 sm:p-6">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Resumo do Pagamento</DialogTitle>
             <DialogDescription>
               Confirme os detalhes do pagamento para o colaborador identificado.
@@ -660,30 +684,38 @@ export default function Camera() {
           </DialogHeader>
 
           {colaborador && (
-            <div className="space-y-6 mt-4">
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900 p-4 rounded-lg">
+            <div className="flex flex-col min-h-0 gap-4 mt-2">
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900 p-3 rounded-lg shrink-0">
                 <div>
-                  <p className="text-sm text-slate-500">Registro</p>
-                  <p className="font-medium text-slate-900 dark:text-white">
+                  <p className="text-xs text-slate-500">Registro</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
                     {colaborador.registro}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">Nome</p>
-                  <p className="font-medium text-slate-900 dark:text-white">{colaborador.nome}</p>
+                  <p className="text-xs text-slate-500">Nome</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {colaborador.nome}
+                  </p>
                 </div>
               </div>
 
-              <div className="border rounded-md overflow-x-auto">
-                <Table className="min-w-[600px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Início</TableHead>
-                      <TableHead>Término</TableHead>
-                      <TableHead>Total (Horas)</TableHead>
-                      <TableHead>Tipo de Pagamento</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
+              <div className="border rounded-md overflow-auto flex-1 min-h-0 bg-white dark:bg-slate-950">
+                <Table className="min-w-[700px] text-sm relative">
+                  <TableHeader className="sticky top-0 bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-sm z-10 shadow-sm">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="py-2 h-8 text-xs font-semibold">Data</TableHead>
+                      <TableHead className="py-2 h-8 text-xs font-semibold">Início</TableHead>
+                      <TableHead className="py-2 h-8 text-xs font-semibold">Término</TableHead>
+                      <TableHead className="py-2 h-8 text-xs font-semibold">
+                        Total (Horas)
+                      </TableHead>
+                      <TableHead className="py-2 h-8 text-xs font-semibold">
+                        Tipo de Pagamento
+                      </TableHead>
+                      <TableHead className="py-2 h-8 text-xs font-semibold text-right">
+                        Valor
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -691,13 +723,26 @@ export default function Camera() {
                       ? colaborador.records
                       : [colaborador]
                     ).map((record: any, idx: number) => (
-                      <TableRow key={record.id || idx}>
-                        <TableCell>{formatDateSafe(record.data)}</TableCell>
-                        <TableCell>{formatTime(record.inicio)}</TableCell>
-                        <TableCell>{formatTime(record.termino)}</TableCell>
-                        <TableCell>{formatHoras(record.horas)}</TableCell>
-                        <TableCell>{getTipoPagamentoDesc(record.idtipopgto)}</TableCell>
-                        <TableCell className="text-right font-medium">
+                      <TableRow
+                        key={record.id || idx}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      >
+                        <TableCell className="py-1.5 leading-tight text-slate-700 dark:text-slate-300">
+                          {formatDateSafe(record.data)}
+                        </TableCell>
+                        <TableCell className="py-1.5 leading-tight text-slate-700 dark:text-slate-300">
+                          {formatTime(record.inicio)}
+                        </TableCell>
+                        <TableCell className="py-1.5 leading-tight text-slate-700 dark:text-slate-300">
+                          {formatTime(record.termino)}
+                        </TableCell>
+                        <TableCell className="py-1.5 leading-tight text-slate-700 dark:text-slate-300">
+                          {calcularIntervaloHoras(record.inicio, record.termino, record.horas)}
+                        </TableCell>
+                        <TableCell className="py-1.5 leading-tight text-slate-700 dark:text-slate-300">
+                          {getTipoPagamentoDesc(record.idtipopgto)}
+                        </TableCell>
+                        <TableCell className="py-1.5 leading-tight text-right font-medium text-slate-900 dark:text-slate-100">
                           {formatCurrency(record.valor_a_receber || record.valor || 0)}
                         </TableCell>
                       </TableRow>
@@ -706,10 +751,10 @@ export default function Camera() {
                 </Table>
               </div>
 
-              <div className="flex justify-end">
-                <div className="w-full md:w-1/2 space-y-3">
-                  <div className="border-b pb-3 space-y-2">
-                    <h4 className="font-medium text-sm text-slate-700 dark:text-slate-300">
+              <div className="flex justify-end shrink-0 pt-2">
+                <div className="w-full md:w-1/3 space-y-2">
+                  <div className="border-b pb-2 space-y-1">
+                    <h4 className="font-medium text-xs text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Subtotais por Tipo
                     </h4>
                     {Object.entries(
@@ -723,15 +768,15 @@ export default function Camera() {
                         return acc
                       }, {}),
                     ).map(([type, total]: any) => (
-                      <div key={type} className="flex justify-between text-sm">
+                      <div key={type} className="flex justify-between text-xs">
                         <span className="text-slate-500">{type}</span>
                         <span className="font-medium">{formatCurrency(total)}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="font-bold text-lg">Total Geral</span>
-                    <span className="font-bold text-xl text-green-600 dark:text-green-500">
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="font-bold text-sm">Total Geral</span>
+                    <span className="font-bold text-lg text-green-600 dark:text-green-500">
                       {formatCurrency(colaborador.valor_a_receber || colaborador.valor || 0)}
                     </span>
                   </div>
@@ -740,7 +785,7 @@ export default function Camera() {
             </div>
           )}
 
-          <DialogFooter className="mt-6">
+          <DialogFooter className="mt-4 shrink-0">
             <Button
               variant="outline"
               onClick={handleReset}
