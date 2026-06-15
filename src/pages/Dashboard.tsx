@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -21,6 +21,7 @@ import {
   Inbox,
   Info,
   Image as ImageIcon,
+  FilterX,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +42,7 @@ import { format, subDays } from 'date-fns'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
-import { formatDataString, formatHoraString, formatBRL, getTipoPagamento } from '@/lib/formatters'
+import { formatDataString, formatBRL, getTipoPagamento } from '@/lib/formatters'
 
 export default function Dashboard() {
   const { toast } = useToast()
@@ -56,12 +57,18 @@ export default function Dashboard() {
   const [debouncedFilters, setDebouncedFilters] = useState(filters)
   const [knownTipos, setKnownTipos] = useState<Set<number>>(new Set())
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
+
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [tableLoading, setTableLoading] = useState(true)
   const [error, setError] = useState(false)
+
   const [statsData, setStatsData] = useState<any[]>([])
   const [tableData, setTableData] = useState<any>(null)
-  const [pagamentosTotals, setPagamentosTotals] = useState({ pago: 0, pendente: 0 })
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
+
+  // Chart Interactive Filters
+  const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
+  const [selectedChartDate, setSelectedChartDate] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -76,47 +83,59 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [filters])
 
-  const loadData = async () => {
-    setLoading(true)
+  const loadStats = async () => {
+    setStatsLoading(true)
     setError(false)
     try {
-      const [stats, paginated] = await Promise.all([
-        getColaboradoresAnalytics(debouncedFilters),
-        getColaboradoresPaginated(page, 20, debouncedFilters),
-      ])
+      const stats = await getColaboradoresAnalytics(debouncedFilters)
       setStatsData(stats)
-      setTableData(paginated)
-
-      const pago = stats.reduce((acc: number, curr: any) => {
-        if (curr.foto_confirmacao_url && curr.foto_confirmacao_url.trim() !== '') {
-          return acc + (curr.valor_a_receber || curr.valor || 0)
-        }
-        return acc
-      }, 0)
-
-      const pendente = stats.reduce((acc: number, curr: any) => {
-        if (!curr.foto_confirmacao_url || curr.foto_confirmacao_url.trim() === '') {
-          return acc + (curr.valor_a_receber || curr.valor || 0)
-        }
-        return acc
-      }, 0)
-
-      setPagamentosTotals({ pago, pendente })
     } catch (e: any) {
       setError(true)
       toast({
         title: 'Erro de conexão',
-        description: e.response?.message || 'Falha ao carregar os dados do dashboard.',
+        description: e.response?.message || 'Falha ao carregar as estatísticas.',
         variant: 'destructive',
       })
     } finally {
-      setLoading(false)
+      setStatsLoading(false)
+    }
+  }
+
+  const loadTable = async () => {
+    setTableLoading(true)
+    try {
+      const tableFiltersForAPI = { ...debouncedFilters }
+
+      if (selectedChartFilial && selectedChartFilial !== 'Outra') {
+        tableFiltersForAPI.filial = selectedChartFilial
+      }
+
+      if (selectedChartDate) {
+        tableFiltersForAPI.startDate = selectedChartDate
+        tableFiltersForAPI.endDate = selectedChartDate
+      }
+
+      const paginated = await getColaboradoresPaginated(page, 20, tableFiltersForAPI)
+      setTableData(paginated)
+    } catch (e: any) {
+      // Error is caught by loadStats generally, preventing double toast
+    } finally {
+      setTableLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
-  }, [debouncedFilters, page])
+    loadStats()
+  }, [debouncedFilters])
+
+  useEffect(() => {
+    loadTable()
+  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
+
+  const refreshAll = useCallback(() => {
+    loadStats()
+    loadTable()
+  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
 
   useEffect(() => {
     if (statsData.length > 0) {
@@ -130,36 +149,81 @@ export default function Dashboard() {
     }
   }, [statsData])
 
-  const availableTipos = Array.from(knownTipos).sort()
+  useRealtime('pagamentos', refreshAll)
+  useRealtime('colaboradores', refreshAll)
+  useRealtime('fotos_colaboradores', refreshAll)
 
-  useRealtime('pagamentos', loadData)
-  useRealtime('colaboradores', loadData)
-  useRealtime('fotos_colaboradores', loadData)
+  const availableTipos = Array.from(knownTipos).sort()
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center p-12 space-y-4 h-full">
         <AlertCircle className="h-12 w-12 text-rose-500" />
         <p className="text-lg font-medium">Erro ao carregar dados</p>
-        <Button onClick={loadData} variant="outline">
+        <Button onClick={refreshAll} variant="outline">
           Tentar novamente
         </Button>
       </div>
     )
   }
 
+  // Derived filtered stats for Summary Cards based on interactive chart selections
+  const filteredStatsData = useMemo(() => {
+    return statsData.filter((curr) => {
+      if (selectedChartFilial && (curr.filial || 'Outra') !== selectedChartFilial) return false
+
+      if (selectedChartDate) {
+        let dStr = ''
+        if (curr.data_pagamento) {
+          dStr = curr.data_pagamento.split(',')[0].trim()
+        } else {
+          dStr =
+            formatDataString(curr.data) ||
+            (curr.created ? format(new Date(curr.created), 'dd/MM/yyyy') : '')
+        }
+
+        if (!dStr || dStr === '-') return false
+
+        let dateKey = dStr
+        if (dStr.includes('/')) {
+          const p = dStr.split('/')
+          dateKey = `${p[2]}-${p[1]}-${p[0]}`
+        }
+
+        if (dateKey !== selectedChartDate) return false
+      }
+
+      return true
+    })
+  }, [statsData, selectedChartFilial, selectedChartDate])
+
+  const pagamentosTotals = useMemo(() => {
+    return filteredStatsData.reduce(
+      (acc, curr) => {
+        const val = curr.valor_a_receber || curr.valor || 0
+        if (curr.foto_confirmacao_url && curr.foto_confirmacao_url.trim() !== '') {
+          acc.pago += val
+        } else {
+          acc.pendente += val
+        }
+        return acc
+      },
+      { pago: 0, pendente: 0 },
+    )
+  }, [filteredStatsData])
+
   // Calculations
-  const totalValor = statsData.reduce(
+  const totalValor = filteredStatsData.reduce(
     (acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0),
     0,
   )
-  const uniqueColabs = new Set(statsData.map((c) => c.registro).filter(Boolean)).size
-  const values = statsData.map((c) => c.valor_a_receber || c.valor || 0)
+  const uniqueColabs = new Set(filteredStatsData.map((c) => c.registro).filter(Boolean)).size
+  const values = filteredStatsData.map((c) => c.valor_a_receber || c.valor || 0)
   const maxPago = values.length ? Math.max(...values) : 0
   const minPago = values.length ? Math.min(...values) : 0
   const avgPago = values.length ? totalValor / values.length : 0
 
-  // Chart Data Preparation
+  // Chart Data Preparation (using full statsData so context remains visible)
   const pieDataMap = statsData.reduce(
     (acc, curr) => {
       const filial = curr.filial || 'Outra'
@@ -207,7 +271,7 @@ export default function Dashboard() {
       }
     })
 
-  const isEmpty = statsData.length === 0 && !loading
+  const isEmpty = statsData.length === 0 && !statsLoading
 
   // Group table items by Name without aggregating their values
   const groupedByName = (tableData?.items || []).reduce((acc: any, item: any) => {
@@ -228,6 +292,21 @@ export default function Dashboard() {
             Analise a distribuição de pagamentos e monitore as filiais.
           </p>
         </div>
+        {(selectedChartFilial || selectedChartDate) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedChartFilial(null)
+              setSelectedChartDate(null)
+              setPage(1)
+            }}
+            className="animate-fade-in text-muted-foreground"
+          >
+            <FilterX className="h-4 w-4 mr-2" />
+            Limpar Filtros de Gráfico
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -345,10 +424,12 @@ export default function Dashboard() {
             <DollarSign className="h-4 w-4 text-forest" />
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatBRL(pagamentosTotals.pago)}</div>
+              <div className="text-2xl font-bold transition-all duration-300">
+                {formatBRL(pagamentosTotals.pago)}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -358,10 +439,12 @@ export default function Dashboard() {
             <AlertCircle className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatBRL(pagamentosTotals.pendente)}</div>
+              <div className="text-2xl font-bold transition-all duration-300">
+                {formatBRL(pagamentosTotals.pendente)}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -371,10 +454,10 @@ export default function Dashboard() {
             <Users className="h-4 w-4 text-forest" />
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold">{uniqueColabs}</div>
+              <div className="text-2xl font-bold transition-all duration-300">{uniqueColabs}</div>
             )}
           </CardContent>
         </Card>
@@ -384,10 +467,12 @@ export default function Dashboard() {
             <ArrowUp className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatBRL(maxPago)}</div>
+              <div className="text-2xl font-bold transition-all duration-300">
+                {formatBRL(maxPago)}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -397,10 +482,12 @@ export default function Dashboard() {
             <ArrowDown className="h-4 w-4 text-rose-500" />
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatBRL(minPago)}</div>
+              <div className="text-2xl font-bold transition-all duration-300">
+                {formatBRL(minPago)}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -410,10 +497,12 @@ export default function Dashboard() {
             <TrendingUp className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatBRL(avgPago)}</div>
+              <div className="text-2xl font-bold transition-all duration-300">
+                {formatBRL(avgPago)}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -433,7 +522,7 @@ export default function Dashboard() {
                 <CardTitle>Total Pago por Dia</CardTitle>
               </CardHeader>
               <CardContent>
-                {loading ? (
+                {statsLoading ? (
                   <Skeleton className="h-[300px] w-full" />
                 ) : (
                   <ChartContainer
@@ -455,7 +544,34 @@ export default function Dashboard() {
                         tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
                       />
                       <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="total" fill="var(--color-total)" radius={[4, 4, 0, 0]} />
+                      <Bar
+                        dataKey="total"
+                        radius={[4, 4, 0, 0]}
+                        onClick={(data) => {
+                          const date = data?.date || data?.payload?.date
+                          if (date) {
+                            setSelectedChartDate((prev) => (prev === date ? null : date))
+                            setPage(1)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {dailyData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill="var(--color-total)"
+                            style={{
+                              opacity: selectedChartDate
+                                ? selectedChartDate === entry.date
+                                  ? 1
+                                  : 0.3
+                                : 1,
+                              transition: 'opacity 0.2s',
+                              outline: 'none',
+                            }}
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ChartContainer>
                 )}
@@ -467,7 +583,7 @@ export default function Dashboard() {
                 <CardTitle>Distribuição por Filial</CardTitle>
               </CardHeader>
               <CardContent>
-                {loading ? (
+                {statsLoading ? (
                   <Skeleton className="h-[300px] w-full" />
                 ) : (
                   <ChartContainer
@@ -489,9 +605,29 @@ export default function Dashboard() {
                         paddingAngle={5}
                         dataKey="value"
                         nameKey="name"
+                        onClick={(data) => {
+                          const name = data?.name || data?.payload?.name
+                          if (name) {
+                            setSelectedChartFilial((prev) => (prev === name ? null : name))
+                            setPage(1)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
                       >
                         {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={`var(--color-${entry.name})`} />
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={`var(--color-${entry.name})`}
+                            style={{
+                              opacity: selectedChartFilial
+                                ? selectedChartFilial === entry.name
+                                  ? 1
+                                  : 0.3
+                                : 1,
+                              transition: 'opacity 0.2s',
+                              outline: 'none',
+                            }}
+                          />
                         ))}
                       </Pie>
                     </PieChart>
@@ -504,10 +640,17 @@ export default function Dashboard() {
           {/* Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Transações de Pagamentos</CardTitle>
+              <CardTitle>
+                Transações de Pagamentos
+                {(selectedChartFilial || selectedChartDate) && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    (Filtro de gráfico ativo)
+                  </span>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {tableLoading ? (
                 <div className="space-y-4">
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />
@@ -531,148 +674,169 @@ export default function Dashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
-                          const totalLines = statsData.filter(
-                            (c) => (c.nome || 'Desconhecido') === nome,
-                          ).length
-                          return (
-                            <React.Fragment key={nome}>
-                              <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                <TableCell
-                                  colSpan={8}
-                                  className="font-semibold text-slate-700 dark:text-slate-300"
-                                >
-                                  {nome} - {totalLines}{' '}
-                                  {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
-                                </TableCell>
-                              </TableRow>
-                              {records.map((p: any) => (
-                                <TableRow key={p.id}>
-                                  <TableCell className="font-medium pl-8">{p.nome}</TableCell>
-                                  <TableCell>{p.registro}</TableCell>
-                                  <TableCell>{p.filial}</TableCell>
-                                  <TableCell className="text-forest font-medium text-left">
-                                    {formatBRL(p.valor_a_receber || p.valor)}
-                                  </TableCell>
-                                  <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-                                  <TableCell>{p.data_pagamento || 'Pendente'}</TableCell>
-                                  <TableCell>
-                                    {(() => {
-                                      const status =
-                                        p.status ||
-                                        (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-                                      if (!status) return null
-                                      if (status === 'Confirmado')
-                                        return (
-                                          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                                            Confirmado
-                                          </Badge>
-                                        )
-                                      if (status === 'Pendente')
-                                        return (
-                                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
-                                            Pendente
-                                          </Badge>
-                                        )
-                                      if (status === 'Cancelado')
-                                        return <Badge variant="destructive">Cancelado</Badge>
-                                      return <Badge variant="outline">{status}</Badge>
-                                    })()}
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    {p.foto_confirmacao_url && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setSelectedPhotoUrl(p.foto_confirmacao_url)}
-                                      >
-                                        <ImageIcon className="w-4 h-4 mr-2" />
-                                        Visualizar
-                                      </Button>
-                                    )}
+                        {Object.keys(groupedByName).length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={8}
+                              className="h-24 text-center text-muted-foreground"
+                            >
+                              Nenhum pagamento encontrado com os filtros atuais.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
+                            const totalLines = filteredStatsData.filter(
+                              (c) => (c.nome || 'Desconhecido') === nome,
+                            ).length
+                            return (
+                              <React.Fragment key={nome}>
+                                <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                  <TableCell
+                                    colSpan={8}
+                                    className="font-semibold text-slate-700 dark:text-slate-300"
+                                  >
+                                    {nome} - {totalLines}{' '}
+                                    {totalLines === 1
+                                      ? 'linha de pagamento'
+                                      : 'linhas de pagamento'}
                                   </TableCell>
                                 </TableRow>
-                              ))}
-                            </React.Fragment>
-                          )
-                        })}
+                                {records.map((p: any) => (
+                                  <TableRow key={p.id}>
+                                    <TableCell className="font-medium pl-8">{p.nome}</TableCell>
+                                    <TableCell>{p.registro}</TableCell>
+                                    <TableCell>{p.filial}</TableCell>
+                                    <TableCell className="text-forest font-medium text-left">
+                                      {formatBRL(p.valor_a_receber || p.valor)}
+                                    </TableCell>
+                                    <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
+                                    <TableCell>{p.data_pagamento || 'Pendente'}</TableCell>
+                                    <TableCell>
+                                      {(() => {
+                                        const status =
+                                          p.status ||
+                                          (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                        if (!status) return null
+                                        if (status === 'Confirmado')
+                                          return (
+                                            <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
+                                              Confirmado
+                                            </Badge>
+                                          )
+                                        if (status === 'Pendente')
+                                          return (
+                                            <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
+                                              Pendente
+                                            </Badge>
+                                          )
+                                        if (status === 'Cancelado')
+                                          return <Badge variant="destructive">Cancelado</Badge>
+                                        return <Badge variant="outline">{status}</Badge>
+                                      })()}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      {p.foto_confirmacao_url && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() =>
+                                            setSelectedPhotoUrl(p.foto_confirmacao_url)
+                                          }
+                                        >
+                                          <ImageIcon className="w-4 h-4 mr-2" />
+                                          Visualizar
+                                        </Button>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </React.Fragment>
+                            )
+                          })
+                        )}
                       </TableBody>
                     </Table>
                   </div>
 
                   {/* Mobile View */}
                   <div className="md:hidden space-y-6">
-                    {Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
-                      const totalLines = statsData.filter(
-                        (c) => (c.nome || 'Desconhecido') === nome,
-                      ).length
-                      return (
-                        <div key={nome} className="space-y-4">
-                          <div className="font-semibold text-slate-700 dark:text-slate-300 px-2 pt-2 border-b pb-2">
-                            {nome} - {totalLines}{' '}
-                            {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
-                          </div>
-                          {records.map((p: any) => (
-                            <Card key={p.id} className="shadow-sm">
-                              <CardContent className="p-4 flex flex-col gap-2">
-                                <div className="flex justify-between font-bold">
-                                  <span className="truncate">{p.nome}</span>
-                                  <span className="text-forest">
-                                    {formatBRL(p.valor_a_receber || p.valor)}
-                                  </span>
-                                </div>
-                                <div className="text-sm text-muted-foreground flex justify-between">
-                                  <span>Reg: {p.registro}</span>
-                                  <span>{p.filial}</span>
-                                </div>
-                                <div className="text-sm text-muted-foreground flex justify-between">
-                                  <span>{getTipoPagamento(p.idtipopgto)}</span>
-                                </div>
-                                <div className="text-sm text-muted-foreground flex justify-between">
-                                  <span>Data de Pagamento:</span>
-                                  <span>{p.data_pagamento || 'Pendente'}</span>
-                                </div>
-                                <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
-                                  <div>
-                                    {(() => {
-                                      const status =
-                                        p.status ||
-                                        (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-                                      if (!status) return null
-                                      if (status === 'Confirmado')
-                                        return (
-                                          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                                            Confirmado
-                                          </Badge>
-                                        )
-                                      if (status === 'Pendente')
-                                        return (
-                                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
-                                            Pendente
-                                          </Badge>
-                                        )
-                                      if (status === 'Cancelado')
-                                        return <Badge variant="destructive">Cancelado</Badge>
-                                      return <Badge variant="outline">{status}</Badge>
-                                    })()}
+                    {Object.keys(groupedByName).length === 0 ? (
+                      <div className="text-center text-muted-foreground p-8">
+                        Nenhum pagamento encontrado.
+                      </div>
+                    ) : (
+                      Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
+                        const totalLines = filteredStatsData.filter(
+                          (c) => (c.nome || 'Desconhecido') === nome,
+                        ).length
+                        return (
+                          <div key={nome} className="space-y-4">
+                            <div className="font-semibold text-slate-700 dark:text-slate-300 px-2 pt-2 border-b pb-2">
+                              {nome} - {totalLines}{' '}
+                              {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
+                            </div>
+                            {records.map((p: any) => (
+                              <Card key={p.id} className="shadow-sm">
+                                <CardContent className="p-4 flex flex-col gap-2">
+                                  <div className="flex justify-between font-bold">
+                                    <span className="truncate">{p.nome}</span>
+                                    <span className="text-forest">
+                                      {formatBRL(p.valor_a_receber || p.valor)}
+                                    </span>
                                   </div>
-                                  {p.foto_confirmacao_url && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setSelectedPhotoUrl(p.foto_confirmacao_url)}
-                                    >
-                                      <ImageIcon className="w-4 h-4 mr-2" />
-                                      Foto
-                                    </Button>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      )
-                    })}
+                                  <div className="text-sm text-muted-foreground flex justify-between">
+                                    <span>Reg: {p.registro}</span>
+                                    <span>{p.filial}</span>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground flex justify-between">
+                                    <span>{getTipoPagamento(p.idtipopgto)}</span>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground flex justify-between">
+                                    <span>Data de Pagamento:</span>
+                                    <span>{p.data_pagamento || 'Pendente'}</span>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
+                                    <div>
+                                      {(() => {
+                                        const status =
+                                          p.status ||
+                                          (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                        if (!status) return null
+                                        if (status === 'Confirmado')
+                                          return (
+                                            <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
+                                              Confirmado
+                                            </Badge>
+                                          )
+                                        if (status === 'Pendente')
+                                          return (
+                                            <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
+                                              Pendente
+                                            </Badge>
+                                          )
+                                        if (status === 'Cancelado')
+                                          return <Badge variant="destructive">Cancelado</Badge>
+                                        return <Badge variant="outline">{status}</Badge>
+                                      })()}
+                                    </div>
+                                    {p.foto_confirmacao_url && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSelectedPhotoUrl(p.foto_confirmacao_url)}
+                                      >
+                                        <ImageIcon className="w-4 h-4 mr-2" />
+                                        Foto
+                                      </Button>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        )
+                      })
+                    )}
                   </div>
 
                   {/* Pagination */}
