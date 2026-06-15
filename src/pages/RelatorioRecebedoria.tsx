@@ -329,7 +329,7 @@ export default function RelatorioRecebedoria() {
     }[]
   }, [summaryData])
 
-  // Consolidated Summary grouped by Payment Type
+  // Consolidated Summary grouped by Payment Type and Date
   const consolidatedSummary = React.useMemo(() => {
     const targetCategories = [
       { name: 'Hora Extra', keywords: ['hora extra', 'hora extras', 'horas extras'] },
@@ -337,7 +337,7 @@ export default function RelatorioRecebedoria() {
       { name: 'VR', keywords: ['vr', 'vale refeição', 'vale refeicao', 'vale-refeição'] },
     ]
 
-    const typeTotals: Record<string, number> = {}
+    const typeTotals: Record<string, { tipo: string; data: string; total: number }> = {}
 
     summaryData.forEach((item) => {
       const tipoRaw = (item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || '').toLowerCase()
@@ -346,23 +346,27 @@ export default function RelatorioRecebedoria() {
         cat.keywords.some((keyword) => tipoRaw.includes(keyword)),
       )
 
+      const tipoName = matchedCategory
+        ? matchedCategory.name
+        : item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || 'Outros'
+      const dataPagamento = item.data_pagamento ? item.data_pagamento.split(' ')[0] : '-'
+      const key = `${tipoName}_${dataPagamento}`
+
       const val = item.valor_pago || item.valor_a_receber || item.valor || 0
 
-      if (matchedCategory) {
-        if (!typeTotals[matchedCategory.name]) typeTotals[matchedCategory.name] = 0
-        typeTotals[matchedCategory.name] += val
-      } else {
-        const tipoName = item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || 'Outros'
-        if (!typeTotals[tipoName]) typeTotals[tipoName] = 0
-        typeTotals[tipoName] += val
+      if (!typeTotals[key]) {
+        typeTotals[key] = { tipo: tipoName, data: dataPagamento, total: 0 }
       }
+      typeTotals[key].total += val
     })
 
-    const rows = Object.entries(typeTotals)
-      .map(([tipo, total]) => ({ tipo, total }))
-      .filter((row) => row.total > 0)
+    const rows = Object.values(typeTotals).filter((row) => row.total > 0)
 
-    rows.sort((a, b) => a.tipo.localeCompare(b.tipo))
+    rows.sort((a, b) => {
+      const cmp = a.tipo.localeCompare(b.tipo)
+      if (cmp !== 0) return cmp
+      return a.data.localeCompare(b.data)
+    })
 
     const totalGeral = rows.reduce((sum, row) => sum + row.total, 0)
 
@@ -944,8 +948,11 @@ export default function RelatorioRecebedoria() {
                       <TableHead className="h-8 py-3 print:text-black print:font-bold print:uppercase">
                         Tipo de Pagamento
                       </TableHead>
+                      <TableHead className="h-8 py-3 print:text-black print:font-bold print:uppercase">
+                        Data
+                      </TableHead>
                       <TableHead className="h-8 py-3 text-right print:text-black print:font-bold print:uppercase">
-                        Valor Total
+                        Valor
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -957,13 +964,16 @@ export default function RelatorioRecebedoria() {
                             <Skeleton className="h-4 w-32" />
                           </TableCell>
                           <TableCell className="py-3">
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell className="py-3">
                             <Skeleton className="h-4 w-24 ml-auto" />
                           </TableCell>
                         </TableRow>
                       ))
                     ) : consolidatedSummary.rows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={2} className="h-24 text-center py-8">
+                        <TableCell colSpan={3} className="h-24 text-center py-8">
                           <p className="text-sm text-slate-500 font-medium">
                             Nenhum registro encontrado.
                           </p>
@@ -978,6 +988,9 @@ export default function RelatorioRecebedoria() {
                           <TableCell className="py-3 font-medium text-sm print:text-black">
                             {item.tipo}
                           </TableCell>
+                          <TableCell className="py-3 font-medium text-sm print:text-black">
+                            {formatDateStringSafe(item.data)}
+                          </TableCell>
                           <TableCell className="py-3 text-sm text-right font-medium print:text-black">
                             {formatBRL(item.total)}
                           </TableCell>
@@ -988,8 +1001,11 @@ export default function RelatorioRecebedoria() {
                   {!loading && consolidatedSummary.rows.length > 0 && (
                     <tfoot className="bg-slate-50 dark:bg-slate-800/50 print:bg-transparent border-t-2 border-slate-300 print:border-slate-800">
                       <tr>
-                        <td className="p-3 font-bold text-sm text-slate-900 dark:text-slate-100 print:text-black uppercase">
-                          Total Geral
+                        <td
+                          colSpan={2}
+                          className="p-3 font-bold text-sm text-slate-900 dark:text-slate-100 print:text-black uppercase"
+                        >
+                          Valor Total
                         </td>
                         <td className="p-3 text-sm text-right font-bold text-indigo-700 dark:text-indigo-400 print:text-black double-underline">
                           {formatBRL(consolidatedSummary.totalGeral)}
