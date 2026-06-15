@@ -15,7 +15,13 @@ const buildFilterStr = (filters: any) => {
   let filterStr = []
 
   if (search) {
-    filterStr.push(`(nome~"${search}" || registro~"${search}")`)
+    const trimmed = search.trim()
+    const isNumeric = !isNaN(Number(trimmed)) && trimmed !== ''
+    if (isNumeric) {
+      filterStr.push(`(nome~"${search}" || registro~"${search}" || referencia=${trimmed})`)
+    } else {
+      filterStr.push(`(nome~"${search}" || registro~"${search}")`)
+    }
   }
   if (filial && filial !== 'Todas') {
     filterStr.push(`filial="${filial}"`)
