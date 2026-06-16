@@ -30,6 +30,7 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCcw,
+  Lock,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
@@ -52,6 +53,7 @@ export default function Camera() {
   const [fotoPredeterminada, setFotoPredeterminada] = useState<string | null>(null)
   const [fotoCapturada, setFotoCapturada] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [blockedDate, setBlockedDate] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -116,6 +118,39 @@ export default function Camera() {
     'RECOGNITION_FAILED',
     'CONFIRMING_PAYMENT',
   ].includes(viewState)
+
+  useEffect(() => {
+    if (colaborador) {
+      let maxBlockedFormatted: string | null = null
+      let maxLibTime = 0
+
+      const recordsToCheck =
+        colaborador.records && colaborador.records.length > 0 ? colaborador.records : [colaborador]
+
+      const startOfToday = new Date()
+      startOfToday.setHours(0, 0, 0, 0)
+
+      for (const rec of recordsToCheck) {
+        if (rec.data_liberacao) {
+          const libDate = new Date(rec.data_liberacao)
+          const startOfLibDate = new Date(
+            libDate.getFullYear(),
+            libDate.getMonth(),
+            libDate.getDate(),
+          )
+          if (startOfToday < startOfLibDate) {
+            if (startOfLibDate.getTime() > maxLibTime) {
+              maxLibTime = startOfLibDate.getTime()
+              maxBlockedFormatted = `${String(libDate.getDate()).padStart(2, '0')}/${String(libDate.getMonth() + 1).padStart(2, '0')}/${libDate.getFullYear()}`
+            }
+          }
+        }
+      }
+      setBlockedDate(maxBlockedFormatted)
+    } else {
+      setBlockedDate(null)
+    }
+  }, [colaborador])
 
   useEffect(() => {
     if (isCameraActive) {
@@ -815,24 +850,40 @@ export default function Camera() {
             </div>
           )}
 
-          <DialogFooter className="mt-4 shrink-0">
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              disabled={viewState === 'CONFIRMING_PAYMENT'}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleConfirmPayment} disabled={viewState === 'CONFIRMING_PAYMENT'}>
-              {viewState === 'CONFIRMING_PAYMENT' ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Confirmando...
-                </>
-              ) : (
-                'Confirmar'
-              )}
-            </Button>
+          <DialogFooter className="mt-4 shrink-0 w-full">
+            <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-4">
+              <div className="text-sm w-full sm:w-auto">
+                {blockedDate && (
+                  <span className="text-amber-600 dark:text-amber-500 text-xs sm:text-sm font-medium flex items-center justify-center sm:justify-start gap-1.5 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 rounded-md border border-amber-200 dark:border-amber-900/50">
+                    <Lock className="h-4 w-4 shrink-0" /> Pagamento bloqueado até {blockedDate}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto justify-end">
+                <Button
+                  variant="outline"
+                  onClick={handleReset}
+                  disabled={viewState === 'CONFIRMING_PAYMENT'}
+                  className="flex-1 sm:flex-none"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConfirmPayment}
+                  disabled={viewState === 'CONFIRMING_PAYMENT' || !!blockedDate}
+                  className="flex-1 sm:flex-none"
+                >
+                  {viewState === 'CONFIRMING_PAYMENT' ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Confirmando...
+                    </>
+                  ) : (
+                    'Confirmar'
+                  )}
+                </Button>
+              </div>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
