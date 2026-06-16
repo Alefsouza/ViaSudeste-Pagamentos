@@ -626,21 +626,21 @@ export default function Dashboard() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-8">
-        <Card className="lg:col-span-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-8 items-stretch">
+        <Card className="lg:col-span-2 flex flex-col h-full">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
             <DollarSign className="h-4 w-4 text-forest" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 flex flex-col">
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="space-y-1">
+              <div className="flex flex-col h-full space-y-1">
                 <div className="text-2xl font-bold transition-all duration-300">
                   {formatBRL(pagamentosTotals.pago)}
                 </div>
-                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-2 space-y-0.5 pt-1 border-t border-border/50">
+                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-auto space-y-0.5 pt-1 border-t border-border/50">
                   <span>VR: {formatBRL(pagamentosTotals.pagoVR)}</span>
                   <span>HE: {formatBRL(pagamentosTotals.pagoHE)}</span>
                   <span>FT: {formatBRL(pagamentosTotals.pagoFT)}</span>
@@ -649,20 +649,20 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 flex flex-col h-full">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Valor a Pagar</CardTitle>
             <AlertCircle className="h-4 w-4 text-amber-500" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 flex flex-col">
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="space-y-1">
+              <div className="flex flex-col h-full space-y-1">
                 <div className="text-2xl font-bold transition-all duration-300">
                   {formatBRL(pagamentosTotals.pendente)}
                 </div>
-                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-2 space-y-0.5 pt-1 border-t border-border/50">
+                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-auto space-y-0.5 pt-1 border-t border-border/50">
                   <span>VR: {formatBRL(pagamentosTotals.pendenteVR)}</span>
                   <span>HE: {formatBRL(pagamentosTotals.pendenteHE)}</span>
                   <span>FT: {formatBRL(pagamentosTotals.pendenteFT)}</span>
@@ -671,12 +671,12 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="flex flex-col h-full">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Qtd. Colaboradores</CardTitle>
             <Users className="h-4 w-4 text-forest" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
@@ -684,12 +684,12 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="flex flex-col h-full">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Maior Valor</CardTitle>
             <ArrowUp className="h-4 w-4 text-amber-500" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
@@ -699,12 +699,12 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="flex flex-col h-full">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Menor Valor</CardTitle>
             <ArrowDown className="h-4 w-4 text-rose-500" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
@@ -714,12 +714,12 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="flex flex-col h-full">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Média Paga</CardTitle>
             <TrendingUp className="h-4 w-4 text-purple-500" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
