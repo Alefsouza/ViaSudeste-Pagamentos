@@ -387,7 +387,7 @@ export default function Dashboard() {
   const refData = Object.entries(refDataMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([ref, total]) => ({
-      ref,
+      referenciaName: ref,
       total,
     }))
 
@@ -439,7 +439,7 @@ export default function Dashboard() {
               <Label>Buscar</Label>
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger asChild>
+                  <TooltipTrigger>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent>
@@ -732,7 +732,12 @@ export default function Dashboard() {
                   >
                     <BarChart data={refData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="ref" fontSize={12} tickLine={false} axisLine={false} />
+                      <XAxis
+                        dataKey="referenciaName"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                      />
                       <YAxis
                         fontSize={12}
                         tickLine={false}
@@ -745,9 +750,9 @@ export default function Dashboard() {
                         radius={[4, 4, 0, 0]}
                         fill="var(--color-total)"
                         onClick={(data) => {
-                          const ref = data?.ref || data?.payload?.ref
-                          if (ref) {
-                            setSelectedChartRef((prev) => (prev === ref ? null : ref))
+                          const refVal = data?.referenciaName || data?.payload?.referenciaName
+                          if (refVal) {
+                            setSelectedChartRef((prev) => (prev === refVal ? null : refVal))
                             setPage(1)
                           }
                         }}
@@ -759,7 +764,7 @@ export default function Dashboard() {
                             fill="var(--color-total)"
                             style={{
                               opacity: selectedChartRef
-                                ? selectedChartRef === entry.ref
+                                ? selectedChartRef === entry.referenciaName
                                   ? 1
                                   : 0.3
                                 : 1,
