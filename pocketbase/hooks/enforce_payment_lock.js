@@ -8,17 +8,19 @@ onRecordCreateRequest((e) => {
       const colab = $app.findRecordById('colaboradores', colabId)
       const dataLib = colab.getString('data_liberacao')
       if (dataLib) {
-        const releaseDate = new Date(dataLib)
-        const now = new Date()
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        const releaseDay = new Date(
-          releaseDate.getFullYear(),
-          releaseDate.getMonth(),
-          releaseDate.getDate(),
-        )
+        const lockDateParts = dataLib.split(' ')[0].split('-')
+        if (lockDateParts.length === 3) {
+          const lockYear = lockDateParts[0].length === 4 ? lockDateParts[0] : lockDateParts[2]
+          const lockMonth = lockDateParts[1]
+          const lockDay = lockDateParts[0].length === 4 ? lockDateParts[2] : lockDateParts[0]
 
-        if (releaseDay > today) {
-          throw new BadRequestError('Este pagamento está agendado e ainda não foi liberado.')
+          const releaseDay = new Date(Number(lockYear), Number(lockMonth) - 1, Number(lockDay))
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+
+          if (releaseDay > today) {
+            throw new BadRequestError('Este pagamento está agendado e ainda não foi liberado.')
+          }
         }
       }
     } catch (err) {
@@ -39,17 +41,19 @@ onRecordUpdateRequest((e) => {
       const colab = $app.findRecordById('colaboradores', colabId)
       const dataLib = colab.getString('data_liberacao')
       if (dataLib) {
-        const releaseDate = new Date(dataLib)
-        const now = new Date()
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        const releaseDay = new Date(
-          releaseDate.getFullYear(),
-          releaseDate.getMonth(),
-          releaseDate.getDate(),
-        )
+        const lockDateParts = dataLib.split(' ')[0].split('-')
+        if (lockDateParts.length === 3) {
+          const lockYear = lockDateParts[0].length === 4 ? lockDateParts[0] : lockDateParts[2]
+          const lockMonth = lockDateParts[1]
+          const lockDay = lockDateParts[0].length === 4 ? lockDateParts[2] : lockDateParts[0]
 
-        if (releaseDay > today) {
-          throw new BadRequestError('Este pagamento está agendado e ainda não foi liberado.')
+          const releaseDay = new Date(Number(lockYear), Number(lockMonth) - 1, Number(lockDay))
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+
+          if (releaseDay > today) {
+            throw new BadRequestError('Este pagamento está agendado e ainda não foi liberado.')
+          }
         }
       }
     } catch (err) {
@@ -66,17 +70,19 @@ onRecordUpdateRequest((e) => {
   if (body.liberado_pagamento === true || body.liberado_pagamento === 'true') {
     const dataLib = e.record.getString('data_liberacao')
     if (dataLib) {
-      const releaseDate = new Date(dataLib)
-      const now = new Date()
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      const releaseDay = new Date(
-        releaseDate.getFullYear(),
-        releaseDate.getMonth(),
-        releaseDate.getDate(),
-      )
+      const lockDateParts = dataLib.split(' ')[0].split('-')
+      if (lockDateParts.length === 3) {
+        const lockYear = lockDateParts[0].length === 4 ? lockDateParts[0] : lockDateParts[2]
+        const lockMonth = lockDateParts[1]
+        const lockDay = lockDateParts[0].length === 4 ? lockDateParts[2] : lockDateParts[0]
 
-      if (releaseDay > today) {
-        throw new BadRequestError('Não é possível liberar um pagamento agendado para o futuro.')
+        const releaseDay = new Date(Number(lockYear), Number(lockMonth) - 1, Number(lockDay))
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        if (releaseDay > today) {
+          throw new BadRequestError('Não é possível liberar um pagamento agendado para o futuro.')
+        }
       }
     }
   }

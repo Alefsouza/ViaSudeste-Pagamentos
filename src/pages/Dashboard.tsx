@@ -59,7 +59,7 @@ import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
-import { formatDataString, formatBRL, getTipoPagamento } from '@/lib/formatters'
+import { formatDataString, formatBRL, getTipoPagamento, checkIsLocked } from '@/lib/formatters'
 
 export default function Dashboard() {
   const { toast } = useToast()
@@ -1076,7 +1076,9 @@ export default function Dashboard() {
                                       {formatBRL(p.valor_a_receber || p.valor)}
                                     </TableCell>
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-                                    <TableCell>{p.data_pagamento || 'Pendente'}</TableCell>
+                                    <TableCell>
+                                      {formatDataString(p.data_pagamento) || 'Pendente'}
+                                    </TableCell>
                                     <TableCell>
                                       {(() => {
                                         const status =
@@ -1084,25 +1086,7 @@ export default function Dashboard() {
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
 
-                                        const startOfToday = new Date()
-                                        startOfToday.setHours(0, 0, 0, 0)
-                                        let isLocked = false
-                                        if (
-                                          p.data_liberacao &&
-                                          new Date(p.data_liberacao) > startOfToday
-                                        )
-                                          isLocked = true
-                                        if (
-                                          p.data_pagamento_v2 &&
-                                          new Date(p.data_pagamento_v2) > startOfToday
-                                        )
-                                          isLocked = true
-                                        if (
-                                          p.expand?.colaborador_id?.data_pagamento_v2 &&
-                                          new Date(p.expand.colaborador_id.data_pagamento_v2) >
-                                            startOfToday
-                                        )
-                                          isLocked = true
+                                        const isLocked = checkIsLocked(p)
 
                                         if (status === 'Confirmado')
                                           return (
@@ -1112,6 +1096,11 @@ export default function Dashboard() {
                                           )
                                         if (status === 'Pendente') {
                                           if (isLocked) {
+                                            const lockDate =
+                                              p.data_liberacao ||
+                                              p.data_pagamento_v2 ||
+                                              p.expand?.colaborador_id?.data_pagamento_v2 ||
+                                              p.data_pagamento
                                             return (
                                               <TooltipProvider>
                                                 <Tooltip>
@@ -1122,22 +1111,7 @@ export default function Dashboard() {
                                                     </Badge>
                                                   </TooltipTrigger>
                                                   <TooltipContent>
-                                                    <p>
-                                                      Liberado em:{' '}
-                                                      {p.data_liberacao
-                                                        ? new Date(
-                                                            p.data_liberacao,
-                                                          ).toLocaleDateString('pt-BR')
-                                                        : p.data_pagamento_v2 ||
-                                                            p.expand?.colaborador_id
-                                                              ?.data_pagamento_v2
-                                                          ? new Date(
-                                                              p.data_pagamento_v2 ||
-                                                                p.expand?.colaborador_id
-                                                                  ?.data_pagamento_v2,
-                                                            ).toLocaleDateString('pt-BR')
-                                                          : ''}
-                                                    </p>
+                                                    <p>Liberado em: {formatDataString(lockDate)}</p>
                                                   </TooltipContent>
                                                 </Tooltip>
                                               </TooltipProvider>
@@ -1155,7 +1129,7 @@ export default function Dashboard() {
                                       })()}
                                     </TableCell>
                                     <TableCell className="text-center">
-                                      {p.foto_confirmacao_url && (
+                                      {p.foto_confirmacao_url ? (
                                         <Button
                                           variant="ghost"
                                           size="sm"
@@ -1166,6 +1140,22 @@ export default function Dashboard() {
                                           <ImageIcon className="w-4 h-4 mr-2" />
                                           Visualizar
                                         </Button>
+                                      ) : (
+                                        (() => {
+                                          const isLocked = checkIsLocked(p)
+                                          const status = p.status || 'Pendente'
+                                          if (!isLocked && status === 'Pendente') {
+                                            return (
+                                              <Badge
+                                                variant="outline"
+                                                className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400"
+                                              >
+                                                Foto Pendente
+                                              </Badge>
+                                            )
+                                          }
+                                          return null
+                                        })()
                                       )}
                                     </TableCell>
                                     {isAlcimara && (
@@ -1178,25 +1168,7 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const startOfToday = new Date()
-                                          startOfToday.setHours(0, 0, 0, 0)
-                                          let isLocked = false
-                                          if (
-                                            p.data_liberacao &&
-                                            new Date(p.data_liberacao) > startOfToday
-                                          )
-                                            isLocked = true
-                                          if (
-                                            p.data_pagamento_v2 &&
-                                            new Date(p.data_pagamento_v2) > startOfToday
-                                          )
-                                            isLocked = true
-                                          if (
-                                            p.expand?.colaborador_id?.data_pagamento_v2 &&
-                                            new Date(p.expand.colaborador_id.data_pagamento_v2) >
-                                              startOfToday
-                                          )
-                                            isLocked = true
+                                          const isLocked = checkIsLocked(p)
 
                                           return (
                                             <div className="flex justify-center gap-1">
@@ -1296,7 +1268,7 @@ export default function Dashboard() {
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
                                     <span>Data de Pagamento:</span>
-                                    <span>{p.data_pagamento || 'Pendente'}</span>
+                                    <span>{formatDataString(p.data_pagamento) || 'Pendente'}</span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
                                     <div>
@@ -1306,25 +1278,7 @@ export default function Dashboard() {
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
 
-                                        const startOfToday = new Date()
-                                        startOfToday.setHours(0, 0, 0, 0)
-                                        let isLocked = false
-                                        if (
-                                          p.data_liberacao &&
-                                          new Date(p.data_liberacao) > startOfToday
-                                        )
-                                          isLocked = true
-                                        if (
-                                          p.data_pagamento_v2 &&
-                                          new Date(p.data_pagamento_v2) > startOfToday
-                                        )
-                                          isLocked = true
-                                        if (
-                                          p.expand?.colaborador_id?.data_pagamento_v2 &&
-                                          new Date(p.expand.colaborador_id.data_pagamento_v2) >
-                                            startOfToday
-                                        )
-                                          isLocked = true
+                                        const isLocked = checkIsLocked(p)
 
                                         if (status === 'Confirmado')
                                           return (
@@ -1334,6 +1288,11 @@ export default function Dashboard() {
                                           )
                                         if (status === 'Pendente') {
                                           if (isLocked) {
+                                            const lockDate =
+                                              p.data_liberacao ||
+                                              p.data_pagamento_v2 ||
+                                              p.expand?.colaborador_id?.data_pagamento_v2 ||
+                                              p.data_pagamento
                                             return (
                                               <TooltipProvider>
                                                 <Tooltip>
@@ -1344,22 +1303,7 @@ export default function Dashboard() {
                                                     </Badge>
                                                   </TooltipTrigger>
                                                   <TooltipContent>
-                                                    <p>
-                                                      Liberado em:{' '}
-                                                      {p.data_liberacao
-                                                        ? new Date(
-                                                            p.data_liberacao,
-                                                          ).toLocaleDateString('pt-BR')
-                                                        : p.data_pagamento_v2 ||
-                                                            p.expand?.colaborador_id
-                                                              ?.data_pagamento_v2
-                                                          ? new Date(
-                                                              p.data_pagamento_v2 ||
-                                                                p.expand?.colaborador_id
-                                                                  ?.data_pagamento_v2,
-                                                            ).toLocaleDateString('pt-BR')
-                                                          : ''}
-                                                    </p>
+                                                    <p>Liberado em: {formatDataString(lockDate)}</p>
                                                   </TooltipContent>
                                                 </Tooltip>
                                               </TooltipProvider>
@@ -1377,7 +1321,7 @@ export default function Dashboard() {
                                       })()}
                                     </div>
                                     <div className="flex gap-2">
-                                      {p.foto_confirmacao_url && (
+                                      {p.foto_confirmacao_url ? (
                                         <Button
                                           variant="outline"
                                           size="sm"
@@ -1388,6 +1332,22 @@ export default function Dashboard() {
                                           <ImageIcon className="w-4 h-4 mr-2" />
                                           Foto
                                         </Button>
+                                      ) : (
+                                        (() => {
+                                          const isLocked = checkIsLocked(p)
+                                          const status = p.status || 'Pendente'
+                                          if (!isLocked && status === 'Pendente') {
+                                            return (
+                                              <Badge
+                                                variant="outline"
+                                                className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 self-center"
+                                              >
+                                                Foto Pendente
+                                              </Badge>
+                                            )
+                                          }
+                                          return null
+                                        })()
                                       )}
                                       {isAlcimara &&
                                         (() => {
@@ -1398,25 +1358,7 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const startOfToday = new Date()
-                                          startOfToday.setHours(0, 0, 0, 0)
-                                          let isLocked = false
-                                          if (
-                                            p.data_liberacao &&
-                                            new Date(p.data_liberacao) > startOfToday
-                                          )
-                                            isLocked = true
-                                          if (
-                                            p.data_pagamento_v2 &&
-                                            new Date(p.data_pagamento_v2) > startOfToday
-                                          )
-                                            isLocked = true
-                                          if (
-                                            p.expand?.colaborador_id?.data_pagamento_v2 &&
-                                            new Date(p.expand.colaborador_id.data_pagamento_v2) >
-                                              startOfToday
-                                          )
-                                            isLocked = true
+                                          const isLocked = checkIsLocked(p)
 
                                           return (
                                             <>
@@ -1560,7 +1502,7 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Data de Pagamento:</span>
-                <span>{paymentToCancel?.data_pagamento || 'Pendente'}</span>
+                <span>{formatDataString(paymentToCancel?.data_pagamento) || 'Pendente'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Filial:</span>
