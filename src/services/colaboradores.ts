@@ -142,7 +142,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
   )
 
   if (validRecords.length === 0) {
-    throw new Error('Pagamento bloqueado: Referência expirada. Requer liberação manual.')
+    throw new Error('Não há valor pendente')
   }
 
   const totalValor = validRecords.reduce((acc, curr) => {

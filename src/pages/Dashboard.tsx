@@ -24,8 +24,10 @@ import {
   FilterX,
   Trash2,
   Unlock,
+  Lock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -54,7 +56,6 @@ export default function Dashboard() {
   const isAlcimara = user?.email === 'alcimara.cabral@viasudeste.com'
 
   const [paymentToCancel, setPaymentToCancel] = useState<any>(null)
-  const [paymentToRelease, setPaymentToRelease] = useState<any>(null)
   const [maxRef, setMaxRef] = useState<number>(0)
   const [filters, setFilters] = useState({
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -163,16 +164,17 @@ export default function Dashboard() {
     loadMaxRef()
   }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
 
-  const handleReleasePayment = async () => {
-    if (!paymentToRelease) return
+  const handleToggleRelease = async (payment: any) => {
     try {
-      await pb.collection('colaboradores').update(paymentToRelease.id, { liberado_pagamento: true })
-      toast({ title: 'Pagamento liberado com sucesso.' })
-      setPaymentToRelease(null)
+      const newStatus = !payment.liberado_pagamento
+      await pb.collection('colaboradores').update(payment.id, { liberado_pagamento: newStatus })
+      toast({
+        title: newStatus ? 'Pagamento liberado com sucesso.' : 'Pagamento bloqueado com sucesso.',
+      })
       refreshAll()
     } catch (err: any) {
       toast({
-        title: 'Erro ao liberar o pagamento. Tente novamente.',
+        title: 'Erro ao alterar o status do pagamento. Tente novamente.',
         variant: 'destructive',
       })
     }
@@ -843,10 +845,7 @@ export default function Dashboard() {
                                             (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
 
                                           const isOutsideValidity =
-                                            p.referencia &&
-                                            maxRef > 0 &&
-                                            p.referencia < maxRef - 3 &&
-                                            !p.liberado_pagamento
+                                            p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
                                           return (
                                             <div className="flex justify-center gap-1">
@@ -854,11 +853,24 @@ export default function Dashboard() {
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"
-                                                  className="text-amber-500 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50"
-                                                  onClick={() => setPaymentToRelease(p)}
-                                                  title="Liberar Pagamento"
+                                                  className={cn(
+                                                    'hover:bg-amber-100 dark:hover:bg-amber-900/50',
+                                                    p.liberado_pagamento
+                                                      ? 'text-emerald-500 hover:text-emerald-700'
+                                                      : 'text-amber-500 hover:text-amber-700',
+                                                  )}
+                                                  onClick={() => handleToggleRelease(p)}
+                                                  title={
+                                                    p.liberado_pagamento
+                                                      ? 'Bloquear Pagamento'
+                                                      : 'Liberar Pagamento'
+                                                  }
                                                 >
-                                                  <Unlock className="h-4 w-4" />
+                                                  {p.liberado_pagamento ? (
+                                                    <Lock className="h-4 w-4" />
+                                                  ) : (
+                                                    <Unlock className="h-4 w-4" />
+                                                  )}
                                                 </Button>
                                               )}
                                               {status === 'Pendente' && (
@@ -979,10 +991,7 @@ export default function Dashboard() {
                                             (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
 
                                           const isOutsideValidity =
-                                            p.referencia &&
-                                            maxRef > 0 &&
-                                            p.referencia < maxRef - 3 &&
-                                            !p.liberado_pagamento
+                                            p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
                                           return (
                                             <>
@@ -990,12 +999,25 @@ export default function Dashboard() {
                                                 <Button
                                                   variant="ghost"
                                                   size="sm"
-                                                  className="text-amber-500 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2"
-                                                  onClick={() => setPaymentToRelease(p)}
-                                                  title="Liberar Pagamento"
+                                                  className={cn(
+                                                    'px-2 hover:bg-amber-100 dark:hover:bg-amber-900/50',
+                                                    p.liberado_pagamento
+                                                      ? 'text-emerald-500 hover:text-emerald-700'
+                                                      : 'text-amber-500 hover:text-amber-700',
+                                                  )}
+                                                  onClick={() => handleToggleRelease(p)}
+                                                  title={
+                                                    p.liberado_pagamento
+                                                      ? 'Bloquear Pagamento'
+                                                      : 'Liberar Pagamento'
+                                                  }
                                                 >
-                                                  <Unlock className="h-4 w-4 mr-2" />
-                                                  Liberar
+                                                  {p.liberado_pagamento ? (
+                                                    <Lock className="h-4 w-4 mr-2" />
+                                                  ) : (
+                                                    <Unlock className="h-4 w-4 mr-2" />
+                                                  )}
+                                                  {p.liberado_pagamento ? 'Bloquear' : 'Liberar'}
                                                 </Button>
                                               )}
                                               {status === 'Pendente' && (
@@ -1076,64 +1098,6 @@ export default function Dashboard() {
                 className="max-w-full max-h-[70vh] object-contain rounded-md shadow-sm"
               />
             )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!paymentToRelease} onOpenChange={(open) => !open && setPaymentToRelease(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Liberar Pagamento</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p>
-              Este pagamento está fora da janela de validade (mais antigo que as 4 últimas
-              importações). Deseja liberá-lo manualmente?
-            </p>
-            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md space-y-2 text-sm border">
-              <div className="flex justify-between">
-                <span className="font-semibold text-muted-foreground">Colaborador:</span>
-                <span>
-                  {paymentToRelease?.nome ||
-                    paymentToRelease?.expand?.colaborador_id?.nome ||
-                    'Desconhecido'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold text-muted-foreground">Registro:</span>
-                <span>
-                  {paymentToRelease?.registro || paymentToRelease?.expand?.colaborador_id?.registro}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold text-muted-foreground">Valor:</span>
-                <span className="text-forest font-medium">
-                  {paymentToRelease
-                    ? formatBRL(
-                        paymentToRelease.valor_pago ||
-                          paymentToRelease.valor_a_receber ||
-                          paymentToRelease.valor ||
-                          0,
-                      )
-                    : ''}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold text-muted-foreground">Referência:</span>
-                <span>{paymentToRelease?.referencia}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setPaymentToRelease(null)}>
-              Cancelar
-            </Button>
-            <Button
-              className="bg-amber-500 hover:bg-amber-600 text-white"
-              onClick={handleReleasePayment}
-            >
-              Confirmar Liberação
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
