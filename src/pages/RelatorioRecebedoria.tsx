@@ -84,6 +84,7 @@ export default function RelatorioRecebedoria() {
   const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
   const [filiaisOptions, setFiliaisOptions] = useState<{ label: string; value: string }[]>([])
   const [tiposPagamento, setTiposPagamento] = useState<string[]>([])
+  const [top4Referencias, setTop4Referencias] = useState<number[]>([])
 
   useEffect(() => {
     async function fetchFilterOptions() {
@@ -115,6 +116,16 @@ export default function RelatorioRecebedoria() {
           new Set(pagamentosRes.map((p: any) => p.tipo_pagamento).filter(Boolean)),
         )
         setTiposPagamento(uniqueTipos as string[])
+
+        const refsRes = await pb.collection('colaboradores').getFullList({
+          fields: 'referencia',
+          filter: 'referencia > 0',
+        })
+        const refs = refsRes.map((i: any) => i.referencia).filter((r: any) => r != null && r > 0)
+        const uniqueRefs = Array.from(new Set(refs))
+          .sort((a, b) => b - a)
+          .slice(0, 4)
+        setTop4Referencias(uniqueRefs)
 
         const uniqueFiliais = Array.from(
           new Set(
@@ -339,6 +350,16 @@ export default function RelatorioRecebedoria() {
       total: number
     }[]
   }, [summaryData])
+
+  const fora4RefData = React.useMemo(() => {
+    if (top4Referencias.length === 0) return []
+    const minTop4 = Math.min(...top4Referencias)
+    return summaryData.filter((item: any) => {
+      const ref = item.expand?.colaborador_id?.referencia || item.referencia
+      if (!ref) return false
+      return ref < minTop4
+    })
+  }, [summaryData, top4Referencias])
 
   // Consolidated Summary grouped by Payment Type and Date
   const consolidatedSummary = React.useMemo(() => {
@@ -649,9 +670,17 @@ export default function RelatorioRecebedoria() {
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4 w-full sm:w-auto grid grid-cols-2 print:hidden">
+          <TabsList
+            className={cn(
+              'mb-4 w-full sm:w-auto grid print:hidden',
+              user?.role === 'Administrador' ? 'grid-cols-3' : 'grid-cols-2',
+            )}
+          >
             <TabsTrigger value="detalhado">Relatório Detalhado</TabsTrigger>
             <TabsTrigger value="resumido">Relatório Resumido</TabsTrigger>
+            {user?.role === 'Administrador' && (
+              <TabsTrigger value="fora-4-ref">Fora das 4 Últimas Ref.</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="detalhado" className="mt-0 space-y-6">
@@ -996,6 +1025,106 @@ export default function RelatorioRecebedoria() {
               </div>
             )}
           </TabsContent>
+
+          {user?.role === 'Administrador' && (
+            <TabsContent value="fora-4-ref" className="mt-0 space-y-6">
+              <div className="print:hidden">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+                  Pagamentos Fora das 4 Últimas Referências
+                </h3>
+                {top4Referencias.length > 0 && (
+                  <p className="text-sm text-slate-500 mb-4">
+                    Mostrando pagamentos com referência menor que {Math.min(...top4Referencias)}{' '}
+                    (Top 4: {top4Referencias.join(', ')}).
+                  </p>
+                )}
+                <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+                  <Table>
+                    <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
+                      <TableRow>
+                        <TableHead>Registro</TableHead>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Dt. Ref</TableHead>
+                        <TableHead>Ref</TableHead>
+                        <TableHead>Tipo de Pagamento</TableHead>
+                        <TableHead className="text-left">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loading ? (
+                        [...Array(5)].map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell>
+                              <Skeleton className="h-4 w-20" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-40" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-24" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-16" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-32" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-24" />
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : fora4RefData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="h-32 text-center py-8">
+                            <SearchX className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                            <p className="text-sm text-slate-500 font-medium">
+                              Nenhum registro encontrado fora das 4 últimas referências.
+                            </p>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        fora4RefData.map((item: any, idx: number) => (
+                          <TableRow
+                            key={idx}
+                            className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
+                          >
+                            <TableCell className="font-medium">
+                              {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'}
+                            </TableCell>
+                            <TableCell>
+                              {formatDateStringSafe(
+                                item.expand?.colaborador_id?.data ||
+                                  item.expand?.colaborador_id?.periodo_fim,
+                              ) || '-'}
+                            </TableCell>
+                            <TableCell>
+                              {item.expand?.colaborador_id?.referencia || item.referencia || '-'}
+                            </TableCell>
+                            <TableCell>
+                              {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento || 'Outros'}
+                            </TableCell>
+                            <TableCell className="text-left font-medium text-emerald-600 dark:text-emerald-400">
+                              {formatBRL(
+                                item.expand?.colaborador_id?.valor_a_receber ||
+                                  item.valor_pago ||
+                                  item.valor_a_receber ||
+                                  item.valor ||
+                                  0,
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </TabsContent>
+          )}
 
           <TabsContent value="resumido" className="mt-0 space-y-8">
             <div className="print:hidden">
