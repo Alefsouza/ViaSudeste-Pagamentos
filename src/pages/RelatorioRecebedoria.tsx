@@ -75,6 +75,7 @@ export default function RelatorioRecebedoria() {
   const [usuarioFilter, setUsuarioFilter] = useState('Todos')
   const [garagemFilter, setGaragemFilter] = useState('Todos')
   const [tipoPagamentoFilter, setTipoPagamentoFilter] = useState('Todos')
+  const [referenciaFilter, setReferenciaFilter] = useState('Todos')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
@@ -84,6 +85,7 @@ export default function RelatorioRecebedoria() {
   const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
   const [filiaisOptions, setFiliaisOptions] = useState<{ label: string; value: string }[]>([])
   const [tiposPagamento, setTiposPagamento] = useState<string[]>([])
+  const [todasReferencias, setTodasReferencias] = useState<number[]>([])
   const [top4Referencias, setTop4Referencias] = useState<number[]>([])
 
   useEffect(() => {
@@ -122,10 +124,9 @@ export default function RelatorioRecebedoria() {
           filter: 'referencia > 0',
         })
         const refs = refsRes.map((i: any) => i.referencia).filter((r: any) => r != null && r > 0)
-        const uniqueRefs = Array.from(new Set(refs))
-          .sort((a, b) => b - a)
-          .slice(0, 4)
-        setTop4Referencias(uniqueRefs)
+        const allUniqueRefs = Array.from(new Set(refs)).sort((a: any, b: any) => b - a) as number[]
+        setTodasReferencias(allUniqueRefs)
+        setTop4Referencias(allUniqueRefs.slice(0, 4))
 
         const uniqueFiliais = Array.from(
           new Set(
@@ -215,6 +216,10 @@ export default function RelatorioRecebedoria() {
         conditions.push(`tipo_pagamento = "${tipoPagamentoFilter}"`)
       }
 
+      if (referenciaFilter && referenciaFilter !== 'Todos') {
+        conditions.push(`colaborador_id.referencia = ${referenciaFilter}`)
+      }
+
       const filterString = conditions.length > 0 ? conditions.join(' && ') : ''
 
       const fullRes = await pb.collection('pagamentos').getFullList({
@@ -255,6 +260,7 @@ export default function RelatorioRecebedoria() {
     usuarioFilter,
     garagemFilter,
     tipoPagamentoFilter,
+    referenciaFilter,
     allUsers.length,
     filiaisOptions.length,
   ])
@@ -273,6 +279,7 @@ export default function RelatorioRecebedoria() {
     setUsuarioFilter('Todos')
     setGaragemFilter('Todos')
     setTipoPagamentoFilter('Todos')
+    setReferenciaFilter('Todos')
     setSearchTerm('')
     setStartTime('')
     setEndTime('')
@@ -353,11 +360,10 @@ export default function RelatorioRecebedoria() {
 
   const fora4RefData = React.useMemo(() => {
     if (top4Referencias.length === 0) return []
-    const minTop4 = Math.min(...top4Referencias)
     return summaryData.filter((item: any) => {
       const ref = item.expand?.colaborador_id?.referencia || item.referencia
       if (!ref) return false
-      return ref < minTop4
+      return !top4Referencias.includes(ref)
     })
   }, [summaryData, top4Referencias])
 
@@ -639,6 +645,23 @@ export default function RelatorioRecebedoria() {
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label>Referência</Label>
+            <Select value={referenciaFilter} onValueChange={setReferenciaFilter}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todos">Todas</SelectItem>
+                {todasReferencias.map((r) => (
+                  <SelectItem key={r} value={String(r)}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex flex-col gap-2">
             <div className="hidden sm:block h-5"></div>
             <Button
@@ -679,7 +702,7 @@ export default function RelatorioRecebedoria() {
             <TabsTrigger value="detalhado">Relatório Detalhado</TabsTrigger>
             <TabsTrigger value="resumido">Relatório Resumido</TabsTrigger>
             {user?.role === 'Administrador' && (
-              <TabsTrigger value="fora-4-ref">Fora das 4 Últimas Ref.</TabsTrigger>
+              <TabsTrigger value="fora-4-ref">Relatório Pag. Pendentes</TabsTrigger>
             )}
           </TabsList>
 
@@ -1030,14 +1053,8 @@ export default function RelatorioRecebedoria() {
             <TabsContent value="fora-4-ref" className="mt-0 space-y-6">
               <div className="print:hidden">
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                  Pagamentos Fora das 4 Últimas Referências
+                  Relatório Pag. Pendentes
                 </h3>
-                {top4Referencias.length > 0 && (
-                  <p className="text-sm text-slate-500 mb-4">
-                    Mostrando pagamentos com referência menor que {Math.min(...top4Referencias)}{' '}
-                    (Top 4: {top4Referencias.join(', ')}).
-                  </p>
-                )}
                 <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
                   <Table>
                     <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
@@ -1079,7 +1096,7 @@ export default function RelatorioRecebedoria() {
                           <TableCell colSpan={6} className="h-32 text-center py-8">
                             <SearchX className="mx-auto h-8 w-8 text-slate-300 mb-2" />
                             <p className="text-sm text-slate-500 font-medium">
-                              Nenhum registro encontrado fora das 4 últimas referências.
+                              Nenhum registro encontrado.
                             </p>
                           </TableCell>
                         </TableRow>
@@ -1098,6 +1115,7 @@ export default function RelatorioRecebedoria() {
                             <TableCell>
                               {formatDateStringSafe(
                                 item.expand?.colaborador_id?.data ||
+                                  item.expand?.colaborador_id?.periodo_inicio ||
                                   item.expand?.colaborador_id?.periodo_fim,
                               ) || '-'}
                             </TableCell>
