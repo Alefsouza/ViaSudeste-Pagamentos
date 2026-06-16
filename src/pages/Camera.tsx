@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
+import { useRealtime } from '@/hooks/use-realtime'
 import { cn } from '@/lib/utils'
 
 type ViewState =
@@ -61,6 +62,28 @@ export default function Camera() {
 
   const { toast } = useToast()
   const { user } = useAuth()
+
+  const fetchColaboradorBackground = useCallback(async () => {
+    if (!registro || viewState === 'CONFIRMING_PAYMENT' || viewState === 'PROCESSING') return
+    try {
+      const result = await getColaboradorByRegistro(registro)
+      if (result && result.colab) {
+        setColaborador(result.colab)
+      } else {
+        setColaborador(null)
+        setViewState('EMPTY')
+      }
+    } catch {
+      setColaborador(null)
+      setViewState('EMPTY')
+    }
+  }, [registro, viewState])
+
+  useRealtime('colaboradores', (e) => {
+    if (colaborador && e.record.registro === colaborador.registro) {
+      fetchColaboradorBackground()
+    }
+  })
 
   const sortedRecords = useMemo(() => {
     if (!colaborador) return []
@@ -100,38 +123,31 @@ export default function Camera() {
       const val = rec.valor_a_receber || rec.valor || 0
       if (val <= 0) return false
 
-      let isDue = false
-
       if (rec.liberado_pagamento === true || rec.liberado_pagamento === 'true') {
-        isDue = true
-      }
-      if (rec.status === 'Pendente' || rec.status === 'pendente') {
-        isDue = true
+        return true
       }
 
-      if (rec.data_pagamento_v2) {
-        const v2Date = new Date(rec.data_pagamento_v2)
-        const startOfV2Date = new Date(v2Date.getFullYear(), v2Date.getMonth(), v2Date.getDate())
-        if (startOfV2Date <= startOfToday) {
-          isDue = true
-        } else {
-          isDue = false
-        }
-      } else if (rec.data_liberacao) {
+      if (rec.data_liberacao) {
         const libDate = new Date(rec.data_liberacao)
         const startOfLibDate = new Date(
           libDate.getFullYear(),
           libDate.getMonth(),
           libDate.getDate(),
         )
-        if (startOfLibDate <= startOfToday) {
-          isDue = true
-        } else {
-          isDue = false
+        if (startOfLibDate > startOfToday) {
+          return false
         }
       }
 
-      return isDue
+      if (rec.data_pagamento_v2) {
+        const v2Date = new Date(rec.data_pagamento_v2)
+        const startOfV2Date = new Date(v2Date.getFullYear(), v2Date.getMonth(), v2Date.getDate())
+        if (startOfV2Date > startOfToday) {
+          return false
+        }
+      }
+
+      return true
     })
   }, [sortedRecords])
 
