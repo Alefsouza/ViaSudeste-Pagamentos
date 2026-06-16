@@ -793,8 +793,7 @@ export default function Camera() {
                 Não há pagamentos liberados
               </h3>
               <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
-                Não há pagamentos liberados para este colaborador hoje. Os pagamentos agendados para
-                o futuro não estão disponíveis para processamento no momento.
+                Não há pagamentos disponíveis para processamento no momento.
               </p>
             </div>
           )}
@@ -904,15 +903,7 @@ export default function Camera() {
 
           <DialogFooter className="mt-4 shrink-0 w-full">
             <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-4">
-              <div className="text-sm w-full sm:w-auto">
-                {sortedRecords.length > visibleRecords.length && visibleRecords.length > 0 && (
-                  <span className="text-amber-600 dark:text-amber-500 text-xs sm:text-sm font-medium flex items-center justify-center sm:justify-start gap-1.5 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 rounded-md border border-amber-200 dark:border-amber-900/50">
-                    <Lock className="h-4 w-4 shrink-0" />{' '}
-                    {sortedRecords.length - visibleRecords.length} pagamento(s) agendado(s)
-                    ocultado(s)
-                  </span>
-                )}
-              </div>
+              <div className="text-sm w-full sm:w-auto"></div>
               <div className="flex gap-2 w-full sm:w-auto justify-end">
                 <Button
                   variant="outline"
