@@ -883,17 +883,20 @@ export default function Dashboard() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
-                            const totalLines = filteredStatsData.filter(
-                              (c) =>
-                                (c.nome ||
-                                  c.expand?.colaborador_id?.nome ||
-                                  c.expand?.user_id?.name ||
-                                  'Desconhecido') === nome,
-                            ).length
-                            return (
-                              <React.Fragment key={nome}>
-                                <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          Object.entries(groupedByName).flatMap(
+                            ([nome, records]: [string, any]) => {
+                              const totalLines = filteredStatsData.filter(
+                                (c) =>
+                                  (c.nome ||
+                                    c.expand?.colaborador_id?.nome ||
+                                    c.expand?.user_id?.name ||
+                                    'Desconhecido') === nome,
+                              ).length
+                              return [
+                                <TableRow
+                                  key={`header-${nome}`}
+                                  className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                                >
                                   <TableCell
                                     colSpan={isAlcimara ? 10 : 9}
                                     className="font-semibold text-slate-700 dark:text-slate-300"
@@ -903,8 +906,8 @@ export default function Dashboard() {
                                       ? 'linha de pagamento'
                                       : 'linhas de pagamento'}
                                   </TableCell>
-                                </TableRow>
-                                {records.map((p: any) => (
+                                </TableRow>,
+                                ...records.map((p: any) => (
                                   <TableRow key={p.id}>
                                     <TableCell className="font-medium pl-8">
                                       {p.nome || p.expand?.colaborador_id?.nome || 'Desconhecido'}
@@ -1013,10 +1016,10 @@ export default function Dashboard() {
                                       </TableCell>
                                     )}
                                   </TableRow>
-                                ))}
-                              </React.Fragment>
-                            )
-                          })
+                                )),
+                              ]
+                            },
+                          )
                         )}
                       </TableBody>
                     </Table>
