@@ -94,6 +94,7 @@ export default function Dashboard() {
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
   const [selectedChartDate, setSelectedChartDate] = useState<string | null>(null)
   const [selectedChartRef, setSelectedChartRef] = useState<string | null>(null)
+  const [chartRefSearch, setChartRefSearch] = useState('')
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -174,13 +175,27 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadTable()
-  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate, selectedChartRef])
+  }, [
+    debouncedFilters,
+    page,
+    selectedChartFilial,
+    selectedChartDate,
+    selectedChartRef,
+    chartRefSearch,
+  ])
 
   const refreshAll = useCallback(() => {
     loadStats()
     loadTable()
     loadMaxRef()
-  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate, selectedChartRef])
+  }, [
+    debouncedFilters,
+    page,
+    selectedChartFilial,
+    selectedChartDate,
+    selectedChartRef,
+    chartRefSearch,
+  ])
 
   const handleToggleRelease = async (payment: any) => {
     try {
@@ -262,6 +277,11 @@ export default function Dashboard() {
       if (selectedChartRef) {
         const cRef = curr.referencia ? String(curr.referencia) : 'N/A'
         if (cRef !== selectedChartRef) return false
+      }
+
+      if (chartRefSearch) {
+        const cRef = curr.referencia ? String(curr.referencia) : 'N/A'
+        if (!cRef.toLowerCase().includes(chartRefSearch.toLowerCase())) return false
       }
 
       if (selectedChartDate) {
@@ -378,6 +398,9 @@ export default function Dashboard() {
   const refDataMap = statsData.reduce(
     (acc, curr) => {
       const ref = curr.referencia ? String(curr.referencia) : 'N/A'
+      if (chartRefSearch && !ref.toLowerCase().includes(chartRefSearch.toLowerCase())) {
+        return acc
+      }
       acc[ref] = (acc[ref] || 0) + (curr.valor_a_receber || curr.valor || 0)
       return acc
     },
@@ -413,7 +436,7 @@ export default function Dashboard() {
             Analise a distribuição de pagamentos e monitore as filiais.
           </p>
         </div>
-        {(selectedChartFilial || selectedChartDate || selectedChartRef) && (
+        {(selectedChartFilial || selectedChartDate || selectedChartRef || chartRefSearch) && (
           <Button
             variant="outline"
             size="sm"
@@ -421,6 +444,7 @@ export default function Dashboard() {
               setSelectedChartFilial(null)
               setSelectedChartDate(null)
               setSelectedChartRef(null)
+              setChartRefSearch('')
               setPage(1)
             }}
             className="animate-fade-in text-muted-foreground"
@@ -719,15 +743,24 @@ export default function Dashboard() {
             </Card>
 
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle>Distribuição por Referência</CardTitle>
+                <div className="relative w-32 md:w-40">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar ref..."
+                    className="pl-8 h-9 text-sm"
+                    value={chartRefSearch}
+                    onChange={(e) => setChartRefSearch(e.target.value)}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 {statsLoading ? (
                   <Skeleton className="h-[300px] w-full" />
                 ) : (
                   <ChartContainer
-                    config={{ total: { label: 'Total', color: 'hsl(var(--chart-3))' } }}
+                    config={{ total: { label: 'Total', color: '#22c55e' } }}
                     className="h-[300px] w-full"
                   >
                     <BarChart data={refData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -839,7 +872,10 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle>
                 Transações de Pagamentos
-                {(selectedChartFilial || selectedChartDate || selectedChartRef) && (
+                {(selectedChartFilial ||
+                  selectedChartDate ||
+                  selectedChartRef ||
+                  chartRefSearch) && (
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
                     (Filtro de gráfico ativo)
                   </span>
