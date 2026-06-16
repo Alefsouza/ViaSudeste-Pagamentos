@@ -1,8 +1,9 @@
 onRecordCreateRequest((e) => {
   const body = e.requestInfo().body || {}
   const colabId = body.colaborador_id || e.record.getString('colaborador_id')
+  const status = body.status || e.record.getString('status')
 
-  if (colabId) {
+  if (colabId && status === 'Confirmado') {
     try {
       const colab = $app.findRecordById('colaboradores', colabId)
       const dataLib = colab.getString('data_liberacao')
@@ -31,8 +32,9 @@ onRecordCreateRequest((e) => {
 onRecordUpdateRequest((e) => {
   const body = e.requestInfo().body || {}
   const colabId = e.record.getString('colaborador_id')
+  const status = body.status || e.record.getString('status')
 
-  if (colabId && body.status !== 'Cancelado') {
+  if (colabId && status === 'Confirmado') {
     try {
       const colab = $app.findRecordById('colaboradores', colabId)
       const dataLib = colab.getString('data_liberacao')

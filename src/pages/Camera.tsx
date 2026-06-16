@@ -89,6 +89,28 @@ export default function Camera() {
     })
   }, [colaborador])
 
+  const visibleRecords = useMemo(() => {
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+
+    return sortedRecords.filter((rec: any) => {
+      if (rec.status === 'Agendado' || rec.status === 'agendado') return false
+
+      if (rec.data_liberacao) {
+        const libDate = new Date(rec.data_liberacao)
+        const startOfLibDate = new Date(
+          libDate.getFullYear(),
+          libDate.getMonth(),
+          libDate.getDate(),
+        )
+        if (startOfLibDate > startOfToday) {
+          return false
+        }
+      }
+      return true
+    })
+  }, [sortedRecords])
+
   const stopCamera = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream
@@ -400,11 +422,24 @@ export default function Camera() {
     const data_pagamento = now.toISOString()
     const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
 
+    const now = new Date()
+    const data_pagamento = now.toISOString()
+    const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
+
+    if (visibleRecords.length === 0) {
+      toast({
+        title: 'Aviso',
+        description: 'Não há pagamentos liberados para processar.',
+        variant: 'destructive',
+      })
+      setViewState('RECOGNITION_SUCCESS')
+      return
+    }
+
     try {
       let firstFileUrl = ''
 
-      const recordsToProcess =
-        colaborador.records && colaborador.records.length > 0 ? colaborador.records : [colaborador]
+      const recordsToProcess = visibleRecords
 
       for (let i = 0; i < recordsToProcess.length; i++) {
         const record = recordsToProcess[i]
@@ -472,11 +507,14 @@ export default function Camera() {
         return
       }
 
+      const totalPago = visibleRecords.reduce(
+        (acc: number, rec: any) => acc + (rec.valor_a_receber || rec.valor || 0),
+        0,
+      )
+
       toast({
         title: 'Sucesso',
-        description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(
-          colaborador.valor_a_receber || colaborador.valor || 0,
-        )}`,
+        description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(totalPago)}`,
       })
       handleReset()
     } catch (err) {
@@ -752,7 +790,20 @@ export default function Camera() {
             </DialogDescription>
           </DialogHeader>
 
-          {colaborador && (
+          {colaborador && visibleRecords.length === 0 && (
+            <div className="flex flex-col items-center justify-center p-8 text-center bg-slate-50 dark:bg-slate-900 rounded-lg min-h-[300px]">
+              <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 dark:text-white">
+                Não há pagamentos liberados
+              </h3>
+              <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
+                Não há pagamentos liberados para este colaborador hoje. Os pagamentos agendados para
+                o futuro não estão disponíveis para processamento no momento.
+              </p>
+            </div>
+          )}
+
+          {colaborador && visibleRecords.length > 0 && (
             <div className="flex flex-col min-h-0 gap-4 mt-2">
               <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900 p-3 rounded-lg shrink-0">
                 <div>
@@ -788,7 +839,7 @@ export default function Camera() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedRecords.map((record: any, idx: number) => (
+                    {visibleRecords.map((record: any, idx: number) => (
                       <TableRow
                         key={record.id || idx}
                         className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -826,7 +877,7 @@ export default function Camera() {
                       Subtotais por Tipo
                     </h4>
                     {Object.entries(
-                      sortedRecords.reduce((acc: any, record: any) => {
+                      visibleRecords.reduce((acc: any, record: any) => {
                         const type = getTipoPagamentoDesc(record.idtipopgto)
                         const val = record.valor_a_receber || record.valor || 0
                         acc[type] = (acc[type] || 0) + val
@@ -842,7 +893,12 @@ export default function Camera() {
                   <div className="flex justify-between items-center pt-1">
                     <span className="font-bold text-sm">Total Geral</span>
                     <span className="font-bold text-lg text-green-600 dark:text-green-500">
-                      {formatCurrency(colaborador.valor_a_receber || colaborador.valor || 0)}
+                      {formatCurrency(
+                        visibleRecords.reduce(
+                          (acc: number, rec: any) => acc + (rec.valor_a_receber || rec.valor || 0),
+                          0,
+                        ),
+                      )}
                     </span>
                   </div>
                 </div>
@@ -853,9 +909,11 @@ export default function Camera() {
           <DialogFooter className="mt-4 shrink-0 w-full">
             <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-4">
               <div className="text-sm w-full sm:w-auto">
-                {blockedDate && (
+                {sortedRecords.length > visibleRecords.length && visibleRecords.length > 0 && (
                   <span className="text-amber-600 dark:text-amber-500 text-xs sm:text-sm font-medium flex items-center justify-center sm:justify-start gap-1.5 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 rounded-md border border-amber-200 dark:border-amber-900/50">
-                    <Lock className="h-4 w-4 shrink-0" /> Pagamento bloqueado até {blockedDate}
+                    <Lock className="h-4 w-4 shrink-0" />{' '}
+                    {sortedRecords.length - visibleRecords.length} pagamento(s) agendado(s)
+                    ocultado(s)
                   </span>
                 )}
               </div>
@@ -870,7 +928,7 @@ export default function Camera() {
                 </Button>
                 <Button
                   onClick={handleConfirmPayment}
-                  disabled={viewState === 'CONFIRMING_PAYMENT' || !!blockedDate}
+                  disabled={viewState === 'CONFIRMING_PAYMENT' || visibleRecords.length === 0}
                   className="flex-1 sm:flex-none"
                 >
                   {viewState === 'CONFIRMING_PAYMENT' ? (
