@@ -475,12 +475,12 @@ export default function Dashboard() {
 
   const isEmpty = statsData.length === 0 && !statsLoading
 
-  // Group table items by Name without aggregating their values
-  const groupedByName = (tableData?.items || []).reduce((acc: any, item: any) => {
-    const n =
-      item.nome || item.expand?.colaborador_id?.nome || item.expand?.user_id?.name || 'Desconhecido'
-    if (!acc[n]) acc[n] = []
-    acc[n].push(item)
+  // Group table items by Reference without aggregating their values
+  const groupedByRef = (tableData?.items || []).reduce((acc: any, item: any) => {
+    const ref = item.referencia ?? item.expand?.colaborador_id?.referencia
+    const refStr = ref != null ? `Referência: ${ref}` : 'Sem Referência'
+    if (!acc[refStr]) acc[refStr] = []
+    acc[refStr].push(item)
     return acc
   }, {})
 
@@ -1027,7 +1027,7 @@ export default function Dashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {Object.keys(groupedByName).length === 0 ? (
+                        {Object.keys(groupedByRef).length === 0 ? (
                           <TableRow>
                             <TableCell
                               colSpan={isAlcimara ? 10 : 9}
@@ -1037,28 +1037,25 @@ export default function Dashboard() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          Object.entries(groupedByName).flatMap(
-                            ([nome, records]: [string, any]) => {
-                              const totalLines = filteredStatsData.filter(
-                                (c) =>
-                                  (c.nome ||
-                                    c.expand?.colaborador_id?.nome ||
-                                    c.expand?.user_id?.name ||
-                                    'Desconhecido') === nome,
-                              ).length
+                          Object.entries(groupedByRef).flatMap(
+                            ([refName, records]: [string, any]) => {
+                              const totalLines = filteredStatsData.filter((c) => {
+                                const cRef = c.referencia ?? c.expand?.colaborador_id?.referencia
+                                const cRefStr =
+                                  cRef != null ? `Referência: ${cRef}` : 'Sem Referência'
+                                return cRefStr === refName
+                              }).length
                               return [
                                 <TableRow
-                                  key={`header-${nome}`}
+                                  key={`header-${refName}`}
                                   className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                                 >
                                   <TableCell
                                     colSpan={isAlcimara ? 10 : 9}
                                     className="font-semibold text-slate-700 dark:text-slate-300"
                                   >
-                                    {nome} - {totalLines}{' '}
-                                    {totalLines === 1
-                                      ? 'linha de pagamento'
-                                      : 'linhas de pagamento'}
+                                    {refName} - {totalLines}{' '}
+                                    {totalLines === 1 ? 'pagamento' : 'pagamentos'}
                                   </TableCell>
                                 </TableRow>,
                                 ...records.map((p: any) => (
@@ -1215,24 +1212,22 @@ export default function Dashboard() {
 
                   {/* Mobile View */}
                   <div className="md:hidden space-y-6">
-                    {Object.keys(groupedByName).length === 0 ? (
+                    {Object.keys(groupedByRef).length === 0 ? (
                       <div className="text-center text-muted-foreground p-8">
                         Nenhum pagamento encontrado.
                       </div>
                     ) : (
-                      Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
-                        const totalLines = filteredStatsData.filter(
-                          (c) =>
-                            (c.nome ||
-                              c.expand?.colaborador_id?.nome ||
-                              c.expand?.user_id?.name ||
-                              'Desconhecido') === nome,
-                        ).length
+                      Object.entries(groupedByRef).map(([refName, records]: [string, any]) => {
+                        const totalLines = filteredStatsData.filter((c) => {
+                          const cRef = c.referencia ?? c.expand?.colaborador_id?.referencia
+                          const cRefStr = cRef != null ? `Referência: ${cRef}` : 'Sem Referência'
+                          return cRefStr === refName
+                        }).length
                         return (
-                          <div key={nome} className="space-y-4">
+                          <div key={refName} className="space-y-4">
                             <div className="font-semibold text-slate-700 dark:text-slate-300 px-2 pt-2 border-b pb-2">
-                              {nome} - {totalLines}{' '}
-                              {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
+                              {refName} - {totalLines}{' '}
+                              {totalLines === 1 ? 'pagamento' : 'pagamentos'}
                             </div>
                             {records.map((p: any) => (
                               <Card key={p.id} className="shadow-sm">
