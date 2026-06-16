@@ -422,10 +422,6 @@ export default function Camera() {
     const data_pagamento = now.toISOString()
     const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
 
-    const now = new Date()
-    const data_pagamento = now.toISOString()
-    const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
-
     if (visibleRecords.length === 0) {
       toast({
         title: 'Aviso',
