@@ -1024,18 +1024,46 @@ export default function Dashboard() {
                                           p.status ||
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
+
+                                        const isLocked =
+                                          p.data_liberacao &&
+                                          new Date(p.data_liberacao) > new Date()
+
                                         if (status === 'Confirmado')
                                           return (
                                             <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
                                               Confirmado
                                             </Badge>
                                           )
-                                        if (status === 'Pendente')
+                                        if (status === 'Pendente') {
+                                          if (isLocked) {
+                                            return (
+                                              <TooltipProvider>
+                                                <Tooltip>
+                                                  <TooltipTrigger className="cursor-help">
+                                                    <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1 w-max">
+                                                      <Lock className="w-3 h-3" />
+                                                      Agendado
+                                                    </Badge>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>
+                                                    <p>
+                                                      Liberado em:{' '}
+                                                      {new Date(
+                                                        p.data_liberacao,
+                                                      ).toLocaleDateString('pt-BR')}
+                                                    </p>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              </TooltipProvider>
+                                            )
+                                          }
                                           return (
                                             <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
                                               Pendente
                                             </Badge>
                                           )
+                                        }
                                         if (status === 'Cancelado')
                                           return <Badge variant="destructive">Cancelado</Badge>
                                         return <Badge variant="outline">{status}</Badge>
@@ -1065,32 +1093,38 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
+                                          const isLocked =
+                                            p.data_liberacao &&
+                                            new Date(p.data_liberacao) > new Date()
+
                                           return (
                                             <div className="flex justify-center gap-1">
-                                              {status === 'Pendente' && isOutsideValidity && (
-                                                <Button
-                                                  variant="ghost"
-                                                  size="icon"
-                                                  className={cn(
-                                                    'hover:bg-amber-100 dark:hover:bg-amber-900/50',
-                                                    p.liberado_pagamento
-                                                      ? 'text-emerald-500 hover:text-emerald-700'
-                                                      : 'text-amber-500 hover:text-amber-700',
-                                                  )}
-                                                  onClick={() => handleToggleRelease(p)}
-                                                  title={
-                                                    p.liberado_pagamento
-                                                      ? 'Bloquear Pagamento'
-                                                      : 'Liberar Pagamento'
-                                                  }
-                                                >
-                                                  {p.liberado_pagamento ? (
-                                                    <Lock className="h-4 w-4" />
-                                                  ) : (
-                                                    <Unlock className="h-4 w-4" />
-                                                  )}
-                                                </Button>
-                                              )}
+                                              {status === 'Pendente' &&
+                                                isOutsideValidity &&
+                                                !isLocked && (
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className={cn(
+                                                      'hover:bg-amber-100 dark:hover:bg-amber-900/50',
+                                                      p.liberado_pagamento
+                                                        ? 'text-emerald-500 hover:text-emerald-700'
+                                                        : 'text-amber-500 hover:text-amber-700',
+                                                    )}
+                                                    onClick={() => handleToggleRelease(p)}
+                                                    title={
+                                                      p.liberado_pagamento
+                                                        ? 'Bloquear Pagamento'
+                                                        : 'Liberar Pagamento'
+                                                    }
+                                                  >
+                                                    {p.liberado_pagamento ? (
+                                                      <Lock className="h-4 w-4" />
+                                                    ) : (
+                                                      <Unlock className="h-4 w-4" />
+                                                    )}
+                                                  </Button>
+                                                )}
                                               {status === 'Pendente' && (
                                                 <Button
                                                   variant="ghost"
@@ -1098,6 +1132,7 @@ export default function Dashboard() {
                                                   className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
                                                   onClick={() => setPaymentToCancel(p)}
                                                   title="Cancelar Pagamento"
+                                                  disabled={isLocked}
                                                 >
                                                   <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -1106,7 +1141,7 @@ export default function Dashboard() {
                                           )
                                         })()}
                                       </TableCell>
-                                    )}
+                                    )}{' '}
                                   </TableRow>
                                 )),
                               ]
@@ -1172,18 +1207,46 @@ export default function Dashboard() {
                                           p.status ||
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
+
+                                        const isLocked =
+                                          p.data_liberacao &&
+                                          new Date(p.data_liberacao) > new Date()
+
                                         if (status === 'Confirmado')
                                           return (
                                             <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
                                               Confirmado
                                             </Badge>
                                           )
-                                        if (status === 'Pendente')
+                                        if (status === 'Pendente') {
+                                          if (isLocked) {
+                                            return (
+                                              <TooltipProvider>
+                                                <Tooltip>
+                                                  <TooltipTrigger className="cursor-help">
+                                                    <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1">
+                                                      <Lock className="w-3 h-3" />
+                                                      Agendado
+                                                    </Badge>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>
+                                                    <p>
+                                                      Liberado em:{' '}
+                                                      {new Date(
+                                                        p.data_liberacao,
+                                                      ).toLocaleDateString('pt-BR')}
+                                                    </p>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              </TooltipProvider>
+                                            )
+                                          }
                                           return (
                                             <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
                                               Pendente
                                             </Badge>
                                           )
+                                        }
                                         if (status === 'Cancelado')
                                           return <Badge variant="destructive">Cancelado</Badge>
                                         return <Badge variant="outline">{status}</Badge>
@@ -1211,33 +1274,39 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
+                                          const isLocked =
+                                            p.data_liberacao &&
+                                            new Date(p.data_liberacao) > new Date()
+
                                           return (
                                             <>
-                                              {status === 'Pendente' && isOutsideValidity && (
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  className={cn(
-                                                    'px-2 hover:bg-amber-100 dark:hover:bg-amber-900/50',
-                                                    p.liberado_pagamento
-                                                      ? 'text-emerald-500 hover:text-emerald-700'
-                                                      : 'text-amber-500 hover:text-amber-700',
-                                                  )}
-                                                  onClick={() => handleToggleRelease(p)}
-                                                  title={
-                                                    p.liberado_pagamento
-                                                      ? 'Bloquear Pagamento'
-                                                      : 'Liberar Pagamento'
-                                                  }
-                                                >
-                                                  {p.liberado_pagamento ? (
-                                                    <Lock className="h-4 w-4 mr-2" />
-                                                  ) : (
-                                                    <Unlock className="h-4 w-4 mr-2" />
-                                                  )}
-                                                  {p.liberado_pagamento ? 'Bloquear' : 'Liberar'}
-                                                </Button>
-                                              )}
+                                              {status === 'Pendente' &&
+                                                isOutsideValidity &&
+                                                !isLocked && (
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className={cn(
+                                                      'px-2 hover:bg-amber-100 dark:hover:bg-amber-900/50',
+                                                      p.liberado_pagamento
+                                                        ? 'text-emerald-500 hover:text-emerald-700'
+                                                        : 'text-amber-500 hover:text-amber-700',
+                                                    )}
+                                                    onClick={() => handleToggleRelease(p)}
+                                                    title={
+                                                      p.liberado_pagamento
+                                                        ? 'Bloquear Pagamento'
+                                                        : 'Liberar Pagamento'
+                                                    }
+                                                  >
+                                                    {p.liberado_pagamento ? (
+                                                      <Lock className="h-4 w-4 mr-2" />
+                                                    ) : (
+                                                      <Unlock className="h-4 w-4 mr-2" />
+                                                    )}
+                                                    {p.liberado_pagamento ? 'Bloquear' : 'Liberar'}
+                                                  </Button>
+                                                )}
                                               {status === 'Pendente' && (
                                                 <Button
                                                   variant="ghost"
@@ -1245,6 +1314,7 @@ export default function Dashboard() {
                                                   className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 px-2"
                                                   onClick={() => setPaymentToCancel(p)}
                                                   title="Cancelar Pagamento"
+                                                  disabled={isLocked}
                                                 >
                                                   <Trash2 className="h-4 w-4 mr-2" />
                                                   Cancelar

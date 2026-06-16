@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,26 @@ export function ImportPlanilhaModal({
   const [dataLiberacao, setDataLiberacao] = useState('')
   const [periodoInicio, setPeriodoInicio] = useState('')
   const [periodoFim, setPeriodoFim] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      const fetchMaxRef = async () => {
+        try {
+          const rec = await pb
+            .collection('colaboradores')
+            .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
+          if (rec && rec.referencia) {
+            setReferencia(String(rec.referencia + 1))
+          } else {
+            setReferencia('1')
+          }
+        } catch (e) {
+          setReferencia('1')
+        }
+      }
+      fetchMaxRef()
+    }
+  }, [open])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -303,7 +323,7 @@ export function ImportPlanilhaModal({
         }
       }}
     >
-      <DialogContent className="sm:max-w-3xl w-11/12 overflow-hidden">
+      <DialogContent className="sm:max-w-3xl w-11/12 overflow-hidden max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-center">Importar Planilha</DialogTitle>
           <DialogDescription className="text-center">
