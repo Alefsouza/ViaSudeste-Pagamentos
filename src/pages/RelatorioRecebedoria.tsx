@@ -42,8 +42,6 @@ import {
   ChevronLeft,
   ChevronRight,
   SearchX,
-  Lock,
-  Unlock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatHoraString, formatHoras, getTipoPagamento, formatBRL } from '@/lib/formatters'
@@ -323,42 +321,6 @@ export default function RelatorioRecebedoria() {
 
   const handleExport = () => {
     window.print()
-  }
-
-  const isAlcimara = user?.email?.toLowerCase() === 'alcimara.cabral@viasudeste.com'
-
-  const handleToggleLiberacao = async (colaborador: any) => {
-    try {
-      const newValue = !colaborador.liberado_pagamento
-
-      const updateData: any = {
-        liberado_pagamento: newValue,
-      }
-
-      if (newValue) {
-        updateData.data_liberacao = new Date().toISOString()
-      } else {
-        updateData.data_liberacao = ''
-      }
-
-      await pb.collection('colaboradores').update(colaborador.id, updateData)
-
-      setColaboradoresPendentes((prev) =>
-        prev.map((c) => (c.id === colaborador.id ? { ...c, ...updateData } : c)),
-      )
-
-      toast({
-        title: newValue ? 'Pagamento Liberado' : 'Liberação Cancelada',
-        description: `O status do pagamento de ${colaborador.nome} foi atualizado.`,
-      })
-    } catch (err: any) {
-      console.error(err)
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar o status de liberação.',
-        variant: 'destructive',
-      })
-    }
   }
 
   const parseDateForSort = (dateStr: string | undefined | null) => {
@@ -1122,9 +1084,6 @@ export default function RelatorioRecebedoria() {
                         <TableHead>Ref</TableHead>
                         <TableHead>Tipo de Pagamento</TableHead>
                         <TableHead className="text-left">Valor</TableHead>
-                        {isAlcimara && (
-                          <TableHead className="text-center w-[100px]">Ações</TableHead>
-                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1149,16 +1108,11 @@ export default function RelatorioRecebedoria() {
                             <TableCell>
                               <Skeleton className="h-4 w-24" />
                             </TableCell>
-                            {isAlcimara && (
-                              <TableCell>
-                                <Skeleton className="h-8 w-8 mx-auto" />
-                              </TableCell>
-                            )}
                           </TableRow>
                         ))
                       ) : colaboradoresPendentes.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={isAlcimara ? 7 : 6} className="h-32 text-center py-8">
+                          <TableCell colSpan={6} className="h-32 text-center py-8">
                             <SearchX className="mx-auto h-8 w-8 text-slate-300 mb-2" />
                             <p className="text-sm text-slate-500 font-medium">
                               Nenhum registro encontrado.
@@ -1181,21 +1135,6 @@ export default function RelatorioRecebedoria() {
                             <TableCell className="text-left font-medium text-emerald-600 dark:text-emerald-400">
                               {formatBRL(item.valor_a_receber || item.valor || 0)}
                             </TableCell>
-                            {isAlcimara && (
-                              <TableCell className="text-center">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleToggleLiberacao(item)}
-                                >
-                                  {item.liberado_pagamento ? (
-                                    <Unlock className="h-4 w-4 text-emerald-500" />
-                                  ) : (
-                                    <Lock className="h-4 w-4 text-slate-400" />
-                                  )}
-                                </Button>
-                              </TableCell>
-                            )}
                           </TableRow>
                         ))
                       )}
