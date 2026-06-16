@@ -304,7 +304,7 @@ export default function Dashboard() {
 
       return true
     })
-  }, [statsData, selectedChartFilial, selectedChartDate])
+  }, [statsData, selectedChartFilial, selectedChartDate, selectedChartRef, chartRefSearch])
 
   const pagamentosTotals = useMemo(() => {
     return filteredStatsData.reduce(
@@ -335,17 +335,21 @@ export default function Dashboard() {
   }
 
   // Calculations
-  const totalValor = filteredStatsData.reduce(
-    (acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0),
-    0,
-  )
   const uniqueColabs = new Set(
     filteredStatsData.map((c) => c.registro || c.expand?.colaborador_id?.registro).filter(Boolean),
   ).size
-  const values = filteredStatsData.map((c) => c.valor_a_receber || c.valor || 0)
-  const maxPago = values.length ? Math.max(...values) : 0
-  const minPago = values.length ? Math.min(...values) : 0
-  const avgPago = values.length ? totalValor / values.length : 0
+
+  const confirmedPayments = filteredStatsData.filter((c) => {
+    const status = c.status || (c.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+    return status === 'Confirmado'
+  })
+
+  const confirmedValues = confirmedPayments.map(
+    (c) => c.valor_pago || c.valor_a_receber || c.valor || 0,
+  )
+  const maxPago = confirmedValues.length ? Math.max(...confirmedValues) : 0
+  const minPago = confirmedValues.length ? Math.min(...confirmedValues) : 0
+  const avgPago = confirmedValues.length ? pagamentosTotals.pago / confirmedValues.length : 0
 
   // Chart Data Preparation (using full statsData so context remains visible)
   const pieDataMap = statsData.reduce(
