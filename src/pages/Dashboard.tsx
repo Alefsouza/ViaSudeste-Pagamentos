@@ -1141,7 +1141,7 @@ export default function Dashboard() {
                                           )
                                         })()}
                                       </TableCell>
-                                    )}{' '}
+                                    )}
                                   </TableRow>
                                 )),
                               ]
