@@ -311,14 +311,52 @@ export default function Dashboard() {
       (acc, curr) => {
         const val = curr.valor_a_receber || curr.valor || 0
         const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+
+        let acronym = ''
+        const tipoNome = getTipoPagamento(curr.idtipopgto) || ''
+        const lowerTipo = typeof tipoNome === 'string' ? tipoNome.toLowerCase() : ''
+
+        if (curr.idtipopgto === 1 || lowerTipo.includes('hora') || lowerTipo.includes('he'))
+          acronym = 'HE'
+        else if (
+          curr.idtipopgto === 2 ||
+          lowerTipo.includes('vale') ||
+          lowerTipo.includes('vr') ||
+          lowerTipo.includes('refeição') ||
+          lowerTipo.includes('refeicao')
+        )
+          acronym = 'VR'
+        else if (
+          curr.idtipopgto === 3 ||
+          lowerTipo.includes('férias') ||
+          lowerTipo.includes('ferias') ||
+          lowerTipo.includes('ft')
+        )
+          acronym = 'FT'
+
         if (status === 'Confirmado') {
           acc.pago += val
+          if (acronym === 'HE') acc.pagoHE += val
+          if (acronym === 'VR') acc.pagoVR += val
+          if (acronym === 'FT') acc.pagoFT += val
         } else {
           acc.pendente += val
+          if (acronym === 'HE') acc.pendenteHE += val
+          if (acronym === 'VR') acc.pendenteVR += val
+          if (acronym === 'FT') acc.pendenteFT += val
         }
         return acc
       },
-      { pago: 0, pendente: 0 },
+      {
+        pago: 0,
+        pendente: 0,
+        pagoVR: 0,
+        pagoHE: 0,
+        pagoFT: 0,
+        pendenteVR: 0,
+        pendenteHE: 0,
+        pendenteFT: 0,
+      },
     )
   }, [filteredStatsData])
 
@@ -588,8 +626,8 @@ export default function Dashboard() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-6">
-        <Card>
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-8">
+        <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
             <DollarSign className="h-4 w-4 text-forest" />
@@ -598,13 +636,19 @@ export default function Dashboard() {
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold transition-all duration-300">
-                {formatBRL(pagamentosTotals.pago)}
+              <div className="space-y-1">
+                <div className="text-2xl font-bold transition-all duration-300">
+                  {formatBRL(pagamentosTotals.pago)}
+                </div>
+                <p className="text-[11px] md:text-xs text-muted-foreground leading-tight">
+                  VR: {formatBRL(pagamentosTotals.pagoVR)} • HE:{' '}
+                  {formatBRL(pagamentosTotals.pagoHE)} • FT: {formatBRL(pagamentosTotals.pagoFT)}
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Valor a Pagar</CardTitle>
             <AlertCircle className="h-4 w-4 text-amber-500" />
@@ -613,8 +657,15 @@ export default function Dashboard() {
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold transition-all duration-300">
-                {formatBRL(pagamentosTotals.pendente)}
+              <div className="space-y-1">
+                <div className="text-2xl font-bold transition-all duration-300">
+                  {formatBRL(pagamentosTotals.pendente)}
+                </div>
+                <p className="text-[11px] md:text-xs text-muted-foreground leading-tight">
+                  VR: {formatBRL(pagamentosTotals.pendenteVR)} • HE:{' '}
+                  {formatBRL(pagamentosTotals.pendenteHE)} • FT:{' '}
+                  {formatBRL(pagamentosTotals.pendenteFT)}
+                </p>
               </div>
             )}
           </CardContent>
