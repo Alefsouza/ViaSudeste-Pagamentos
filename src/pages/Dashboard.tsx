@@ -630,7 +630,7 @@ export default function Dashboard() {
         <Card className="lg:col-span-2 flex flex-col h-full">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
-            <DollarSign className="h-4 w-4 text-forest" />
+            <DollarSign className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent className="flex-1 flex flex-col">
             {statsLoading ? (
@@ -674,7 +674,7 @@ export default function Dashboard() {
         <Card className="flex flex-col h-full">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Qtd. Colaboradores</CardTitle>
-            <Users className="h-4 w-4 text-forest" />
+            <Users className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent className="flex-1">
             {statsLoading ? (
@@ -1013,7 +1013,7 @@ export default function Dashboard() {
                                     <TableCell>
                                       {p.referencia || p.expand?.colaborador_id?.referencia || '-'}
                                     </TableCell>
-                                    <TableCell className="text-forest font-medium text-left">
+                                    <TableCell className="text-emerald-600 dark:text-emerald-500 font-medium text-left">
                                       {formatBRL(p.valor_a_receber || p.valor)}
                                     </TableCell>
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
@@ -1180,7 +1180,7 @@ export default function Dashboard() {
                                     <span className="truncate">
                                       {p.nome || p.expand?.colaborador_id?.nome || 'Desconhecido'}
                                     </span>
-                                    <span className="text-forest">
+                                    <span className="text-emerald-600 dark:text-emerald-500">
                                       {formatBRL(p.valor_a_receber || p.valor)}
                                     </span>
                                   </div>
@@ -1408,7 +1408,7 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Valor:</span>
-                <span className="text-forest font-medium">
+                <span className="text-emerald-600 dark:text-emerald-500 font-medium">
                   {paymentToCancel
                     ? formatBRL(
                         paymentToCancel.valor_pago ||
