@@ -640,10 +640,11 @@ export default function Dashboard() {
                 <div className="text-2xl font-bold transition-all duration-300">
                   {formatBRL(pagamentosTotals.pago)}
                 </div>
-                <p className="text-[11px] md:text-xs text-muted-foreground leading-tight">
-                  VR: {formatBRL(pagamentosTotals.pagoVR)} • HE:{' '}
-                  {formatBRL(pagamentosTotals.pagoHE)} • FT: {formatBRL(pagamentosTotals.pagoFT)}
-                </p>
+                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-2 space-y-0.5 pt-1 border-t border-border/50">
+                  <span>VR: {formatBRL(pagamentosTotals.pagoVR)}</span>
+                  <span>HE: {formatBRL(pagamentosTotals.pagoHE)}</span>
+                  <span>FT: {formatBRL(pagamentosTotals.pagoFT)}</span>
+                </div>
               </div>
             )}
           </CardContent>
@@ -661,11 +662,11 @@ export default function Dashboard() {
                 <div className="text-2xl font-bold transition-all duration-300">
                   {formatBRL(pagamentosTotals.pendente)}
                 </div>
-                <p className="text-[11px] md:text-xs text-muted-foreground leading-tight">
-                  VR: {formatBRL(pagamentosTotals.pendenteVR)} • HE:{' '}
-                  {formatBRL(pagamentosTotals.pendenteHE)} • FT:{' '}
-                  {formatBRL(pagamentosTotals.pendenteFT)}
-                </p>
+                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-2 space-y-0.5 pt-1 border-t border-border/50">
+                  <span>VR: {formatBRL(pagamentosTotals.pendenteVR)}</span>
+                  <span>HE: {formatBRL(pagamentosTotals.pendenteHE)}</span>
+                  <span>FT: {formatBRL(pagamentosTotals.pendenteFT)}</span>
+                </div>
               </div>
             )}
           </CardContent>
