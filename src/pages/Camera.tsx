@@ -96,6 +96,10 @@ export default function Camera() {
     return sortedRecords.filter((rec: any) => {
       if (rec.status === 'Agendado' || rec.status === 'agendado') return false
 
+      if (rec.liberado_pagamento !== true && rec.liberado_pagamento !== 'true') {
+        return false
+      }
+
       if (rec.data_liberacao) {
         const libDate = new Date(rec.data_liberacao)
         const startOfLibDate = new Date(
@@ -106,14 +110,14 @@ export default function Camera() {
         if (startOfLibDate > startOfToday) {
           return false
         }
-      }
-
-      if (rec.data_pagamento_v2) {
+      } else if (rec.data_pagamento_v2) {
         const v2Date = new Date(rec.data_pagamento_v2)
         const startOfV2Date = new Date(v2Date.getFullYear(), v2Date.getMonth(), v2Date.getDate())
         if (startOfV2Date > startOfToday) {
           return false
         }
+      } else {
+        return false
       }
 
       return true
@@ -509,12 +513,8 @@ export default function Camera() {
       }
 
       try {
-        if (colaborador.all_records_ids && Array.isArray(colaborador.all_records_ids)) {
-          for (const id of colaborador.all_records_ids) {
-            await updateColaborador(id, { foto_confirmacao_url: firstFileUrl })
-          }
-        } else {
-          await updateColaborador(colaborador.id, { foto_confirmacao_url: firstFileUrl })
+        for (const record of recordsToProcess) {
+          await updateColaborador(record.id, { foto_confirmacao_url: firstFileUrl })
         }
       } catch (err) {
         toast({
