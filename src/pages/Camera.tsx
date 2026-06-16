@@ -94,33 +94,44 @@ export default function Camera() {
     startOfToday.setHours(0, 0, 0, 0)
 
     return sortedRecords.filter((rec: any) => {
-      if (rec.status === 'Agendado' || rec.status === 'agendado') return false
+      if (rec.status === 'Confirmado' || rec.status === 'confirmado') return false
+      if (rec.status === 'Cancelado' || rec.status === 'cancelado') return false
 
-      if (rec.liberado_pagamento !== true && rec.liberado_pagamento !== 'true') {
-        return false
+      const val = rec.valor_a_receber || rec.valor || 0
+      if (val <= 0) return false
+
+      let isDue = false
+
+      if (rec.liberado_pagamento === true || rec.liberado_pagamento === 'true') {
+        isDue = true
+      }
+      if (rec.status === 'Pendente' || rec.status === 'pendente') {
+        isDue = true
       }
 
-      if (rec.data_liberacao) {
+      if (rec.data_pagamento_v2) {
+        const v2Date = new Date(rec.data_pagamento_v2)
+        const startOfV2Date = new Date(v2Date.getFullYear(), v2Date.getMonth(), v2Date.getDate())
+        if (startOfV2Date <= startOfToday) {
+          isDue = true
+        } else {
+          isDue = false
+        }
+      } else if (rec.data_liberacao) {
         const libDate = new Date(rec.data_liberacao)
         const startOfLibDate = new Date(
           libDate.getFullYear(),
           libDate.getMonth(),
           libDate.getDate(),
         )
-        if (startOfLibDate > startOfToday) {
-          return false
+        if (startOfLibDate <= startOfToday) {
+          isDue = true
+        } else {
+          isDue = false
         }
-      } else if (rec.data_pagamento_v2) {
-        const v2Date = new Date(rec.data_pagamento_v2)
-        const startOfV2Date = new Date(v2Date.getFullYear(), v2Date.getMonth(), v2Date.getDate())
-        if (startOfV2Date > startOfToday) {
-          return false
-        }
-      } else {
-        return false
       }
 
-      return true
+      return isDue
     })
   }, [sortedRecords])
 
@@ -157,7 +168,7 @@ export default function Camera() {
   useEffect(() => {
     if (colaborador) {
       let maxBlockedFormatted: string | null = null
-      let maxLibTime = 0
+      let minFutureTime = Infinity
 
       const recordsToCheck =
         colaborador.records && colaborador.records.length > 0 ? colaborador.records : [colaborador]
@@ -166,6 +177,9 @@ export default function Camera() {
       startOfToday.setHours(0, 0, 0, 0)
 
       for (const rec of recordsToCheck) {
+        if (rec.status === 'Confirmado' || rec.status === 'confirmado') continue
+        if (rec.status === 'Cancelado' || rec.status === 'cancelado') continue
+
         if (rec.data_liberacao) {
           const libDate = new Date(rec.data_liberacao)
           const startOfLibDate = new Date(
@@ -174,8 +188,8 @@ export default function Camera() {
             libDate.getDate(),
           )
           if (startOfToday < startOfLibDate) {
-            if (startOfLibDate.getTime() > maxLibTime) {
-              maxLibTime = startOfLibDate.getTime()
+            if (startOfLibDate.getTime() < minFutureTime) {
+              minFutureTime = startOfLibDate.getTime()
               maxBlockedFormatted = `${String(libDate.getDate()).padStart(2, '0')}/${String(libDate.getMonth() + 1).padStart(2, '0')}/${libDate.getFullYear()}`
             }
           }
@@ -188,8 +202,8 @@ export default function Camera() {
             libDate.getDate(),
           )
           if (startOfToday < startOfLibDate) {
-            if (startOfLibDate.getTime() > maxLibTime) {
-              maxLibTime = startOfLibDate.getTime()
+            if (startOfLibDate.getTime() < minFutureTime) {
+              minFutureTime = startOfLibDate.getTime()
               maxBlockedFormatted = `${String(libDate.getDate()).padStart(2, '0')}/${String(libDate.getMonth() + 1).padStart(2, '0')}/${libDate.getFullYear()}`
             }
           }
