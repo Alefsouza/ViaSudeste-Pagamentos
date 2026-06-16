@@ -443,17 +443,34 @@ export default function Dashboard() {
       if (chartRefSearch && !ref.toLowerCase().includes(chartRefSearch.toLowerCase())) {
         return acc
       }
-      acc[ref] = (acc[ref] || 0) + (curr.valor_a_receber || curr.valor || 0)
+      if (!acc[ref]) {
+        acc[ref] = { total: 0, periodo_inicio: null, periodo_fim: null }
+      }
+      acc[ref].total += curr.valor_a_receber || curr.valor || 0
+
+      if (!acc[ref].periodo_inicio) {
+        acc[ref].periodo_inicio =
+          curr.periodo_inicio || curr.expand?.colaborador_id?.periodo_inicio || null
+      }
+      if (!acc[ref].periodo_fim) {
+        acc[ref].periodo_fim = curr.periodo_fim || curr.expand?.colaborador_id?.periodo_fim || null
+      }
+
       return acc
     },
-    {} as Record<string, number>,
+    {} as Record<
+      string,
+      { total: number; periodo_inicio: string | null; periodo_fim: string | null }
+    >,
   )
 
   const refData = Object.entries(refDataMap)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([ref, total]) => ({
+    .map(([ref, data]) => ({
       referenciaName: ref,
-      total,
+      total: data.total,
+      periodo_inicio: data.periodo_inicio,
+      periodo_fim: data.periodo_fim,
     }))
 
   const isEmpty = statsData.length === 0 && !statsLoading
@@ -833,7 +850,52 @@ export default function Dashboard() {
                         axisLine={false}
                         tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
                       />
-                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartTooltip
+                        cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload
+
+                            const formatDateStr = (d: string | null) => {
+                              if (!d) return 'Não informado'
+                              const datePart = d.split(' ')[0]
+                              const parts = datePart.split('-')
+                              if (parts.length === 3) {
+                                const [y, m, day] = parts
+                                return `${day}/${m}/${y}`
+                              }
+                              return d
+                            }
+
+                            return (
+                              <div className="rounded-lg border bg-background p-3 shadow-md text-sm space-y-1 min-w-[220px]">
+                                <div className="font-medium text-foreground mb-2 pb-1 border-b">
+                                  Período da Referência: {data.referenciaName}
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-muted-foreground">Data Início:</span>
+                                  <span className="font-medium">
+                                    {formatDateStr(data.periodo_inicio)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-muted-foreground">Data Final:</span>
+                                  <span className="font-medium">
+                                    {formatDateStr(data.periodo_fim)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between gap-4 pt-1 mt-1 border-t">
+                                  <span className="text-muted-foreground">Total Pago:</span>
+                                  <span className="font-bold text-emerald-600 dark:text-emerald-500">
+                                    {formatBRL(data.total)}
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          }
+                          return null
+                        }}
+                      />
                       <Bar
                         dataKey="total"
                         radius={[4, 4, 0, 0]}
