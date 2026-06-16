@@ -1194,7 +1194,6 @@ export default function Dashboard() {
                                                   className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
                                                   onClick={() => setPaymentToCancel(p)}
                                                   title="Cancelar Pagamento"
-                                                  disabled={isLocked}
                                                 >
                                                   <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -1376,7 +1375,6 @@ export default function Dashboard() {
                                                   className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 px-2"
                                                   onClick={() => setPaymentToCancel(p)}
                                                   title="Cancelar Pagamento"
-                                                  disabled={isLocked}
                                                 >
                                                   <Trash2 className="h-4 w-4 mr-2" />
                                                   Cancelar
