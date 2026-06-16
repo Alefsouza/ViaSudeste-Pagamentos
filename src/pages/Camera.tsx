@@ -89,7 +89,7 @@ export default function Camera() {
     })
   }, [colaborador])
 
-  const visibleRecords = useMemo(() => {
+  const payableRecords = useMemo(() => {
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
 
@@ -107,6 +107,15 @@ export default function Camera() {
           return false
         }
       }
+
+      if (rec.data_pagamento_v2) {
+        const v2Date = new Date(rec.data_pagamento_v2)
+        const startOfV2Date = new Date(v2Date.getFullYear(), v2Date.getMonth(), v2Date.getDate())
+        if (startOfV2Date > startOfToday) {
+          return false
+        }
+      }
+
       return true
     })
   }, [sortedRecords])
@@ -155,6 +164,20 @@ export default function Camera() {
       for (const rec of recordsToCheck) {
         if (rec.data_liberacao) {
           const libDate = new Date(rec.data_liberacao)
+          const startOfLibDate = new Date(
+            libDate.getFullYear(),
+            libDate.getMonth(),
+            libDate.getDate(),
+          )
+          if (startOfToday < startOfLibDate) {
+            if (startOfLibDate.getTime() > maxLibTime) {
+              maxLibTime = startOfLibDate.getTime()
+              maxBlockedFormatted = `${String(libDate.getDate()).padStart(2, '0')}/${String(libDate.getMonth() + 1).padStart(2, '0')}/${libDate.getFullYear()}`
+            }
+          }
+        }
+        if (rec.data_pagamento_v2) {
+          const libDate = new Date(rec.data_pagamento_v2)
           const startOfLibDate = new Date(
             libDate.getFullYear(),
             libDate.getMonth(),
@@ -422,7 +445,7 @@ export default function Camera() {
     const data_pagamento = now.toISOString()
     const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
 
-    if (visibleRecords.length === 0) {
+    if (payableRecords.length === 0) {
       toast({
         title: 'Aviso',
         description: 'Não há pagamentos liberados para processar.',
@@ -435,7 +458,7 @@ export default function Camera() {
     try {
       let firstFileUrl = ''
 
-      const recordsToProcess = visibleRecords
+      const recordsToProcess = payableRecords
 
       for (let i = 0; i < recordsToProcess.length; i++) {
         const record = recordsToProcess[i]
@@ -503,7 +526,7 @@ export default function Camera() {
         return
       }
 
-      const totalPago = visibleRecords.reduce(
+      const totalPago = payableRecords.reduce(
         (acc: number, rec: any) => acc + (rec.valor_a_receber || rec.valor || 0),
         0,
       )
@@ -756,14 +779,23 @@ export default function Camera() {
             {viewState === 'CAPTURING' && (
               <div className="absolute inset-0 z-10 flex flex-col justify-end p-6">
                 <div className="flex justify-center">
-                  <Button
-                    size="lg"
-                    className="rounded-full h-16 w-16 p-0 border border-slate-200 bg-white/90 hover:bg-white text-slate-900 shadow-sm backdrop-blur-sm transition-all"
-                    onClick={handleCapture}
-                  >
-                    <CameraIcon className="h-6 w-6" />
-                    <span className="sr-only">Capturar Foto</span>
-                  </Button>
+                  {payableRecords.length > 0 ? (
+                    <Button
+                      size="lg"
+                      className="rounded-full h-16 w-16 p-0 border border-slate-200 bg-white/90 hover:bg-white text-slate-900 shadow-sm backdrop-blur-sm transition-all"
+                      onClick={handleCapture}
+                    >
+                      <CameraIcon className="h-6 w-6" />
+                      <span className="sr-only">Capturar Foto</span>
+                    </Button>
+                  ) : (
+                    <div className="bg-slate-900/80 text-white px-4 py-3 rounded-full text-sm font-medium backdrop-blur-sm flex items-center gap-2 shadow-lg">
+                      <Lock className="h-4 w-4" />
+                      {blockedDate
+                        ? `Agendado para ${blockedDate}`
+                        : 'Aguardando data de pagamento'}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -786,7 +818,7 @@ export default function Camera() {
             </DialogDescription>
           </DialogHeader>
 
-          {colaborador && visibleRecords.length === 0 && (
+          {colaborador && payableRecords.length === 0 && (
             <div className="flex flex-col items-center justify-center p-8 text-center bg-slate-50 dark:bg-slate-900 rounded-lg min-h-[300px]">
               <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
               <h3 className="text-lg font-medium text-slate-900 dark:text-white">
@@ -798,7 +830,7 @@ export default function Camera() {
             </div>
           )}
 
-          {colaborador && visibleRecords.length > 0 && (
+          {colaborador && payableRecords.length > 0 && (
             <div className="flex flex-col min-h-0 gap-4 mt-2">
               <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900 p-3 rounded-lg shrink-0">
                 <div>
@@ -834,7 +866,7 @@ export default function Camera() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visibleRecords.map((record: any, idx: number) => (
+                    {payableRecords.map((record: any, idx: number) => (
                       <TableRow
                         key={record.id || idx}
                         className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -872,7 +904,7 @@ export default function Camera() {
                       Subtotais por Tipo
                     </h4>
                     {Object.entries(
-                      visibleRecords.reduce((acc: any, record: any) => {
+                      payableRecords.reduce((acc: any, record: any) => {
                         const type = getTipoPagamentoDesc(record.idtipopgto)
                         const val = record.valor_a_receber || record.valor || 0
                         acc[type] = (acc[type] || 0) + val
@@ -889,7 +921,7 @@ export default function Camera() {
                     <span className="font-bold text-sm">Total Geral</span>
                     <span className="font-bold text-lg text-green-600 dark:text-green-500">
                       {formatCurrency(
-                        visibleRecords.reduce(
+                        payableRecords.reduce(
                           (acc: number, rec: any) => acc + (rec.valor_a_receber || rec.valor || 0),
                           0,
                         ),
@@ -915,7 +947,7 @@ export default function Camera() {
                 </Button>
                 <Button
                   onClick={handleConfirmPayment}
-                  disabled={viewState === 'CONFIRMING_PAYMENT' || visibleRecords.length === 0}
+                  disabled={viewState === 'CONFIRMING_PAYMENT' || payableRecords.length === 0}
                   className="flex-1 sm:flex-none"
                 >
                   {viewState === 'CONFIRMING_PAYMENT' ? (

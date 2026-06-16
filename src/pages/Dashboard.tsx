@@ -1084,9 +1084,25 @@ export default function Dashboard() {
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
 
-                                        const isLocked =
+                                        const startOfToday = new Date()
+                                        startOfToday.setHours(0, 0, 0, 0)
+                                        let isLocked = false
+                                        if (
                                           p.data_liberacao &&
-                                          new Date(p.data_liberacao) > new Date()
+                                          new Date(p.data_liberacao) > startOfToday
+                                        )
+                                          isLocked = true
+                                        if (
+                                          p.data_pagamento_v2 &&
+                                          new Date(p.data_pagamento_v2) > startOfToday
+                                        )
+                                          isLocked = true
+                                        if (
+                                          p.expand?.colaborador_id?.data_pagamento_v2 &&
+                                          new Date(p.expand.colaborador_id.data_pagamento_v2) >
+                                            startOfToday
+                                        )
+                                          isLocked = true
 
                                         if (status === 'Confirmado')
                                           return (
@@ -1108,9 +1124,19 @@ export default function Dashboard() {
                                                   <TooltipContent>
                                                     <p>
                                                       Liberado em:{' '}
-                                                      {new Date(
-                                                        p.data_liberacao,
-                                                      ).toLocaleDateString('pt-BR')}
+                                                      {p.data_liberacao
+                                                        ? new Date(
+                                                            p.data_liberacao,
+                                                          ).toLocaleDateString('pt-BR')
+                                                        : p.data_pagamento_v2 ||
+                                                            p.expand?.colaborador_id
+                                                              ?.data_pagamento_v2
+                                                          ? new Date(
+                                                              p.data_pagamento_v2 ||
+                                                                p.expand?.colaborador_id
+                                                                  ?.data_pagamento_v2,
+                                                            ).toLocaleDateString('pt-BR')
+                                                          : ''}
                                                     </p>
                                                   </TooltipContent>
                                                 </Tooltip>
@@ -1152,9 +1178,25 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const isLocked =
+                                          const startOfToday = new Date()
+                                          startOfToday.setHours(0, 0, 0, 0)
+                                          let isLocked = false
+                                          if (
                                             p.data_liberacao &&
-                                            new Date(p.data_liberacao) > new Date()
+                                            new Date(p.data_liberacao) > startOfToday
+                                          )
+                                            isLocked = true
+                                          if (
+                                            p.data_pagamento_v2 &&
+                                            new Date(p.data_pagamento_v2) > startOfToday
+                                          )
+                                            isLocked = true
+                                          if (
+                                            p.expand?.colaborador_id?.data_pagamento_v2 &&
+                                            new Date(p.expand.colaborador_id.data_pagamento_v2) >
+                                              startOfToday
+                                          )
+                                            isLocked = true
 
                                           return (
                                             <div className="flex justify-center gap-1">
@@ -1264,9 +1306,25 @@ export default function Dashboard() {
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
 
-                                        const isLocked =
+                                        const startOfToday = new Date()
+                                        startOfToday.setHours(0, 0, 0, 0)
+                                        let isLocked = false
+                                        if (
                                           p.data_liberacao &&
-                                          new Date(p.data_liberacao) > new Date()
+                                          new Date(p.data_liberacao) > startOfToday
+                                        )
+                                          isLocked = true
+                                        if (
+                                          p.data_pagamento_v2 &&
+                                          new Date(p.data_pagamento_v2) > startOfToday
+                                        )
+                                          isLocked = true
+                                        if (
+                                          p.expand?.colaborador_id?.data_pagamento_v2 &&
+                                          new Date(p.expand.colaborador_id.data_pagamento_v2) >
+                                            startOfToday
+                                        )
+                                          isLocked = true
 
                                         if (status === 'Confirmado')
                                           return (
@@ -1288,9 +1346,19 @@ export default function Dashboard() {
                                                   <TooltipContent>
                                                     <p>
                                                       Liberado em:{' '}
-                                                      {new Date(
-                                                        p.data_liberacao,
-                                                      ).toLocaleDateString('pt-BR')}
+                                                      {p.data_liberacao
+                                                        ? new Date(
+                                                            p.data_liberacao,
+                                                          ).toLocaleDateString('pt-BR')
+                                                        : p.data_pagamento_v2 ||
+                                                            p.expand?.colaborador_id
+                                                              ?.data_pagamento_v2
+                                                          ? new Date(
+                                                              p.data_pagamento_v2 ||
+                                                                p.expand?.colaborador_id
+                                                                  ?.data_pagamento_v2,
+                                                            ).toLocaleDateString('pt-BR')
+                                                          : ''}
                                                     </p>
                                                   </TooltipContent>
                                                 </Tooltip>
@@ -1330,9 +1398,25 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const isLocked =
+                                          const startOfToday = new Date()
+                                          startOfToday.setHours(0, 0, 0, 0)
+                                          let isLocked = false
+                                          if (
                                             p.data_liberacao &&
-                                            new Date(p.data_liberacao) > new Date()
+                                            new Date(p.data_liberacao) > startOfToday
+                                          )
+                                            isLocked = true
+                                          if (
+                                            p.data_pagamento_v2 &&
+                                            new Date(p.data_pagamento_v2) > startOfToday
+                                          )
+                                            isLocked = true
+                                          if (
+                                            p.expand?.colaborador_id?.data_pagamento_v2 &&
+                                            new Date(p.expand.colaborador_id.data_pagamento_v2) >
+                                              startOfToday
+                                          )
+                                            isLocked = true
 
                                           return (
                                             <>

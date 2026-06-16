@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -42,6 +43,7 @@ import {
   ChevronLeft,
   ChevronRight,
   SearchX,
+  Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatHoraString, formatHoras, getTipoPagamento, formatBRL } from '@/lib/formatters'
@@ -827,7 +829,6 @@ export default function RelatorioRecebedoria() {
                     <TableHead className="text-left w-[150px]">Tipo de Pagamento</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                     <TableHead className="text-center">Foto</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -878,16 +879,53 @@ export default function RelatorioRecebedoria() {
                     </TableRow>
                   ) : (
                     data.map((item: any) => {
-                      const isConfirmado = !!item.foto_confirmacao_url
-                      const statusBadge = isConfirmado ? (
-                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
-                          Confirmado
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
-                          Pendente
-                        </Badge>
+                      const isConfirmado =
+                        !!item.foto_confirmacao_url || item.status === 'Confirmado'
+                      const startOfToday = new Date()
+                      startOfToday.setHours(0, 0, 0, 0)
+                      let isAgendado = false
+                      if (item.status === 'Agendado' || item.status === 'agendado')
+                        isAgendado = true
+                      if (item.data_liberacao && new Date(item.data_liberacao) > startOfToday)
+                        isAgendado = true
+                      if (item.data_pagamento_v2 && new Date(item.data_pagamento_v2) > startOfToday)
+                        isAgendado = true
+                      if (
+                        item.expand?.colaborador_id?.data_pagamento_v2 &&
+                        new Date(item.expand.colaborador_id.data_pagamento_v2) > startOfToday
                       )
+                        isAgendado = true
+
+                      let statusBadge = null
+                      if (isConfirmado) {
+                        statusBadge = (
+                          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                            Confirmado
+                          </Badge>
+                        )
+                      } else if (isAgendado) {
+                        statusBadge = (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger className="cursor-help">
+                                <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-200 shadow-none border-none flex items-center justify-center gap-1 w-max mx-auto">
+                                  <Lock className="w-3 h-3" />
+                                  Agendado
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Aguardando data de pagamento</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )
+                      } else {
+                        statusBadge = (
+                          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                            Pendente
+                          </Badge>
+                        )
+                      }
 
                       return (
                         <TableRow
@@ -932,16 +970,6 @@ export default function RelatorioRecebedoria() {
                               <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
                             </Button>
                           </TableCell>
-                          <TableCell className="text-right print:hidden">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDetailsModal(item)}
-                              className="print:hidden"
-                            >
-                              <FileText className="h-4 w-4 mr-2" /> Detalhes
-                            </Button>
-                          </TableCell>
                         </TableRow>
                       )
                     })
@@ -964,16 +992,51 @@ export default function RelatorioRecebedoria() {
                 </div>
               ) : (
                 data.map((item: any) => {
-                  const isConfirmado = !!item.foto_confirmacao_url
-                  const statusBadge = isConfirmado ? (
-                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
-                      Confirmado
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
-                      Pendente
-                    </Badge>
+                  const isConfirmado = !!item.foto_confirmacao_url || item.status === 'Confirmado'
+                  const startOfToday = new Date()
+                  startOfToday.setHours(0, 0, 0, 0)
+                  let isAgendado = false
+                  if (item.status === 'Agendado' || item.status === 'agendado') isAgendado = true
+                  if (item.data_liberacao && new Date(item.data_liberacao) > startOfToday)
+                    isAgendado = true
+                  if (item.data_pagamento_v2 && new Date(item.data_pagamento_v2) > startOfToday)
+                    isAgendado = true
+                  if (
+                    item.expand?.colaborador_id?.data_pagamento_v2 &&
+                    new Date(item.expand.colaborador_id.data_pagamento_v2) > startOfToday
                   )
+                    isAgendado = true
+
+                  let statusBadge = null
+                  if (isConfirmado) {
+                    statusBadge = (
+                      <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                        Confirmado
+                      </Badge>
+                    )
+                  } else if (isAgendado) {
+                    statusBadge = (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger className="cursor-help">
+                            <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-200 shadow-none border-none flex items-center justify-center gap-1 w-max">
+                              <Lock className="w-3 h-3" />
+                              Agendado
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Aguardando data de pagamento</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )
+                  } else {
+                    statusBadge = (
+                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                        Pendente
+                      </Badge>
+                    )
+                  }
 
                   return (
                     <Card key={item.id} className="shadow-sm">
@@ -1022,14 +1085,6 @@ export default function RelatorioRecebedoria() {
                               onClick={() => setPhotoModal(item.foto_confirmacao_url)}
                             >
                               <ImageIcon className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="h-8"
-                              onClick={() => setDetailsModal(item)}
-                            >
-                              Detalhes
                             </Button>
                           </div>
                         </div>
