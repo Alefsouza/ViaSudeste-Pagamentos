@@ -55,6 +55,7 @@ export default function Camera() {
   const [fotoCapturada, setFotoCapturada] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [blockedDate, setBlockedDate] = useState<string | null>(null)
+  const [maxReferencia, setMaxReferencia] = useState<number>(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -62,6 +63,24 @@ export default function Camera() {
 
   const { toast } = useToast()
   const { user } = useAuth()
+
+  const fetchMaxRef = useCallback(async () => {
+    try {
+      const result = await pb.collection('colaboradores').getList(1, 1, {
+        sort: '-referencia',
+        fields: 'referencia',
+      })
+      if (result.items.length > 0) {
+        setMaxReferencia(result.items[0].referencia || 0)
+      }
+    } catch {
+      /* intentionally ignored */
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchMaxRef()
+  }, [fetchMaxRef])
 
   const fetchColaboradorBackground = useCallback(async () => {
     if (!registro || viewState === 'CONFIRMING_PAYMENT' || viewState === 'PROCESSING') return
@@ -119,12 +138,20 @@ export default function Camera() {
     return sortedRecords.filter((rec: any) => {
       if (rec.status === 'Confirmado' || rec.status === 'confirmado') return false
       if (rec.status === 'Cancelado' || rec.status === 'cancelado') return false
+      if (rec.status === 'Agendado' || rec.status === 'agendado') return false
 
       const val = rec.valor_a_receber || rec.valor || 0
       if (val <= 0) return false
 
       if (rec.liberado_pagamento === true || rec.liberado_pagamento === 'true') {
         return true
+      }
+
+      const recRef = rec.referencia || 0
+      if (maxReferencia > 0) {
+        if (recRef < maxReferencia - 3) {
+          return false
+        }
       }
 
       if (rec.data_liberacao) {
@@ -149,7 +176,7 @@ export default function Camera() {
 
       return true
     })
-  }, [sortedRecords])
+  }, [sortedRecords, maxReferencia])
 
   const stopCamera = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -195,6 +222,7 @@ export default function Camera() {
       for (const rec of recordsToCheck) {
         if (rec.status === 'Confirmado' || rec.status === 'confirmado') continue
         if (rec.status === 'Cancelado' || rec.status === 'cancelado') continue
+        if (rec.status === 'Agendado' || rec.status === 'agendado') continue
 
         if (rec.data_liberacao) {
           const libDate = new Date(rec.data_liberacao)
@@ -247,6 +275,8 @@ export default function Camera() {
     setColaborador(null)
     setFotoPredeterminada(null)
     setFotoCapturada(null)
+
+    await fetchMaxRef()
 
     try {
       const result = await getColaboradorByRegistro(registro)
