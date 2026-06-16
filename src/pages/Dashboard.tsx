@@ -9,7 +9,18 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts'
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts'
 import {
   Users,
   TrendingUp,
@@ -64,9 +75,11 @@ export default function Dashboard() {
     search: '',
     status: 'Todos',
     tipoPagamento: 'Todos',
+    referencia: 'Todas',
   })
   const [debouncedFilters, setDebouncedFilters] = useState(filters)
   const [knownTipos, setKnownTipos] = useState<Set<number>>(new Set())
+  const [knownRefs, setKnownRefs] = useState<Set<number>>(new Set())
   const [page, setPage] = useState(1)
 
   const [statsLoading, setStatsLoading] = useState(true)
@@ -80,6 +93,7 @@ export default function Dashboard() {
   // Chart Interactive Filters
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
   const [selectedChartDate, setSelectedChartDate] = useState<string | null>(null)
+  const [selectedChartRef, setSelectedChartRef] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -126,6 +140,10 @@ export default function Dashboard() {
         tableFiltersForAPI.endDate = selectedChartDate
       }
 
+      if (selectedChartRef && selectedChartRef !== 'N/A') {
+        tableFiltersForAPI.referencia = selectedChartRef
+      }
+
       const paginated = await getColaboradoresPaginated(page, 20, tableFiltersForAPI)
       setTableData(paginated)
     } catch (e: any) {
@@ -156,13 +174,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadTable()
-  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
+  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate, selectedChartRef])
 
   const refreshAll = useCallback(() => {
     loadStats()
     loadTable()
     loadMaxRef()
-  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate])
+  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate, selectedChartRef])
 
   const handleToggleRelease = async (payment: any) => {
     try {
@@ -219,6 +237,13 @@ export default function Dashboard() {
         })
         return next
       })
+      setKnownRefs((prev) => {
+        const next = new Set(prev)
+        statsData.forEach((c) => {
+          if (c.referencia != null) next.add(c.referencia)
+        })
+        return next
+      })
     }
   }, [statsData])
 
@@ -227,11 +252,17 @@ export default function Dashboard() {
   useRealtime('fotos_colaboradores', refreshAll)
 
   const availableTipos = Array.from(knownTipos).sort()
+  const availableRefs = Array.from(knownRefs).sort((a, b) => b - a)
 
   // Derived filtered stats for Summary Cards based on interactive chart selections
   const filteredStatsData = useMemo(() => {
     return statsData.filter((curr) => {
       if (selectedChartFilial && (curr.filial || 'Outra') !== selectedChartFilial) return false
+
+      if (selectedChartRef) {
+        const cRef = curr.referencia ? String(curr.referencia) : 'N/A'
+        if (cRef !== selectedChartRef) return false
+      }
 
       if (selectedChartDate) {
         if (
@@ -344,6 +375,22 @@ export default function Dashboard() {
       }
     })
 
+  const refDataMap = statsData.reduce(
+    (acc, curr) => {
+      const ref = curr.referencia ? String(curr.referencia) : 'N/A'
+      acc[ref] = (acc[ref] || 0) + (curr.valor_a_receber || curr.valor || 0)
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+
+  const refData = Object.entries(refDataMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([ref, total]) => ({
+      ref,
+      total,
+    }))
+
   const isEmpty = statsData.length === 0 && !statsLoading
 
   // Group table items by Name without aggregating their values
@@ -366,13 +413,14 @@ export default function Dashboard() {
             Analise a distribuição de pagamentos e monitore as filiais.
           </p>
         </div>
-        {(selectedChartFilial || selectedChartDate) && (
+        {(selectedChartFilial || selectedChartDate || selectedChartRef) && (
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
               setSelectedChartFilial(null)
               setSelectedChartDate(null)
+              setSelectedChartRef(null)
               setPage(1)
             }}
             className="animate-fade-in text-muted-foreground"
@@ -385,7 +433,7 @@ export default function Dashboard() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <CardContent className="p-4 flex flex-wrap gap-4 *:flex-1 *:min-w-[140px]">
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
               <Label>Buscar</Label>
@@ -486,6 +534,27 @@ export default function Dashboard() {
               value={filters.endDate}
               onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
             />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Label>Referência</Label>
+            </div>
+            <Select
+              value={filters.referencia}
+              onValueChange={(val) => setFilters({ ...filters, referencia: val })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todas">Todas</SelectItem>
+                {availableRefs.map((r) => (
+                  <SelectItem key={r} value={String(r)}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -590,68 +659,7 @@ export default function Dashboard() {
       ) : (
         <>
           {/* Charts */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Total Pago por Dia</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {statsLoading ? (
-                  <Skeleton className="h-[300px] w-full" />
-                ) : (
-                  <ChartContainer
-                    config={{ total: { label: 'Total Pago', color: 'hsl(var(--primary))' } }}
-                    className="h-[300px] w-full"
-                  >
-                    <BarChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis
-                        dataKey="formattedDate"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar
-                        dataKey="total"
-                        radius={[4, 4, 0, 0]}
-                        onClick={(data) => {
-                          const date = data?.date || data?.payload?.date
-                          if (date) {
-                            setSelectedChartDate((prev) => (prev === date ? null : date))
-                            setPage(1)
-                          }
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {dailyData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill="var(--color-total)"
-                            style={{
-                              opacity: selectedChartDate
-                                ? selectedChartDate === entry.date
-                                  ? 1
-                                  : 0.3
-                                : 1,
-                              transition: 'opacity 0.2s',
-                              outline: 'none',
-                            }}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ChartContainer>
-                )}
-              </CardContent>
-            </Card>
-
+          <div className="grid gap-4 md:grid-cols-2 mb-4">
             <Card>
               <CardHeader>
                 <CardTitle>Distribuição por Filial</CardTitle>
@@ -709,6 +717,116 @@ export default function Dashboard() {
                 )}
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuição por Referência</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <ChartContainer
+                    config={{ total: { label: 'Total', color: 'hsl(var(--chart-3))' } }}
+                    className="h-[300px] w-full"
+                  >
+                    <BarChart data={refData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="ref" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar
+                        dataKey="total"
+                        radius={[4, 4, 0, 0]}
+                        fill="var(--color-total)"
+                        onClick={(data) => {
+                          const ref = data?.ref || data?.payload?.ref
+                          if (ref) {
+                            setSelectedChartRef((prev) => (prev === ref ? null : ref))
+                            setPage(1)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {refData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill="var(--color-total)"
+                            style={{
+                              opacity: selectedChartRef
+                                ? selectedChartRef === entry.ref
+                                  ? 1
+                                  : 0.3
+                                : 1,
+                              transition: 'opacity 0.2s',
+                              outline: 'none',
+                            }}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 grid-cols-1 mb-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Pago por Dia</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <ChartContainer
+                    config={{ total: { label: 'Total Pago', color: 'hsl(var(--primary))' } }}
+                    className="h-[300px] w-full"
+                  >
+                    <LineChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="formattedDate"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Line
+                        type="monotone"
+                        dataKey="total"
+                        stroke="var(--color-total)"
+                        strokeWidth={2}
+                        dot={{ r: 4, fill: 'var(--color-total)', strokeWidth: 2 }}
+                        activeDot={{
+                          r: 6,
+                          onClick: (_e: any, payload: any) => {
+                            const date = payload?.payload?.date
+                            if (date) {
+                              setSelectedChartDate((prev) => (prev === date ? null : date))
+                              setPage(1)
+                            }
+                          },
+                          style: { cursor: 'pointer' },
+                        }}
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Table */}
@@ -716,7 +834,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle>
                 Transações de Pagamentos
-                {(selectedChartFilial || selectedChartDate) && (
+                {(selectedChartFilial || selectedChartDate || selectedChartRef) && (
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
                     (Filtro de gráfico ativo)
                   </span>

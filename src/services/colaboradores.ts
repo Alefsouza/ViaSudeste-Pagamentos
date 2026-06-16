@@ -40,6 +40,9 @@ const buildFilterStr = (filters: any) => {
   if (tipoPagamento && tipoPagamento !== 'Todos') {
     filterStr.push(`idtipopgto=${tipoPagamento}`)
   }
+  if (filters.referencia && filters.referencia !== 'Todas') {
+    filterStr.push(`referencia=${filters.referencia}`)
+  }
 
   return filterStr.join(' && ')
 }
@@ -94,7 +97,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .catch(() => null)
 
   if (!anyColab) {
-    throw new Error('Todos os pagamentos deste colaborador estão em dia.')
+    throw new Error('Não há valor pendente')
   }
 
   const fotoRecord = await pb
@@ -126,7 +129,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .catch(() => [])
 
   if (allRecords.length === 0) {
-    throw new Error('Todos os pagamentos deste colaborador estão em dia.')
+    throw new Error('Não há valor pendente')
   }
 
   const lastColab = await pb
@@ -151,7 +154,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
   }, 0)
 
   if (totalValor === 0) {
-    throw new Error('Todos os pagamentos deste colaborador estão em dia.')
+    throw new Error('Não há valor pendente')
   }
 
   const firstColab = validRecords[0]
