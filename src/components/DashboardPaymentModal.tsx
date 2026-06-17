@@ -79,6 +79,15 @@ export function DashboardPaymentModal({
       return
     }
 
+    if (!record.registro || !record.nome) {
+      toast({
+        title: 'Erro de Validação',
+        description: 'Os campos Registro e Nome são obrigatórios.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setSubmitting((prev) => ({ ...prev, [record.id]: true }))
     try {
       const formData = new FormData()
@@ -86,7 +95,10 @@ export function DashboardPaymentModal({
       formData.append('registro', record.registro || '')
       formData.append('nome', record.nome || '')
       formData.append('valor_pago', String(record.valor_a_receber || record.valor || 0))
-      formData.append('data_pagamento', format(new Date(), 'yyyy-MM-dd HH:mm:ss'))
+
+      const now = new Date()
+      formData.append('data_pagamento', format(now, 'yyyy-MM-dd HH:mm:ss'))
+      formData.append('hora_pagamento', format(now, 'HH:mm:ss'))
       formData.append('status', 'Confirmado')
       formData.append('foto_confirmacao', confirmPhoto)
 
@@ -98,23 +110,50 @@ export function DashboardPaymentModal({
         formData.append('idtipopgto', String(record.idtipopgto))
       }
 
+      if (record.tipo_pagamento) {
+        formData.append('tipo_pagamento', record.tipo_pagamento)
+      }
+
+      if (record.inicio) formData.append('inicio', record.inicio)
+      if (record.termino) formData.append('termino', record.termino)
+      if (record.horas) formData.append('horas', String(record.horas))
+
       const filialNumber =
         record.filial_id ||
         (record.filial === 'Cursino' ? 1 : record.filial === 'Sapopemba' ? 2 : '')
-      if (filialNumber) {
+      if (filialNumber !== '') {
         formData.append('filial', String(filialNumber))
       }
 
-      await pb.collection('pagamentos').create(formData)
+      let existingPaymentId = null
+      try {
+        const existing = await pb
+          .collection('pagamentos')
+          .getFirstListItem(`colaborador_id="${record.id}"`)
+        existingPaymentId = existing.id
+      } catch (e) {
+        // Not found, will create
+      }
+
+      if (existingPaymentId) {
+        await pb.collection('pagamentos').update(existingPaymentId, formData)
+      } else {
+        await pb.collection('pagamentos').create(formData)
+      }
 
       toast({ title: 'Pagamento aprovado com sucesso!' })
       setOpen(false)
       setRecords([])
       onRefresh()
     } catch (err: any) {
+      console.error('Erro completo do servidor:', err.response, err.data, err)
       const errors = extractFieldErrors(err)
       const msgs = Object.entries(errors).map(([field, msg]) => `Campo '${field}': ${msg}`)
-      const msg = msgs.length > 0 ? msgs.join(', ') : err.message || 'Erro ao confirmar pagamento'
+      let msg = msgs.length > 0 ? msgs.join(', ') : err.message || 'Erro ao confirmar pagamento'
+      if (err.status === 400 && msgs.length === 0) {
+        msg =
+          'Erro de validação ou conflito de dados (ex: registro duplicado ou campo obrigatório ausente).'
+      }
       toast({ title: 'Erro ao confirmar', description: msg, variant: 'destructive' })
     } finally {
       setSubmitting((prev) => ({ ...prev, [record.id]: false }))
