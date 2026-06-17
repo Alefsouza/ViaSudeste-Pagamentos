@@ -195,34 +195,24 @@ routerAdd(
     }
 
     function bytesToBase64(bytes) {
-      let u8
-      if (bytes instanceof Uint8Array) {
-        u8 = bytes
-      } else if (bytes instanceof ArrayBuffer) {
-        u8 = new Uint8Array(bytes)
-      } else if (bytes && bytes.buffer instanceof ArrayBuffer) {
-        u8 = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-      } else {
-        u8 = new Uint8Array(bytes)
-      }
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
       let result = ''
       let i
-      const len = u8.length
+      const len = bytes.length
       for (i = 0; i < len - 2; i += 3) {
-        result += chars[u8[i] >> 2]
-        result += chars[((u8[i] & 3) << 4) | (u8[i + 1] >> 4)]
-        result += chars[((u8[i + 1] & 15) << 2) | (u8[i + 2] >> 6)]
-        result += chars[u8[i + 2] & 63]
+        result += chars[bytes[i] >> 2]
+        result += chars[((bytes[i] & 3) << 4) | (bytes[i + 1] >> 4)]
+        result += chars[((bytes[i + 1] & 15) << 2) | (bytes[i + 2] >> 6)]
+        result += chars[bytes[i + 2] & 63]
       }
       if (len % 3 === 2) {
-        result += chars[u8[i] >> 2]
-        result += chars[((u8[i] & 3) << 4) | (u8[i + 1] >> 4)]
-        result += chars[(u8[i + 1] & 15) << 2]
+        result += chars[bytes[i] >> 2]
+        result += chars[((bytes[i] & 3) << 4) | (bytes[i + 1] >> 4)]
+        result += chars[(bytes[i + 1] & 15) << 2]
         result += '='
       } else if (len % 3 === 1) {
-        result += chars[u8[i] >> 2]
-        result += chars[(u8[i] & 3) << 4]
+        result += chars[bytes[i] >> 2]
+        result += chars[(bytes[i] & 3) << 4]
         result += '=='
       }
       return result
@@ -246,30 +236,18 @@ routerAdd(
     } else {
       if (sourceB64.startsWith('http://') || sourceB64.startsWith('https://')) {
         try {
-          const headers = {}
-          const authHeader = e.requestInfo().headers['authorization']
-          if (authHeader) headers['Authorization'] = authHeader
-
-          const fetchRes = $http.send({
-            url: sourceB64,
-            method: 'GET',
-            headers: headers,
-            timeout: 5,
-          })
+          const fetchRes = $http.send({ url: sourceB64, method: 'GET', timeout: 5 })
           if (fetchRes.statusCode === 200 && fetchRes.body) {
             sourceB64 = bytesToBase64(fetchRes.body)
-            if (!sourceB64) throw new Error('Falha na conversão de bytes')
             globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
           } else {
             logRecord.set('status', 400)
             $app.save(logRecord)
-            console.log('Erro ao baixar foto do banco. Status: ' + fetchRes.statusCode)
             return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
           }
         } catch (err) {
           logRecord.set('status', 400)
           $app.save(logRecord)
-          console.log('Erro ao baixar foto do banco: ' + String(err))
           return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
         }
       } else {
@@ -357,7 +335,6 @@ routerAdd(
     let timeout = false
     let authFailed = false
     let badRequest = false
-    let awsMessage = ''
 
     try {
       const reqData = signAWSRequest(region, accessKey, secretKey, requestBody, amzTarget)
@@ -378,10 +355,8 @@ routerAdd(
 
       if (statusCode === 400) {
         badRequest = true
-        const awsError = res.json || {}
-        awsMessage = awsError.message || awsError.Message || awsError.__type || ''
         console.log(
-          `Erro AWS: [{ "status": ${statusCode}, "response": ${JSON.stringify(awsError)} }]`,
+          `Erro AWS: [{ "status": ${statusCode}, "response": ${JSON.stringify(res.json || {})} }]`,
         )
       } else if (statusCode === 403 || statusCode === 401) {
         authFailed = true
@@ -419,13 +394,6 @@ routerAdd(
       return e.json(401, { message: 'Credenciais da AWS invalidas. Verifique Secrets' })
     }
     if (badRequest) {
-      const msgLower = awsMessage.toLowerCase()
-      if (msgLower.includes('face') || msgLower.includes('rosto')) {
-        return e.json(400, {
-          message:
-            'Nenhum rosto detectado na imagem. Certifique-se de que o rosto está bem iluminado e visível.',
-        })
-      }
       return e.json(400, { message: 'Imagem invalida. Tente capturar novamente' })
     }
     if (statusCode === 504 || timeout) {

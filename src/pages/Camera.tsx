@@ -30,11 +30,9 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCcw,
-  Lock,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
-import { useRealtime } from '@/hooks/use-realtime'
 import { cn } from '@/lib/utils'
 
 type ViewState =
@@ -54,8 +52,6 @@ export default function Camera() {
   const [fotoPredeterminada, setFotoPredeterminada] = useState<string | null>(null)
   const [fotoCapturada, setFotoCapturada] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [blockedDate, setBlockedDate] = useState<string | null>(null)
-  const [maxReferencia, setMaxReferencia] = useState<number>(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -63,46 +59,6 @@ export default function Camera() {
 
   const { toast } = useToast()
   const { user } = useAuth()
-
-  const fetchMaxRef = useCallback(async () => {
-    try {
-      const result = await pb.collection('colaboradores').getList(1, 1, {
-        sort: '-referencia',
-        fields: 'referencia',
-      })
-      if (result.items.length > 0) {
-        setMaxReferencia(result.items[0].referencia || 0)
-      }
-    } catch {
-      /* intentionally ignored */
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchMaxRef()
-  }, [fetchMaxRef])
-
-  const fetchColaboradorBackground = useCallback(async () => {
-    if (!registro || viewState === 'CONFIRMING_PAYMENT' || viewState === 'PROCESSING') return
-    try {
-      const result = await getColaboradorByRegistro(registro)
-      if (result && result.colab) {
-        setColaborador(result.colab)
-      } else {
-        setColaborador(null)
-        setViewState('EMPTY')
-      }
-    } catch {
-      setColaborador(null)
-      setViewState('EMPTY')
-    }
-  }, [registro, viewState])
-
-  useRealtime('colaboradores', (e) => {
-    if (colaborador && e.record.registro === colaborador.registro) {
-      fetchColaboradorBackground()
-    }
-  })
 
   const sortedRecords = useMemo(() => {
     if (!colaborador) return []
@@ -130,53 +86,6 @@ export default function Camera() {
       return da - db
     })
   }, [colaborador])
-
-  const payableRecords = useMemo(() => {
-    const startOfToday = new Date()
-    startOfToday.setHours(0, 0, 0, 0)
-
-    return sortedRecords.filter((rec: any) => {
-      if (rec.status === 'Confirmado' || rec.status === 'confirmado') return false
-      if (rec.status === 'Cancelado' || rec.status === 'cancelado') return false
-      if (rec.status === 'Agendado' || rec.status === 'agendado') return false
-
-      const val = rec.valor_a_receber || rec.valor || 0
-      if (val <= 0) return false
-
-      if (rec.liberado_pagamento === true || rec.liberado_pagamento === 'true') {
-        return true
-      }
-
-      const recRef = rec.referencia || 0
-      if (maxReferencia > 0) {
-        if (recRef < maxReferencia - 3) {
-          return false
-        }
-      }
-
-      if (rec.data_liberacao) {
-        const libDate = new Date(rec.data_liberacao)
-        const startOfLibDate = new Date(
-          libDate.getFullYear(),
-          libDate.getMonth(),
-          libDate.getDate(),
-        )
-        if (startOfLibDate > startOfToday) {
-          return false
-        }
-      }
-
-      if (rec.data_pagamento_v2) {
-        const v2Date = new Date(rec.data_pagamento_v2)
-        const startOfV2Date = new Date(v2Date.getFullYear(), v2Date.getMonth(), v2Date.getDate())
-        if (startOfV2Date > startOfToday) {
-          return false
-        }
-      }
-
-      return true
-    })
-  }, [sortedRecords, maxReferencia])
 
   const stopCamera = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -209,57 +118,6 @@ export default function Camera() {
   ].includes(viewState)
 
   useEffect(() => {
-    if (colaborador) {
-      let maxBlockedFormatted: string | null = null
-      let minFutureTime = Infinity
-
-      const recordsToCheck =
-        colaborador.records && colaborador.records.length > 0 ? colaborador.records : [colaborador]
-
-      const startOfToday = new Date()
-      startOfToday.setHours(0, 0, 0, 0)
-
-      for (const rec of recordsToCheck) {
-        if (rec.status === 'Confirmado' || rec.status === 'confirmado') continue
-        if (rec.status === 'Cancelado' || rec.status === 'cancelado') continue
-        if (rec.status === 'Agendado' || rec.status === 'agendado') continue
-
-        if (rec.data_liberacao) {
-          const libDate = new Date(rec.data_liberacao)
-          const startOfLibDate = new Date(
-            libDate.getFullYear(),
-            libDate.getMonth(),
-            libDate.getDate(),
-          )
-          if (startOfToday < startOfLibDate) {
-            if (startOfLibDate.getTime() < minFutureTime) {
-              minFutureTime = startOfLibDate.getTime()
-              maxBlockedFormatted = `${String(libDate.getDate()).padStart(2, '0')}/${String(libDate.getMonth() + 1).padStart(2, '0')}/${libDate.getFullYear()}`
-            }
-          }
-        }
-        if (rec.data_pagamento_v2) {
-          const libDate = new Date(rec.data_pagamento_v2)
-          const startOfLibDate = new Date(
-            libDate.getFullYear(),
-            libDate.getMonth(),
-            libDate.getDate(),
-          )
-          if (startOfToday < startOfLibDate) {
-            if (startOfLibDate.getTime() < minFutureTime) {
-              minFutureTime = startOfLibDate.getTime()
-              maxBlockedFormatted = `${String(libDate.getDate()).padStart(2, '0')}/${String(libDate.getMonth() + 1).padStart(2, '0')}/${libDate.getFullYear()}`
-            }
-          }
-        }
-      }
-      setBlockedDate(maxBlockedFormatted)
-    } else {
-      setBlockedDate(null)
-    }
-  }, [colaborador])
-
-  useEffect(() => {
     if (isCameraActive) {
       startCamera()
     } else {
@@ -275,8 +133,6 @@ export default function Camera() {
     setColaborador(null)
     setFotoPredeterminada(null)
     setFotoCapturada(null)
-
-    await fetchMaxRef()
 
     try {
       const result = await getColaboradorByRegistro(registro)
@@ -509,20 +365,11 @@ export default function Camera() {
     const data_pagamento = now.toISOString()
     const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
 
-    if (payableRecords.length === 0) {
-      toast({
-        title: 'Aviso',
-        description: 'Não há pagamentos liberados para processar.',
-        variant: 'destructive',
-      })
-      setViewState('RECOGNITION_SUCCESS')
-      return
-    }
-
     try {
       let firstFileUrl = ''
 
-      const recordsToProcess = payableRecords
+      const recordsToProcess =
+        colaborador.records && colaborador.records.length > 0 ? colaborador.records : [colaborador]
 
       for (let i = 0; i < recordsToProcess.length; i++) {
         const record = recordsToProcess[i]
@@ -573,8 +420,12 @@ export default function Camera() {
       }
 
       try {
-        for (const record of recordsToProcess) {
-          await updateColaborador(record.id, { foto_confirmacao_url: firstFileUrl })
+        if (colaborador.all_records_ids && Array.isArray(colaborador.all_records_ids)) {
+          for (const id of colaborador.all_records_ids) {
+            await updateColaborador(id, { foto_confirmacao_url: firstFileUrl })
+          }
+        } else {
+          await updateColaborador(colaborador.id, { foto_confirmacao_url: firstFileUrl })
         }
       } catch (err) {
         toast({
@@ -586,14 +437,11 @@ export default function Camera() {
         return
       }
 
-      const totalPago = payableRecords.reduce(
-        (acc: number, rec: any) => acc + (rec.valor_a_receber || rec.valor || 0),
-        0,
-      )
-
       toast({
         title: 'Sucesso',
-        description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(totalPago)}`,
+        description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(
+          colaborador.valor_a_receber || colaborador.valor || 0,
+        )}`,
       })
       handleReset()
     } catch (err) {
@@ -839,23 +687,14 @@ export default function Camera() {
             {viewState === 'CAPTURING' && (
               <div className="absolute inset-0 z-10 flex flex-col justify-end p-6">
                 <div className="flex justify-center">
-                  {payableRecords.length > 0 ? (
-                    <Button
-                      size="lg"
-                      className="rounded-full h-16 w-16 p-0 border border-slate-200 bg-white/90 hover:bg-white text-slate-900 shadow-sm backdrop-blur-sm transition-all"
-                      onClick={handleCapture}
-                    >
-                      <CameraIcon className="h-6 w-6" />
-                      <span className="sr-only">Capturar Foto</span>
-                    </Button>
-                  ) : (
-                    <div className="bg-slate-900/80 text-white px-4 py-3 rounded-full text-sm font-medium backdrop-blur-sm flex items-center gap-2 shadow-lg">
-                      <Lock className="h-4 w-4" />
-                      {blockedDate
-                        ? `Agendado para ${blockedDate}`
-                        : 'Aguardando data de pagamento'}
-                    </div>
-                  )}
+                  <Button
+                    size="lg"
+                    className="rounded-full h-16 w-16 p-0 border border-slate-200 bg-white/90 hover:bg-white text-slate-900 shadow-sm backdrop-blur-sm transition-all"
+                    onClick={handleCapture}
+                  >
+                    <CameraIcon className="h-6 w-6" />
+                    <span className="sr-only">Capturar Foto</span>
+                  </Button>
                 </div>
               </div>
             )}
@@ -878,19 +717,7 @@ export default function Camera() {
             </DialogDescription>
           </DialogHeader>
 
-          {colaborador && payableRecords.length === 0 && (
-            <div className="flex flex-col items-center justify-center p-8 text-center bg-slate-50 dark:bg-slate-900 rounded-lg min-h-[300px]">
-              <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 dark:text-white">
-                Não há pagamentos liberados
-              </h3>
-              <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
-                Não há pagamentos disponíveis para processamento no momento.
-              </p>
-            </div>
-          )}
-
-          {colaborador && payableRecords.length > 0 && (
+          {colaborador && (
             <div className="flex flex-col min-h-0 gap-4 mt-2">
               <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900 p-3 rounded-lg shrink-0">
                 <div>
@@ -926,7 +753,7 @@ export default function Camera() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {payableRecords.map((record: any, idx: number) => (
+                    {sortedRecords.map((record: any, idx: number) => (
                       <TableRow
                         key={record.id || idx}
                         className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -964,7 +791,7 @@ export default function Camera() {
                       Subtotais por Tipo
                     </h4>
                     {Object.entries(
-                      payableRecords.reduce((acc: any, record: any) => {
+                      sortedRecords.reduce((acc: any, record: any) => {
                         const type = getTipoPagamentoDesc(record.idtipopgto)
                         const val = record.valor_a_receber || record.valor || 0
                         acc[type] = (acc[type] || 0) + val
@@ -980,12 +807,7 @@ export default function Camera() {
                   <div className="flex justify-between items-center pt-1">
                     <span className="font-bold text-sm">Total Geral</span>
                     <span className="font-bold text-lg text-green-600 dark:text-green-500">
-                      {formatCurrency(
-                        payableRecords.reduce(
-                          (acc: number, rec: any) => acc + (rec.valor_a_receber || rec.valor || 0),
-                          0,
-                        ),
-                      )}
+                      {formatCurrency(colaborador.valor_a_receber || colaborador.valor || 0)}
                     </span>
                   </div>
                 </div>
@@ -993,34 +815,24 @@ export default function Camera() {
             </div>
           )}
 
-          <DialogFooter className="mt-4 shrink-0 w-full">
-            <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-4">
-              <div className="text-sm w-full sm:w-auto"></div>
-              <div className="flex gap-2 w-full sm:w-auto justify-end">
-                <Button
-                  variant="outline"
-                  onClick={handleReset}
-                  disabled={viewState === 'CONFIRMING_PAYMENT'}
-                  className="flex-1 sm:flex-none"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleConfirmPayment}
-                  disabled={viewState === 'CONFIRMING_PAYMENT' || payableRecords.length === 0}
-                  className="flex-1 sm:flex-none"
-                >
-                  {viewState === 'CONFIRMING_PAYMENT' ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Confirmando...
-                    </>
-                  ) : (
-                    'Confirmar'
-                  )}
-                </Button>
-              </div>
-            </div>
+          <DialogFooter className="mt-4 shrink-0">
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              disabled={viewState === 'CONFIRMING_PAYMENT'}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmPayment} disabled={viewState === 'CONFIRMING_PAYMENT'}>
+              {viewState === 'CONFIRMING_PAYMENT' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Confirmando...
+                </>
+              ) : (
+                'Confirmar'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

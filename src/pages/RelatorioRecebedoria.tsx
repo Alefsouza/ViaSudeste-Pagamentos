@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -43,7 +42,6 @@ import {
   ChevronLeft,
   ChevronRight,
   SearchX,
-  Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatHoraString, formatHoras, getTipoPagamento, formatBRL } from '@/lib/formatters'
@@ -77,7 +75,6 @@ export default function RelatorioRecebedoria() {
   const [usuarioFilter, setUsuarioFilter] = useState('Todos')
   const [garagemFilter, setGaragemFilter] = useState('Todos')
   const [tipoPagamentoFilter, setTipoPagamentoFilter] = useState('Todos')
-  const [referenciaFilter, setReferenciaFilter] = useState('Todos')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
@@ -87,12 +84,6 @@ export default function RelatorioRecebedoria() {
   const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
   const [filiaisOptions, setFiliaisOptions] = useState<{ label: string; value: string }[]>([])
   const [tiposPagamento, setTiposPagamento] = useState<string[]>([])
-  const [todasReferencias, setTodasReferencias] = useState<number[]>([])
-  const [top4Referencias, setTop4Referencias] = useState<number[]>([])
-
-  const [colaboradoresPendentes, setColaboradoresPendentes] = useState<any[]>([])
-  const [loadingPendentes, setLoadingPendentes] = useState(false)
-  const minTop4Ref = top4Referencias.length > 0 ? top4Referencias[top4Referencias.length - 1] : 0
 
   useEffect(() => {
     async function fetchFilterOptions() {
@@ -124,15 +115,6 @@ export default function RelatorioRecebedoria() {
           new Set(pagamentosRes.map((p: any) => p.tipo_pagamento).filter(Boolean)),
         )
         setTiposPagamento(uniqueTipos as string[])
-
-        const refsRes = await pb.collection('colaboradores').getFullList({
-          fields: 'referencia',
-          filter: 'referencia > 0',
-        })
-        const refs = refsRes.map((i: any) => i.referencia).filter((r: any) => r != null && r > 0)
-        const allUniqueRefs = Array.from(new Set(refs)).sort((a: any, b: any) => b - a) as number[]
-        setTodasReferencias(allUniqueRefs)
-        setTop4Referencias(allUniqueRefs.slice(0, 4))
 
         const uniqueFiliais = Array.from(
           new Set(
@@ -222,10 +204,6 @@ export default function RelatorioRecebedoria() {
         conditions.push(`tipo_pagamento = "${tipoPagamentoFilter}"`)
       }
 
-      if (referenciaFilter && referenciaFilter !== 'Todos') {
-        conditions.push(`colaborador_id.referencia = ${referenciaFilter}`)
-      }
-
       const filterString = conditions.length > 0 ? conditions.join(' && ') : ''
 
       const fullRes = await pb.collection('pagamentos').getFullList({
@@ -266,7 +244,6 @@ export default function RelatorioRecebedoria() {
     usuarioFilter,
     garagemFilter,
     tipoPagamentoFilter,
-    referenciaFilter,
     allUsers.length,
     filiaisOptions.length,
   ])
@@ -276,32 +253,8 @@ export default function RelatorioRecebedoria() {
     setData(summaryData.slice(startIndex, startIndex + 20))
   }, [page, summaryData])
 
-  const loadPendentes = async () => {
-    if (minTop4Ref <= 0) return
-    setLoadingPendentes(true)
-    try {
-      const res = await pb.collection('colaboradores').getFullList({
-        filter: `referencia < ${minTop4Ref} && (foto_confirmacao_url = "" || foto_confirmacao_url = null)`,
-        sort: '-created',
-      })
-      setColaboradoresPendentes(res)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoadingPendentes(false)
-    }
-  }
-
-  useEffect(() => {
-    loadPendentes()
-  }, [minTop4Ref])
-
   useRealtime('pagamentos', () => {
     loadData()
-  })
-
-  useRealtime('colaboradores', () => {
-    loadPendentes()
   })
 
   const clearFilters = () => {
@@ -309,7 +262,6 @@ export default function RelatorioRecebedoria() {
     setUsuarioFilter('Todos')
     setGaragemFilter('Todos')
     setTipoPagamentoFilter('Todos')
-    setReferenciaFilter('Todos')
     setSearchTerm('')
     setStartTime('')
     setEndTime('')
@@ -666,23 +618,6 @@ export default function RelatorioRecebedoria() {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Referência</Label>
-            <Select value={referenciaFilter} onValueChange={setReferenciaFilter}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todas</SelectItem>
-                {todasReferencias.map((r) => (
-                  <SelectItem key={r} value={String(r)}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="flex flex-col gap-2">
             <div className="hidden sm:block h-5"></div>
             <Button
@@ -714,17 +649,9 @@ export default function RelatorioRecebedoria() {
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList
-            className={cn(
-              'mb-4 w-full sm:w-auto grid print:hidden',
-              user?.role === 'Administrador' ? 'grid-cols-3' : 'grid-cols-2',
-            )}
-          >
+          <TabsList className="mb-4 w-full sm:w-auto grid grid-cols-2 print:hidden">
             <TabsTrigger value="detalhado">Relatório Detalhado</TabsTrigger>
             <TabsTrigger value="resumido">Relatório Resumido</TabsTrigger>
-            {user?.role === 'Administrador' && (
-              <TabsTrigger value="fora-4-ref">Relatório Pag. Pendentes</TabsTrigger>
-            )}
           </TabsList>
 
           <TabsContent value="detalhado" className="mt-0 space-y-6">
@@ -829,6 +756,7 @@ export default function RelatorioRecebedoria() {
                     <TableHead className="text-left w-[150px]">Tipo de Pagamento</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                     <TableHead className="text-center">Foto</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -879,53 +807,16 @@ export default function RelatorioRecebedoria() {
                     </TableRow>
                   ) : (
                     data.map((item: any) => {
-                      const isConfirmado =
-                        !!item.foto_confirmacao_url || item.status === 'Confirmado'
-                      const startOfToday = new Date()
-                      startOfToday.setHours(0, 0, 0, 0)
-                      let isAgendado = false
-                      if (item.status === 'Agendado' || item.status === 'agendado')
-                        isAgendado = true
-                      if (item.data_liberacao && new Date(item.data_liberacao) > startOfToday)
-                        isAgendado = true
-                      if (item.data_pagamento_v2 && new Date(item.data_pagamento_v2) > startOfToday)
-                        isAgendado = true
-                      if (
-                        item.expand?.colaborador_id?.data_pagamento_v2 &&
-                        new Date(item.expand.colaborador_id.data_pagamento_v2) > startOfToday
+                      const isConfirmado = !!item.foto_confirmacao_url
+                      const statusBadge = isConfirmado ? (
+                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                          Confirmado
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                          Pendente
+                        </Badge>
                       )
-                        isAgendado = true
-
-                      let statusBadge = null
-                      if (isConfirmado) {
-                        statusBadge = (
-                          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
-                            Confirmado
-                          </Badge>
-                        )
-                      } else if (isAgendado) {
-                        statusBadge = (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger className="cursor-help">
-                                <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-200 shadow-none border-none flex items-center justify-center gap-1 w-max mx-auto">
-                                  <Lock className="w-3 h-3" />
-                                  Agendado
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Aguardando data de pagamento</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )
-                      } else {
-                        statusBadge = (
-                          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
-                            Pendente
-                          </Badge>
-                        )
-                      }
 
                       return (
                         <TableRow
@@ -970,6 +861,16 @@ export default function RelatorioRecebedoria() {
                               <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
                             </Button>
                           </TableCell>
+                          <TableCell className="text-right print:hidden">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDetailsModal(item)}
+                              className="print:hidden"
+                            >
+                              <FileText className="h-4 w-4 mr-2" /> Detalhes
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       )
                     })
@@ -992,51 +893,16 @@ export default function RelatorioRecebedoria() {
                 </div>
               ) : (
                 data.map((item: any) => {
-                  const isConfirmado = !!item.foto_confirmacao_url || item.status === 'Confirmado'
-                  const startOfToday = new Date()
-                  startOfToday.setHours(0, 0, 0, 0)
-                  let isAgendado = false
-                  if (item.status === 'Agendado' || item.status === 'agendado') isAgendado = true
-                  if (item.data_liberacao && new Date(item.data_liberacao) > startOfToday)
-                    isAgendado = true
-                  if (item.data_pagamento_v2 && new Date(item.data_pagamento_v2) > startOfToday)
-                    isAgendado = true
-                  if (
-                    item.expand?.colaborador_id?.data_pagamento_v2 &&
-                    new Date(item.expand.colaborador_id.data_pagamento_v2) > startOfToday
+                  const isConfirmado = !!item.foto_confirmacao_url
+                  const statusBadge = isConfirmado ? (
+                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
+                      Confirmado
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
+                      Pendente
+                    </Badge>
                   )
-                    isAgendado = true
-
-                  let statusBadge = null
-                  if (isConfirmado) {
-                    statusBadge = (
-                      <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
-                        Confirmado
-                      </Badge>
-                    )
-                  } else if (isAgendado) {
-                    statusBadge = (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger className="cursor-help">
-                            <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-200 shadow-none border-none flex items-center justify-center gap-1 w-max">
-                              <Lock className="w-3 h-3" />
-                              Agendado
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Aguardando data de pagamento</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )
-                  } else {
-                    statusBadge = (
-                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 shadow-none border-none">
-                        Pendente
-                      </Badge>
-                    )
-                  }
 
                   return (
                     <Card key={item.id} className="shadow-sm">
@@ -1086,6 +952,14 @@ export default function RelatorioRecebedoria() {
                             >
                               <ImageIcon className="h-4 w-4" />
                             </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => setDetailsModal(item)}
+                            >
+                              Detalhes
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
@@ -1122,83 +996,6 @@ export default function RelatorioRecebedoria() {
               </div>
             )}
           </TabsContent>
-
-          {user?.role === 'Administrador' && (
-            <TabsContent value="fora-4-ref" className="mt-0 space-y-6">
-              <div className="print:hidden">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                  Relatório Pag. Pendentes
-                </h3>
-                <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-                  <Table>
-                    <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
-                      <TableRow>
-                        <TableHead>Registro</TableHead>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Dt. Ref</TableHead>
-                        <TableHead>Ref</TableHead>
-                        <TableHead>Tipo de Pagamento</TableHead>
-                        <TableHead className="text-left">Valor</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loadingPendentes ? (
-                        [...Array(5)].map((_, i) => (
-                          <TableRow key={i}>
-                            <TableCell>
-                              <Skeleton className="h-4 w-20" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="h-4 w-40" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="h-4 w-24" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="h-4 w-16" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="h-4 w-32" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="h-4 w-24" />
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : colaboradoresPendentes.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="h-32 text-center py-8">
-                            <SearchX className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-                            <p className="text-sm text-slate-500 font-medium">
-                              Nenhum registro encontrado.
-                            </p>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        colaboradoresPendentes.map((item: any, idx: number) => (
-                          <TableRow
-                            key={item.id || idx}
-                            className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
-                          >
-                            <TableCell className="font-medium">{item.registro || 'N/A'}</TableCell>
-                            <TableCell>{item.nome || 'Desconhecido'}</TableCell>
-                            <TableCell>
-                              {formatDateStringSafe(item.data || item.periodo_inicio) || '-'}
-                            </TableCell>
-                            <TableCell>{item.referencia || '-'}</TableCell>
-                            <TableCell>{getTipoPagamento(item.idtipopgto) || 'Outros'}</TableCell>
-                            <TableCell className="text-left font-medium text-emerald-600 dark:text-emerald-400">
-                              {formatBRL(item.valor_a_receber || item.valor || 0)}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </TabsContent>
-          )}
 
           <TabsContent value="resumido" className="mt-0 space-y-8">
             <div className="print:hidden">

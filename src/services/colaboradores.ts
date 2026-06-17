@@ -132,7 +132,17 @@ export const getColaboradorByRegistro = async (registro: string) => {
     throw new Error('Não há valor pendente')
   }
 
-  const validRecords = allRecords.filter((r) => (r.valor_a_receber || r.valor || 0) > 0)
+  const lastColab = await pb
+    .collection('colaboradores')
+    .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
+    .catch(() => null)
+
+  const maxRef = lastColab?.referencia || 0
+  const minValidRef = Math.max(1, maxRef - 3)
+
+  const validRecords = allRecords.filter(
+    (r) => (r.referencia && r.referencia >= minValidRef) || r.liberado_pagamento,
+  )
 
   if (validRecords.length === 0) {
     throw new Error('Não há valor pendente')
