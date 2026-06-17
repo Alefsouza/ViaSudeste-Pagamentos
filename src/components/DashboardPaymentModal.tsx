@@ -90,6 +90,21 @@ export function DashboardPaymentModal({
       formData.append('status', 'Confirmado')
       formData.append('foto_confirmacao', confirmPhoto)
 
+      if (user?.id) {
+        formData.append('user_id', user.id)
+      }
+
+      if (record.idtipopgto != null) {
+        formData.append('idtipopgto', String(record.idtipopgto))
+      }
+
+      const filialNumber =
+        record.filial_id ||
+        (record.filial === 'Cursino' ? 1 : record.filial === 'Sapopemba' ? 2 : '')
+      if (filialNumber) {
+        formData.append('filial', String(filialNumber))
+      }
+
       await pb.collection('pagamentos').create(formData)
 
       toast({ title: 'Pagamento aprovado com sucesso!' })
@@ -98,7 +113,7 @@ export function DashboardPaymentModal({
       onRefresh()
     } catch (err: any) {
       const errors = extractFieldErrors(err)
-      const msgs = Object.entries(errors).map(([field, msg]) => `${field}: ${msg}`)
+      const msgs = Object.entries(errors).map(([field, msg]) => `Campo '${field}': ${msg}`)
       const msg = msgs.length > 0 ? msgs.join(', ') : err.message || 'Erro ao confirmar pagamento'
       toast({ title: 'Erro ao confirmar', description: msg, variant: 'destructive' })
     } finally {

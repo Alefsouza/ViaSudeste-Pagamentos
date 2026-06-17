@@ -32,10 +32,10 @@
     "README.md"
   ],
   "deployment": {
-    "lastDevBuildRef": "165e553",
-    "lastProdBuildRef": "165e553",
-    "publishedAt": "2026-06-17T16:02:05.661Z",
-    "lastPublishedRef": "165e553"
+    "lastDevBuildRef": "0b3362d",
+    "lastProdBuildRef": "0b3362d",
+    "publishedAt": "2026-06-17T16:07:08.987Z",
+    "lastPublishedRef": "0b3362d"
   },
   "migrations": {
     "applied": [
