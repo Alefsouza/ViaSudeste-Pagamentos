@@ -29,7 +29,7 @@ function ProtectedRoute({
     if (user.role === 'DP') return <Navigate to="/dp/fotos" replace />
     return <Navigate to="/camera" replace />
   }
-  return <>{children}</>
+  return children
 }
 
 const AppRoutes = () => (

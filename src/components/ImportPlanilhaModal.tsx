@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -10,8 +10,6 @@ import { Button } from '@/components/ui/button'
 import { UploadCloud, FileSpreadsheet, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 
 export function ImportPlanilhaModal({
   open,
@@ -25,31 +23,6 @@ export function ImportPlanilhaModal({
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const [referencia, setReferencia] = useState('')
-  const [dataLiberacao, setDataLiberacao] = useState('')
-  const [periodoInicio, setPeriodoInicio] = useState('')
-  const [periodoFim, setPeriodoFim] = useState('')
-
-  useEffect(() => {
-    if (open) {
-      const fetchMaxRef = async () => {
-        try {
-          const rec = await pb
-            .collection('colaboradores')
-            .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
-          if (rec && rec.referencia) {
-            setReferencia(String(rec.referencia + 1))
-          } else {
-            setReferencia('1')
-          }
-        } catch (e) {
-          setReferencia('1')
-        }
-      }
-      fetchMaxRef()
-    }
-  }, [open])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -89,18 +62,6 @@ export function ImportPlanilhaModal({
     } else {
       toast.error('Formato inválido. Por favor, envie um arquivo .xlsx ou .xls.')
     }
-  }
-
-  const handleVerify = () => {
-    if (!referencia || !dataLiberacao || !periodoInicio || !periodoFim) {
-      toast.error('Por favor, preencha todos os campos obrigatórios (Referência e Datas).')
-      return
-    }
-    if (new Date(periodoFim) < new Date(periodoInicio)) {
-      toast.error('A data final não pode ser anterior à data inicial.')
-      return
-    }
-    setConfirming(true)
   }
 
   const handleUpload = async () => {
@@ -261,15 +222,7 @@ export function ImportPlanilhaModal({
 
         const res = await pb.send('/backend/v1/import/colaboradores', {
           method: 'POST',
-          body: JSON.stringify({
-            data: formattedData,
-            metadata: {
-              referencia: Number(referencia),
-              data_liberacao: `${dataLiberacao} 12:00:00.000Z`,
-              periodo_inicio: `${periodoInicio} 12:00:00.000Z`,
-              periodo_fim: `${periodoFim} 12:00:00.000Z`,
-            },
-          }),
+          body: JSON.stringify({ data: formattedData }),
         })
 
         if (res.errors && res.errors.length > 0) {
@@ -316,14 +269,10 @@ export function ImportPlanilhaModal({
         if (!val) {
           setFile(null)
           setConfirming(false)
-          setReferencia('')
-          setDataLiberacao('')
-          setPeriodoInicio('')
-          setPeriodoFim('')
         }
       }}
     >
-      <DialogContent className="sm:max-w-3xl w-11/12 overflow-hidden max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl w-11/12 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-center">Importar Planilha</DialogTitle>
           <DialogDescription className="text-center">
@@ -370,58 +319,9 @@ export function ImportPlanilhaModal({
                 </Button>
               </div>
               {!confirming ? (
-                <div className="w-full space-y-4 animate-fade-in-up">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-md border">
-                    <div className="space-y-2">
-                      <Label htmlFor="referencia">
-                        Referência <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="referencia"
-                        type="number"
-                        placeholder="Ex: 202401"
-                        value={referencia}
-                        onChange={(e) => setReferencia(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dataLiberacao">
-                        Data de Liberação <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="dataLiberacao"
-                        type="date"
-                        value={dataLiberacao}
-                        onChange={(e) => setDataLiberacao(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="periodoInicio">
-                        Data Inicial (Período) <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="periodoInicio"
-                        type="date"
-                        value={periodoInicio}
-                        onChange={(e) => setPeriodoInicio(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="periodoFim">
-                        Data Final (Período) <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="periodoFim"
-                        type="date"
-                        value={periodoFim}
-                        onChange={(e) => setPeriodoFim(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <Button onClick={handleVerify} disabled={loading} className="w-full">
-                    Verificar Importação
-                  </Button>
-                </div>
+                <Button onClick={() => setConfirming(true)} disabled={loading} className="w-full">
+                  Verificar Importação
+                </Button>
               ) : (
                 <div className="w-full p-4 border rounded-md bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 animate-fade-in-up">
                   <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-4 text-center">

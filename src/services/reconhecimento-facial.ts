@@ -28,8 +28,9 @@ export const reconhecimentoFacialService = async (
     return response.match
   } catch (error) {
     if (error instanceof ClientResponseError) {
-      throw new FacialRecognitionError(error.status, error.message)
+      const msg = error.response?.message || error.message
+      throw new FacialRecognitionError(error.status, msg)
     }
-    throw new FacialRecognitionError(500, 'Unknown error')
+    throw new FacialRecognitionError(500, error instanceof Error ? error.message : 'Unknown error')
   }
 }
