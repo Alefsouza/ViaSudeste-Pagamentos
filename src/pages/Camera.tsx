@@ -615,14 +615,20 @@ export default function Camera() {
       console.error(err)
 
       let errMsg = getErrorMessage(err)
-      if (err?.status === 400) {
+      if (err?.status === 0) {
+        errMsg = 'Erro de conexão. Verifique sua internet e tente novamente.'
+      } else if (err?.status === 400) {
         const fieldErrors = extractFieldErrors(err)
         if (Object.keys(fieldErrors).length > 0) {
-          errMsg = `Erro de validação: ${Object.values(fieldErrors).join(', ')}`
+          errMsg = Object.entries(fieldErrors)
+            .map(([field, msg]) => `${field}: ${msg}`)
+            .join(' | ')
+        } else if (err?.response?.message) {
+          errMsg = err.response.message
         } else {
-          errMsg = 'Dados obrigatórios ausentes ou falha ao enviar a imagem.'
+          errMsg = err?.message || 'Falha na validação dos dados.'
         }
-      } else if (err?.response?.message && Object.keys(err?.response?.data || {}).length === 0) {
+      } else if (err?.response?.message) {
         errMsg = err.response.message
       }
 
@@ -631,7 +637,8 @@ export default function Camera() {
         errMsg === 'An unexpected error occurred.' ||
         errMsg === 'Failed to create record.'
       ) {
-        errMsg = 'Erro ao confirmar pagamento. Verifique os dados e tente novamente.'
+        errMsg =
+          err?.message || 'Erro ao confirmar pagamento. Verifique os dados e tente novamente.'
       }
 
       toast({
