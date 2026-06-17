@@ -37,6 +37,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import { useRealtime } from '@/hooks/use-realtime'
 import { cn } from '@/lib/utils'
+import { useNavigate } from 'react-router-dom'
 
 type ViewState =
   | 'EMPTY'
@@ -64,6 +65,7 @@ export default function Camera() {
 
   const { toast } = useToast()
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   const fetchMaxRef = useCallback(async () => {
     try {
@@ -521,8 +523,9 @@ export default function Camera() {
     }
 
     const now = new Date()
-    const data_pagamento = now.toISOString()
-    const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    const data_pagamento = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+    const hora_pagamento = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
 
     if (payableRecords.length === 0) {
       toast({
@@ -611,18 +614,25 @@ export default function Camera() {
         description: 'Pagamento confirmado com sucesso!',
       })
       handleReset()
+      navigate('/dashboard')
     } catch (err: any) {
       console.error(err)
 
       let errMsg = getErrorMessage(err)
-      if (err?.status === 400) {
+      if (err?.status === 0) {
+        errMsg = 'Erro de conexão. Verifique sua internet e tente novamente.'
+      } else if (err?.status === 400) {
         const fieldErrors = extractFieldErrors(err)
         if (Object.keys(fieldErrors).length > 0) {
-          errMsg = `Erro de validação: ${Object.values(fieldErrors).join(', ')}`
+          errMsg = Object.entries(fieldErrors)
+            .map(([field, msg]) => `Campo '${field}': ${msg}`)
+            .join(' | ')
+        } else if (err?.response?.message) {
+          errMsg = err.response.message
         } else {
-          errMsg = 'Dados obrigatórios ausentes ou falha ao enviar a imagem.'
+          errMsg = err?.message || 'Falha na validação dos dados.'
         }
-      } else if (err?.response?.message && Object.keys(err?.response?.data || {}).length === 0) {
+      } else if (err?.response?.message) {
         errMsg = err.response.message
       }
 
@@ -631,7 +641,8 @@ export default function Camera() {
         errMsg === 'An unexpected error occurred.' ||
         errMsg === 'Failed to create record.'
       ) {
-        errMsg = 'Erro ao confirmar pagamento. Verifique os dados e tente novamente.'
+        errMsg =
+          err?.message || 'Erro ao confirmar pagamento. Verifique os dados e tente novamente.'
       }
 
       toast({
