@@ -54,12 +54,12 @@ export function DashboardPaymentModal({
 
       const filtered = res.items.filter((r) => {
         if (r.foto_confirmacao_url) return false
-        if (r.liberado_pagamento === true) return true
+        if (checkIsLocked(r)) return false
         const ref = r.referencia || 0
-        if (ref >= maxRef - 3) {
-          return !checkIsLocked(r)
+        if (ref > 0 && maxRef > 0 && ref < maxRef - 3) {
+          return r.liberado_pagamento === true
         }
-        return false
+        return true
       })
 
       setRecords(filtered)

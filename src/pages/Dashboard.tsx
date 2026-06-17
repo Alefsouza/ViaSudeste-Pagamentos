@@ -306,7 +306,19 @@ export default function Dashboard() {
     return filteredStatsData.reduce(
       (acc, curr) => {
         const val = curr.valor_a_receber || curr.valor || 0
-        const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+        let status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+
+        if (status === 'Pendente') {
+          const isLocked = curr.data_liberacao && new Date(curr.data_liberacao) > new Date()
+          const ref = curr.referencia || 0
+          const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
+
+          if (isLocked) {
+            status = 'Agendado'
+          } else if (isOutsideWindow && !curr.liberado_pagamento) {
+            status = 'Bloqueado'
+          }
+        }
 
         let acronym = ''
         const tipoNome = getTipoPagamento(curr.idtipopgto) || ''
@@ -335,7 +347,7 @@ export default function Dashboard() {
           if (acronym === 'HE') acc.pagoHE += val
           if (acronym === 'VR') acc.pagoVR += val
           if (acronym === 'FT') acc.pagoFT += val
-        } else {
+        } else if (status === 'Pendente') {
           acc.pendente += val
           if (acronym === 'HE') acc.pendenteHE += val
           if (acronym === 'VR') acc.pendenteVR += val
@@ -370,11 +382,30 @@ export default function Dashboard() {
 
   // Calculations
   const uniqueColabs = new Set(
-    filteredStatsData.map((c) => c.registro || c.expand?.colaborador_id?.registro).filter(Boolean),
+    filteredStatsData
+      .filter((c) => {
+        let status = c.status || (c.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+
+        if (status === 'Pendente') {
+          const isLocked = c.data_liberacao && new Date(c.data_liberacao) > new Date()
+          const ref = c.referencia || 0
+          const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
+
+          if (isLocked) {
+            status = 'Agendado'
+          } else if (isOutsideWindow && !c.liberado_pagamento) {
+            status = 'Bloqueado'
+          }
+        }
+
+        return status !== 'Agendado' && status !== 'Cancelado' && status !== 'Bloqueado'
+      })
+      .map((c) => c.registro || c.expand?.colaborador_id?.registro)
+      .filter(Boolean),
   ).size
 
   const confirmedPayments = filteredStatsData.filter((c) => {
-    const status = c.status || (c.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+    let status = c.status || (c.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
     return status === 'Confirmado'
   })
 
@@ -1084,6 +1115,11 @@ export default function Dashboard() {
                                           p.data_liberacao &&
                                           new Date(p.data_liberacao) > new Date()
 
+                                        const ref = p.referencia || 0
+                                        const isOutsideWindow =
+                                          ref > 0 && maxRef > 0 && ref < maxRef - 3
+                                        const isBlocked = isOutsideWindow && !p.liberado_pagamento
+
                                         if (status === 'Confirmado')
                                           return (
                                             <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
@@ -1111,6 +1147,14 @@ export default function Dashboard() {
                                                   </TooltipContent>
                                                 </Tooltip>
                                               </TooltipProvider>
+                                            )
+                                          }
+                                          if (isBlocked) {
+                                            return (
+                                              <Badge className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 w-max">
+                                                <Lock className="w-3 h-3" />
+                                                Bloqueado
+                                              </Badge>
                                             )
                                           }
                                           return (
@@ -1264,6 +1308,11 @@ export default function Dashboard() {
                                           p.data_liberacao &&
                                           new Date(p.data_liberacao) > new Date()
 
+                                        const ref = p.referencia || 0
+                                        const isOutsideWindow =
+                                          ref > 0 && maxRef > 0 && ref < maxRef - 3
+                                        const isBlocked = isOutsideWindow && !p.liberado_pagamento
+
                                         if (status === 'Confirmado')
                                           return (
                                             <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
@@ -1291,6 +1340,14 @@ export default function Dashboard() {
                                                   </TooltipContent>
                                                 </Tooltip>
                                               </TooltipProvider>
+                                            )
+                                          }
+                                          if (isBlocked) {
+                                            return (
+                                              <Badge className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 w-max">
+                                                <Lock className="w-3 h-3" />
+                                                Bloqueado
+                                              </Badge>
                                             )
                                           }
                                           return (

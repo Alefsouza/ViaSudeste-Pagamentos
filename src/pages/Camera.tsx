@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
+import { useRealtime } from '@/hooks/use-realtime'
 import { cn } from '@/lib/utils'
 
 type ViewState =
@@ -90,14 +91,18 @@ export default function Camera() {
   }, [colaborador])
 
   const visibleRecords = useMemo(() => {
-    const eligible = sortedRecords.filter((r) => r.isEligible !== false)
+    const relevantRecords = sortedRecords.filter((r) => r.isEligible !== false)
 
     // To get the 4 most recent by referencia, we first sort distinct referencias descending
-    const distinctRefs = Array.from(new Set(eligible.map((r: any) => Number(r.referencia) || 0)))
+    const distinctRefs = Array.from(
+      new Set(relevantRecords.map((r: any) => Number(r.referencia) || 0)),
+    )
     distinctRefs.sort((a, b) => b - a)
 
     const top4Refs = new Set(distinctRefs.slice(0, 4))
-    const top4Records = eligible.filter((r: any) => top4Refs.has(Number(r.referencia) || 0))
+    const top4Records = relevantRecords.filter(
+      (r: any) => top4Refs.has(Number(r.referencia) || 0) && r.isEligible !== false,
+    )
 
     // Then we re-sort by date ascending to keep the table chronological
     return top4Records.sort((a, b) => {
@@ -158,6 +163,44 @@ export default function Camera() {
     }
   }, [isCameraActive, startCamera, stopCamera])
 
+  const fetchColaboradorSilent = useCallback(async () => {
+    if (!registro) return
+    try {
+      const result = await getColaboradorByRegistro(registro)
+      if (result && result.colab) {
+        setColaborador(result.colab)
+      }
+    } catch (err) {
+      // Silent fail, keep current view
+    }
+  }, [registro])
+
+  useRealtime(
+    'colaboradores',
+    (e) => {
+      if (colaborador && e.record.registro === colaborador.registro) {
+        fetchColaboradorSilent()
+      }
+    },
+    !!colaborador,
+  )
+
+  useRealtime(
+    'pagamentos',
+    (e) => {
+      if (colaborador && e.record.registro === colaborador.registro) {
+        fetchColaboradorSilent()
+      } else if (
+        colaborador &&
+        e.record.colaborador_id &&
+        colaborador.all_records_ids?.includes(e.record.colaborador_id)
+      ) {
+        fetchColaboradorSilent()
+      }
+    },
+    !!colaborador,
+  )
+
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
 
@@ -170,7 +213,7 @@ export default function Camera() {
     try {
       const result = await getColaboradorByRegistro(registro)
       if (!result || !result.colab) {
-        const msg = 'Não há valor pendente'
+        const msg = 'não há valor para o colaborador receber'
         setViewState('SEARCH_FAILED')
         setErrorMsg(msg)
         toast({
@@ -186,7 +229,7 @@ export default function Camera() {
       setViewState('CAPTURING')
     } catch (err: any) {
       setViewState('SEARCH_FAILED')
-      const msg = err.message || 'Não há valor pendente'
+      const msg = err.message || 'não há valor para o colaborador receber'
       setErrorMsg(msg)
       toast({
         title: 'Aviso',
@@ -580,7 +623,7 @@ export default function Camera() {
                       <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                       <span className="leading-snug">
                         {viewState === 'SEARCH_FAILED' && !errorMsg
-                          ? 'Não há valor pendente'
+                          ? 'não há valor para o colaborador receber'
                           : errorMsg}
                       </span>
                     </div>

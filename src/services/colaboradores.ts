@@ -97,8 +97,14 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .catch(() => null)
 
   if (!anyColab) {
-    throw new Error('Não há valor pendente')
+    throw new Error('não há valor para o colaborador receber')
   }
+
+  const maxRefRecord = await pb
+    .collection('colaboradores')
+    .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
+    .catch(() => ({ referencia: 0 }))
+  const maxRef = maxRefRecord.referencia || 0
 
   const fotoRecord = await pb
     .collection('fotos_colaboradores')
@@ -129,7 +135,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .catch(() => [])
 
   if (allRecords.length === 0) {
-    throw new Error('Não há registros para este colaborador')
+    throw new Error('não há valor para o colaborador receber')
   }
 
   const pagamentos = await pb
@@ -151,19 +157,41 @@ export const getColaboradorByRegistro = async (registro: string) => {
     const isConfirmedViaPhoto = !!r.foto_confirmacao_url
 
     let isPendente = false
+    let isAgendado = false
     if (pagStatus) {
       isPendente = pagStatus === 'Pendente'
+      isAgendado = pagStatus === 'Agendado'
     } else {
       isPendente = !isConfirmedViaPhoto
     }
 
-    const isLiberado = r.liberado_pagamento === true
+    const ref = r.referencia || 0
+    let isLocked = false
+    if (r.data_liberacao) {
+      isLocked = new Date(r.data_liberacao) > new Date()
+    }
+
+    let isEligible = isPendente
+    if (isEligible) {
+      if (ref > 0 && maxRef > 0 && ref < maxRef - 3) {
+        if (!r.liberado_pagamento) isEligible = false
+      }
+      if (isLocked) {
+        isEligible = false
+      }
+    }
 
     return {
       ...r,
-      isEligible: isLiberado && isPendente,
+      isEligible,
+      isAgendado: isLocked || isAgendado,
     }
   })
+
+  const eligibleRecords = mappedRecords.filter((r) => r.isEligible)
+  if (eligibleRecords.length === 0) {
+    throw new Error('não há valor para o colaborador receber')
+  }
 
   const firstColab = mappedRecords[0]
 
