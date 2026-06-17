@@ -64,7 +64,7 @@ import { formatDataString, formatBRL, getTipoPagamento } from '@/lib/formatters'
 export default function Dashboard() {
   const { toast } = useToast()
   const { user } = useAuth()
-  const isAlcimara = user?.email === 'alcimara.cabral@viasudeste.com'
+  const isAdmin = user?.role === 'Administrador'
 
   const [paymentToCancel, setPaymentToCancel] = useState<any>(null)
   const [maxRef, setMaxRef] = useState<number>(0)
@@ -213,31 +213,27 @@ export default function Dashboard() {
     }
   }
 
-  const handleCancelPayment = async () => {
+  const handleDeletePayment = async () => {
     if (!paymentToCancel) return
     try {
-      let targetId = paymentToCancel.id
-      try {
-        await pb.collection('pagamentos').getOne(targetId)
-      } catch {
-        const records = await pb.collection('pagamentos').getList(1, 1, {
-          filter: `colaborador_id = "${paymentToCancel.id}" || registro = "${paymentToCancel.registro}"`,
-          sort: '-created',
-        })
-        if (records.items.length > 0) {
-          targetId = records.items[0].id
-        } else {
-          throw new Error('Pagamento não encontrado na coleção pagamentos.')
-        }
+      const colabId = paymentToCancel.id
+
+      const pagamentos = await pb.collection('pagamentos').getFullList({
+        filter: `colaborador_id = "${colabId}"`,
+      })
+
+      for (const pag of pagamentos) {
+        await pb.collection('pagamentos').delete(pag.id)
       }
 
-      await pb.collection('pagamentos').update(targetId, { status: 'Cancelado' })
-      toast({ title: 'Pagamento cancelado com sucesso.' })
+      await pb.collection('colaboradores').delete(colabId)
+
+      toast({ title: 'Registro e pagamentos associados excluídos com sucesso!' })
       setPaymentToCancel(null)
       refreshAll()
     } catch (err: any) {
       toast({
-        title: 'Erro ao cancelar o pagamento. Tente novamente.',
+        title: 'Erro ao excluir o registro. Por favor, tente novamente.',
         variant: 'destructive',
       })
     }
@@ -1023,14 +1019,14 @@ export default function Dashboard() {
                           <TableHead>Data de Pagamento</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-center">Foto</TableHead>
-                          {isAlcimara && <TableHead className="text-center">Ações</TableHead>}
+                          {isAdmin && <TableHead className="text-center">Ações</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {Object.keys(groupedByRef).length === 0 ? (
                           <TableRow>
                             <TableCell
-                              colSpan={isAlcimara ? 10 : 9}
+                              colSpan={isAdmin ? 10 : 9}
                               className="h-24 text-center text-muted-foreground"
                             >
                               Nenhum pagamento encontrado com os filtros atuais.
@@ -1051,7 +1047,7 @@ export default function Dashboard() {
                                   className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                                 >
                                   <TableCell
-                                    colSpan={isAlcimara ? 10 : 9}
+                                    colSpan={isAdmin ? 10 : 9}
                                     className="font-semibold text-slate-700 dark:text-slate-300"
                                   >
                                     {refName} - {totalLines}{' '}
@@ -1142,7 +1138,7 @@ export default function Dashboard() {
                                         </Button>
                                       )}
                                     </TableCell>
-                                    {isAlcimara && (
+                                    {isAdmin && (
                                       <TableCell className="text-center">
                                         {(() => {
                                           const status =
@@ -1190,7 +1186,7 @@ export default function Dashboard() {
                                                   size="icon"
                                                   className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
                                                   onClick={() => setPaymentToCancel(p)}
-                                                  title="Cancelar Pagamento"
+                                                  title="Excluir Pagamento"
                                                 >
                                                   <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -1321,7 +1317,7 @@ export default function Dashboard() {
                                           Foto
                                         </Button>
                                       )}
-                                      {isAlcimara &&
+                                      {isAdmin &&
                                         (() => {
                                           const status =
                                             p.status ||
@@ -1369,10 +1365,10 @@ export default function Dashboard() {
                                                   size="sm"
                                                   className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 px-2"
                                                   onClick={() => setPaymentToCancel(p)}
-                                                  title="Cancelar Pagamento"
+                                                  title="Excluir Pagamento"
                                                 >
                                                   <Trash2 className="h-4 w-4 mr-2" />
-                                                  Cancelar
+                                                  Excluir
                                                 </Button>
                                               )}
                                             </>
@@ -1448,10 +1444,13 @@ export default function Dashboard() {
       <Dialog open={!!paymentToCancel} onOpenChange={(open) => !open && setPaymentToCancel(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancelar Pagamento</DialogTitle>
+            <DialogTitle>Excluir Pagamento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p>Tem certeza que deseja cancelar este pagamento?</p>
+            <p>
+              Tem certeza que deseja excluir este registro e todos os pagamentos associados? Esta
+              ação não pode ser desfeita.
+            </p>
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md space-y-2 text-sm border">
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Colaborador:</span>
@@ -1488,8 +1487,8 @@ export default function Dashboard() {
             <Button variant="outline" onClick={() => setPaymentToCancel(null)}>
               Voltar
             </Button>
-            <Button variant="destructive" onClick={handleCancelPayment}>
-              Confirmar Cancelamento
+            <Button variant="destructive" onClick={handleDeletePayment}>
+              Confirmar Exclusão
             </Button>
           </div>
         </DialogContent>
