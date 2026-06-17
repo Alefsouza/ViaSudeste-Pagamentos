@@ -59,7 +59,7 @@ import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
-import { formatDataString, formatBRL, getTipoPagamento, checkIsLocked } from '@/lib/formatters'
+import { formatDataString, formatBRL, getTipoPagamento } from '@/lib/formatters'
 
 export default function Dashboard() {
   const { toast } = useToast()
@@ -94,7 +94,6 @@ export default function Dashboard() {
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
   const [selectedChartDate, setSelectedChartDate] = useState<string | null>(null)
   const [selectedChartRef, setSelectedChartRef] = useState<string | null>(null)
-  const [chartRefSearch, setChartRefSearch] = useState('')
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -175,27 +174,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadTable()
-  }, [
-    debouncedFilters,
-    page,
-    selectedChartFilial,
-    selectedChartDate,
-    selectedChartRef,
-    chartRefSearch,
-  ])
+  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate, selectedChartRef])
 
   const refreshAll = useCallback(() => {
     loadStats()
     loadTable()
     loadMaxRef()
-  }, [
-    debouncedFilters,
-    page,
-    selectedChartFilial,
-    selectedChartDate,
-    selectedChartRef,
-    chartRefSearch,
-  ])
+  }, [debouncedFilters, page, selectedChartFilial, selectedChartDate, selectedChartRef])
 
   const handleToggleRelease = async (payment: any) => {
     try {
@@ -279,11 +264,6 @@ export default function Dashboard() {
         if (cRef !== selectedChartRef) return false
       }
 
-      if (chartRefSearch) {
-        const cRef = curr.referencia ? String(curr.referencia) : 'N/A'
-        if (!cRef.toLowerCase().includes(chartRefSearch.toLowerCase())) return false
-      }
-
       if (selectedChartDate) {
         if (
           !curr.data_pagamento ||
@@ -304,59 +284,21 @@ export default function Dashboard() {
 
       return true
     })
-  }, [statsData, selectedChartFilial, selectedChartDate, selectedChartRef, chartRefSearch])
+  }, [statsData, selectedChartFilial, selectedChartDate])
 
   const pagamentosTotals = useMemo(() => {
     return filteredStatsData.reduce(
       (acc, curr) => {
         const val = curr.valor_a_receber || curr.valor || 0
         const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-
-        let acronym = ''
-        const tipoNome = getTipoPagamento(curr.idtipopgto) || ''
-        const lowerTipo = typeof tipoNome === 'string' ? tipoNome.toLowerCase() : ''
-
-        if (curr.idtipopgto === 1 || lowerTipo.includes('hora') || lowerTipo.includes('he'))
-          acronym = 'HE'
-        else if (
-          curr.idtipopgto === 2 ||
-          lowerTipo.includes('vale') ||
-          lowerTipo.includes('vr') ||
-          lowerTipo.includes('refeição') ||
-          lowerTipo.includes('refeicao')
-        )
-          acronym = 'VR'
-        else if (
-          curr.idtipopgto === 3 ||
-          lowerTipo.includes('férias') ||
-          lowerTipo.includes('ferias') ||
-          lowerTipo.includes('ft')
-        )
-          acronym = 'FT'
-
         if (status === 'Confirmado') {
           acc.pago += val
-          if (acronym === 'HE') acc.pagoHE += val
-          if (acronym === 'VR') acc.pagoVR += val
-          if (acronym === 'FT') acc.pagoFT += val
         } else {
           acc.pendente += val
-          if (acronym === 'HE') acc.pendenteHE += val
-          if (acronym === 'VR') acc.pendenteVR += val
-          if (acronym === 'FT') acc.pendenteFT += val
         }
         return acc
       },
-      {
-        pago: 0,
-        pendente: 0,
-        pagoVR: 0,
-        pagoHE: 0,
-        pagoFT: 0,
-        pendenteVR: 0,
-        pendenteHE: 0,
-        pendenteFT: 0,
-      },
+      { pago: 0, pendente: 0 },
     )
   }, [filteredStatsData])
 
@@ -373,21 +315,17 @@ export default function Dashboard() {
   }
 
   // Calculations
+  const totalValor = filteredStatsData.reduce(
+    (acc, curr) => acc + (curr.valor_a_receber || curr.valor || 0),
+    0,
+  )
   const uniqueColabs = new Set(
     filteredStatsData.map((c) => c.registro || c.expand?.colaborador_id?.registro).filter(Boolean),
   ).size
-
-  const confirmedPayments = filteredStatsData.filter((c) => {
-    const status = c.status || (c.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-    return status === 'Confirmado'
-  })
-
-  const confirmedValues = confirmedPayments.map(
-    (c) => c.valor_pago || c.valor_a_receber || c.valor || 0,
-  )
-  const maxPago = confirmedValues.length ? Math.max(...confirmedValues) : 0
-  const minPago = confirmedValues.length ? Math.min(...confirmedValues) : 0
-  const avgPago = confirmedValues.length ? pagamentosTotals.pago / confirmedValues.length : 0
+  const values = filteredStatsData.map((c) => c.valor_a_receber || c.valor || 0)
+  const maxPago = values.length ? Math.max(...values) : 0
+  const minPago = values.length ? Math.min(...values) : 0
+  const avgPago = values.length ? totalValor / values.length : 0
 
   // Chart Data Preparation (using full statsData so context remains visible)
   const pieDataMap = statsData.reduce(
@@ -440,47 +378,27 @@ export default function Dashboard() {
   const refDataMap = statsData.reduce(
     (acc, curr) => {
       const ref = curr.referencia ? String(curr.referencia) : 'N/A'
-      if (chartRefSearch && !ref.toLowerCase().includes(chartRefSearch.toLowerCase())) {
-        return acc
-      }
-      if (!acc[ref]) {
-        acc[ref] = { total: 0, periodo_inicio: null, periodo_fim: null }
-      }
-      acc[ref].total += curr.valor_a_receber || curr.valor || 0
-
-      if (!acc[ref].periodo_inicio) {
-        acc[ref].periodo_inicio =
-          curr.periodo_inicio || curr.expand?.colaborador_id?.periodo_inicio || null
-      }
-      if (!acc[ref].periodo_fim) {
-        acc[ref].periodo_fim = curr.periodo_fim || curr.expand?.colaborador_id?.periodo_fim || null
-      }
-
+      acc[ref] = (acc[ref] || 0) + (curr.valor_a_receber || curr.valor || 0)
       return acc
     },
-    {} as Record<
-      string,
-      { total: number; periodo_inicio: string | null; periodo_fim: string | null }
-    >,
+    {} as Record<string, number>,
   )
 
   const refData = Object.entries(refDataMap)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([ref, data]) => ({
-      referenciaName: ref,
-      total: data.total,
-      periodo_inicio: data.periodo_inicio,
-      periodo_fim: data.periodo_fim,
+    .map(([referencia, total]) => ({
+      referencia,
+      total,
     }))
 
   const isEmpty = statsData.length === 0 && !statsLoading
 
-  // Group table items by Reference without aggregating their values
-  const groupedByRef = (tableData?.items || []).reduce((acc: any, item: any) => {
-    const ref = item.referencia ?? item.expand?.colaborador_id?.referencia
-    const refStr = ref != null ? `Referência: ${ref}` : 'Sem Referência'
-    if (!acc[refStr]) acc[refStr] = []
-    acc[refStr].push(item)
+  // Group table items by Name without aggregating their values
+  const groupedByName = (tableData?.items || []).reduce((acc: any, item: any) => {
+    const n =
+      item.nome || item.expand?.colaborador_id?.nome || item.expand?.user_id?.name || 'Desconhecido'
+    if (!acc[n]) acc[n] = []
+    acc[n].push(item)
     return acc
   }, {})
 
@@ -495,25 +413,22 @@ export default function Dashboard() {
             Analise a distribuição de pagamentos e monitore as filiais.
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          {(selectedChartFilial || selectedChartDate || selectedChartRef || chartRefSearch) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSelectedChartFilial(null)
-                setSelectedChartDate(null)
-                setSelectedChartRef(null)
-                setChartRefSearch('')
-                setPage(1)
-              }}
-              className="animate-fade-in text-muted-foreground"
-            >
-              <FilterX className="h-4 w-4 mr-2" />
-              Limpar Filtros de Gráfico
-            </Button>
-          )}
-        </div>
+        {(selectedChartFilial || selectedChartDate || selectedChartRef) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedChartFilial(null)
+              setSelectedChartDate(null)
+              setSelectedChartRef(null)
+              setPage(1)
+            }}
+            className="animate-fade-in text-muted-foreground"
+          >
+            <FilterX className="h-4 w-4 mr-2" />
+            Limpar Filtros de Gráfico
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -524,7 +439,7 @@ export default function Dashboard() {
               <Label>Buscar</Label>
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger>
+                  <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent>
@@ -645,57 +560,43 @@ export default function Dashboard() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-8 items-stretch">
-        <Card className="lg:col-span-2 flex flex-col h-full">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-6">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
+            <DollarSign className="h-4 w-4 text-forest" />
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col">
+          <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="flex flex-col h-full space-y-1">
-                <div className="text-2xl font-bold transition-all duration-300">
-                  {formatBRL(pagamentosTotals.pago)}
-                </div>
-                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-auto space-y-0.5 pt-1 border-t border-border/50">
-                  <span>VR: {formatBRL(pagamentosTotals.pagoVR)}</span>
-                  <span>HE: {formatBRL(pagamentosTotals.pagoHE)}</span>
-                  <span>FT: {formatBRL(pagamentosTotals.pagoFT)}</span>
-                </div>
+              <div className="text-2xl font-bold transition-all duration-300">
+                {formatBRL(pagamentosTotals.pago)}
               </div>
             )}
           </CardContent>
         </Card>
-        <Card className="lg:col-span-2 flex flex-col h-full">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Valor a Pagar</CardTitle>
             <AlertCircle className="h-4 w-4 text-amber-500" />
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col">
+          <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="flex flex-col h-full space-y-1">
-                <div className="text-2xl font-bold transition-all duration-300">
-                  {formatBRL(pagamentosTotals.pendente)}
-                </div>
-                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-auto space-y-0.5 pt-1 border-t border-border/50">
-                  <span>VR: {formatBRL(pagamentosTotals.pendenteVR)}</span>
-                  <span>HE: {formatBRL(pagamentosTotals.pendenteHE)}</span>
-                  <span>FT: {formatBRL(pagamentosTotals.pendenteFT)}</span>
-                </div>
+              <div className="text-2xl font-bold transition-all duration-300">
+                {formatBRL(pagamentosTotals.pendente)}
               </div>
             )}
           </CardContent>
         </Card>
-        <Card className="flex flex-col h-full">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Qtd. Colaboradores</CardTitle>
-            <Users className="h-4 w-4 text-emerald-500" />
+            <Users className="h-4 w-4 text-forest" />
           </CardHeader>
-          <CardContent className="flex-1">
+          <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
@@ -703,12 +604,12 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-        <Card className="flex flex-col h-full">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Maior Valor</CardTitle>
             <ArrowUp className="h-4 w-4 text-amber-500" />
           </CardHeader>
-          <CardContent className="flex-1">
+          <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
@@ -718,12 +619,12 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-        <Card className="flex flex-col h-full">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Menor Valor</CardTitle>
             <ArrowDown className="h-4 w-4 text-rose-500" />
           </CardHeader>
-          <CardContent className="flex-1">
+          <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
@@ -733,12 +634,12 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-        <Card className="flex flex-col h-full">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Média Paga</CardTitle>
             <TrendingUp className="h-4 w-4 text-purple-500" />
           </CardHeader>
-          <CardContent className="flex-1">
+          <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
@@ -818,92 +719,33 @@ export default function Dashboard() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader>
                 <CardTitle>Distribuição por Referência</CardTitle>
-                <div className="relative w-32 md:w-40">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar ref..."
-                    className="pl-8 h-9 text-sm"
-                    value={chartRefSearch}
-                    onChange={(e) => setChartRefSearch(e.target.value)}
-                  />
-                </div>
               </CardHeader>
               <CardContent>
                 {statsLoading ? (
                   <Skeleton className="h-[300px] w-full" />
                 ) : (
                   <ChartContainer
-                    config={{ total: { label: 'Total', color: '#22c55e' } }}
+                    config={{ total: { label: 'Total', color: 'hsl(var(--chart-3))' } }}
                     className="h-[300px] w-full"
                   >
                     <BarChart data={refData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis
-                        dataKey="referenciaName"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                      />
+                      <XAxis dataKey="referencia" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis
                         fontSize={12}
                         tickLine={false}
                         axisLine={false}
                         tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
                       />
-                      <ChartTooltip
-                        cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload
-
-                            const formatDateStr = (d: string | null) => {
-                              if (!d) return 'Não informado'
-                              const datePart = d.split(' ')[0]
-                              const parts = datePart.split('-')
-                              if (parts.length === 3) {
-                                const [y, m, day] = parts
-                                return `${day}/${m}/${y}`
-                              }
-                              return d
-                            }
-
-                            return (
-                              <div className="rounded-lg border bg-background p-3 shadow-md text-sm space-y-1 min-w-[220px]">
-                                <div className="font-medium text-foreground mb-2 pb-1 border-b">
-                                  Período da Referência: {data.referenciaName}
-                                </div>
-                                <div className="flex justify-between gap-4">
-                                  <span className="text-muted-foreground">Data Início:</span>
-                                  <span className="font-medium">
-                                    {formatDateStr(data.periodo_inicio)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between gap-4">
-                                  <span className="text-muted-foreground">Data Final:</span>
-                                  <span className="font-medium">
-                                    {formatDateStr(data.periodo_fim)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between gap-4 pt-1 mt-1 border-t">
-                                  <span className="text-muted-foreground">Total Pago:</span>
-                                  <span className="font-bold text-emerald-600 dark:text-emerald-500">
-                                    {formatBRL(data.total)}
-                                  </span>
-                                </div>
-                              </div>
-                            )
-                          }
-                          return null
-                        }}
-                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
                       <Bar
                         dataKey="total"
                         radius={[4, 4, 0, 0]}
                         fill="var(--color-total)"
                         onClick={(data) => {
-                          const refVal = data?.referenciaName || data?.payload?.referenciaName
+                          const refVal = data?.referencia || data?.payload?.referencia
                           if (refVal) {
                             setSelectedChartRef((prev) => (prev === refVal ? null : refVal))
                             setPage(1)
@@ -917,7 +759,7 @@ export default function Dashboard() {
                             fill="var(--color-total)"
                             style={{
                               opacity: selectedChartRef
-                                ? selectedChartRef === entry.referenciaName
+                                ? selectedChartRef === entry.referencia
                                   ? 1
                                   : 0.3
                                 : 1,
@@ -992,10 +834,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle>
                 Transações de Pagamentos
-                {(selectedChartFilial ||
-                  selectedChartDate ||
-                  selectedChartRef ||
-                  chartRefSearch) && (
+                {(selectedChartFilial || selectedChartDate || selectedChartRef) && (
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
                     (Filtro de gráfico ativo)
                   </span>
@@ -1029,7 +868,7 @@ export default function Dashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {Object.keys(groupedByRef).length === 0 ? (
+                        {Object.keys(groupedByName).length === 0 ? (
                           <TableRow>
                             <TableCell
                               colSpan={isAlcimara ? 10 : 9}
@@ -1039,28 +878,28 @@ export default function Dashboard() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          Object.entries(groupedByRef).flatMap(
-                            ([refName, records]: [string, any]) => {
-                              const totalLines = filteredStatsData.filter((c) => {
-                                const cRef = c.referencia ?? c.expand?.colaborador_id?.referencia
-                                const cRefStr =
-                                  cRef != null ? `Referência: ${cRef}` : 'Sem Referência'
-                                return cRefStr === refName
-                              }).length
-                              return [
-                                <TableRow
-                                  key={`header-${refName}`}
-                                  className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                                >
+                          Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
+                            const totalLines = filteredStatsData.filter(
+                              (c) =>
+                                (c.nome ||
+                                  c.expand?.colaborador_id?.nome ||
+                                  c.expand?.user_id?.name ||
+                                  'Desconhecido') === nome,
+                            ).length
+                            return (
+                              <React.Fragment key={nome}>
+                                <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                   <TableCell
                                     colSpan={isAlcimara ? 10 : 9}
                                     className="font-semibold text-slate-700 dark:text-slate-300"
                                   >
-                                    {refName} - {totalLines}{' '}
-                                    {totalLines === 1 ? 'pagamento' : 'pagamentos'}
+                                    {nome} - {totalLines}{' '}
+                                    {totalLines === 1
+                                      ? 'linha de pagamento'
+                                      : 'linhas de pagamento'}
                                   </TableCell>
-                                </TableRow>,
-                                ...records.map((p: any) => (
+                                </TableRow>
+                                {records.map((p: any) => (
                                   <TableRow key={p.id}>
                                     <TableCell className="font-medium pl-8">
                                       {p.nome || p.expand?.colaborador_id?.nome || 'Desconhecido'}
@@ -1074,64 +913,36 @@ export default function Dashboard() {
                                     <TableCell>
                                       {p.referencia || p.expand?.colaborador_id?.referencia || '-'}
                                     </TableCell>
-                                    <TableCell className="text-emerald-600 dark:text-emerald-500 font-medium text-left">
+                                    <TableCell className="text-forest font-medium text-left">
                                       {formatBRL(p.valor_a_receber || p.valor)}
                                     </TableCell>
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-                                    <TableCell>
-                                      {formatDataString(p.data_pagamento) || 'Pendente'}
-                                    </TableCell>
+                                    <TableCell>{p.data_pagamento || 'Pendente'}</TableCell>
                                     <TableCell>
                                       {(() => {
                                         const status =
                                           p.status ||
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
-
-                                        const isLocked = checkIsLocked(p)
-
                                         if (status === 'Confirmado')
                                           return (
                                             <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
                                               Confirmado
                                             </Badge>
                                           )
-                                        if (status === 'Pendente') {
-                                          if (isLocked) {
-                                            const lockDate =
-                                              p.data_liberacao ||
-                                              p.data_pagamento_v2 ||
-                                              p.expand?.colaborador_id?.data_pagamento_v2 ||
-                                              p.data_pagamento
-                                            return (
-                                              <TooltipProvider>
-                                                <Tooltip>
-                                                  <TooltipTrigger className="cursor-help">
-                                                    <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1 w-max">
-                                                      <Lock className="w-3 h-3" />
-                                                      Agendado
-                                                    </Badge>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent>
-                                                    <p>Liberado em: {formatDataString(lockDate)}</p>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              </TooltipProvider>
-                                            )
-                                          }
+                                        if (status === 'Pendente')
                                           return (
                                             <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
                                               Pendente
                                             </Badge>
                                           )
-                                        }
                                         if (status === 'Cancelado')
                                           return <Badge variant="destructive">Cancelado</Badge>
                                         return <Badge variant="outline">{status}</Badge>
                                       })()}
                                     </TableCell>
                                     <TableCell className="text-center">
-                                      {p.foto_confirmacao_url ? (
+                                      {p.foto_confirmacao_url && (
                                         <Button
                                           variant="ghost"
                                           size="sm"
@@ -1142,22 +953,6 @@ export default function Dashboard() {
                                           <ImageIcon className="w-4 h-4 mr-2" />
                                           Visualizar
                                         </Button>
-                                      ) : (
-                                        (() => {
-                                          const isLocked = checkIsLocked(p)
-                                          const status = p.status || 'Pendente'
-                                          if (!isLocked && status === 'Pendente') {
-                                            return (
-                                              <Badge
-                                                variant="outline"
-                                                className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400"
-                                              >
-                                                Foto Pendente
-                                              </Badge>
-                                            )
-                                          }
-                                          return null
-                                        })()
                                       )}
                                     </TableCell>
                                     {isAlcimara && (
@@ -1170,36 +965,32 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const isLocked = checkIsLocked(p)
-
                                           return (
                                             <div className="flex justify-center gap-1">
-                                              {status === 'Pendente' &&
-                                                isOutsideValidity &&
-                                                !isLocked && (
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className={cn(
-                                                      'hover:bg-amber-100 dark:hover:bg-amber-900/50',
-                                                      p.liberado_pagamento
-                                                        ? 'text-emerald-500 hover:text-emerald-700'
-                                                        : 'text-amber-500 hover:text-amber-700',
-                                                    )}
-                                                    onClick={() => handleToggleRelease(p)}
-                                                    title={
-                                                      p.liberado_pagamento
-                                                        ? 'Bloquear Pagamento'
-                                                        : 'Liberar Pagamento'
-                                                    }
-                                                  >
-                                                    {p.liberado_pagamento ? (
-                                                      <Lock className="h-4 w-4" />
-                                                    ) : (
-                                                      <Unlock className="h-4 w-4" />
-                                                    )}
-                                                  </Button>
-                                                )}
+                                              {status === 'Pendente' && isOutsideValidity && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className={cn(
+                                                    'hover:bg-amber-100 dark:hover:bg-amber-900/50',
+                                                    p.liberado_pagamento
+                                                      ? 'text-emerald-500 hover:text-emerald-700'
+                                                      : 'text-amber-500 hover:text-amber-700',
+                                                  )}
+                                                  onClick={() => handleToggleRelease(p)}
+                                                  title={
+                                                    p.liberado_pagamento
+                                                      ? 'Bloquear Pagamento'
+                                                      : 'Liberar Pagamento'
+                                                  }
+                                                >
+                                                  {p.liberado_pagamento ? (
+                                                    <Lock className="h-4 w-4" />
+                                                  ) : (
+                                                    <Unlock className="h-4 w-4" />
+                                                  )}
+                                                </Button>
+                                              )}
                                               {status === 'Pendente' && (
                                                 <Button
                                                   variant="ghost"
@@ -1217,10 +1008,10 @@ export default function Dashboard() {
                                       </TableCell>
                                     )}
                                   </TableRow>
-                                )),
-                              ]
-                            },
-                          )
+                                ))}
+                              </React.Fragment>
+                            )
+                          })
                         )}
                       </TableBody>
                     </Table>
@@ -1228,22 +1019,24 @@ export default function Dashboard() {
 
                   {/* Mobile View */}
                   <div className="md:hidden space-y-6">
-                    {Object.keys(groupedByRef).length === 0 ? (
+                    {Object.keys(groupedByName).length === 0 ? (
                       <div className="text-center text-muted-foreground p-8">
                         Nenhum pagamento encontrado.
                       </div>
                     ) : (
-                      Object.entries(groupedByRef).map(([refName, records]: [string, any]) => {
-                        const totalLines = filteredStatsData.filter((c) => {
-                          const cRef = c.referencia ?? c.expand?.colaborador_id?.referencia
-                          const cRefStr = cRef != null ? `Referência: ${cRef}` : 'Sem Referência'
-                          return cRefStr === refName
-                        }).length
+                      Object.entries(groupedByName).map(([nome, records]: [string, any]) => {
+                        const totalLines = filteredStatsData.filter(
+                          (c) =>
+                            (c.nome ||
+                              c.expand?.colaborador_id?.nome ||
+                              c.expand?.user_id?.name ||
+                              'Desconhecido') === nome,
+                        ).length
                         return (
-                          <div key={refName} className="space-y-4">
+                          <div key={nome} className="space-y-4">
                             <div className="font-semibold text-slate-700 dark:text-slate-300 px-2 pt-2 border-b pb-2">
-                              {refName} - {totalLines}{' '}
-                              {totalLines === 1 ? 'pagamento' : 'pagamentos'}
+                              {nome} - {totalLines}{' '}
+                              {totalLines === 1 ? 'linha de pagamento' : 'linhas de pagamento'}
                             </div>
                             {records.map((p: any) => (
                               <Card key={p.id} className="shadow-sm">
@@ -1252,7 +1045,7 @@ export default function Dashboard() {
                                     <span className="truncate">
                                       {p.nome || p.expand?.colaborador_id?.nome || 'Desconhecido'}
                                     </span>
-                                    <span className="text-emerald-600 dark:text-emerald-500">
+                                    <span className="text-forest">
                                       {formatBRL(p.valor_a_receber || p.valor)}
                                     </span>
                                   </div>
@@ -1270,7 +1063,7 @@ export default function Dashboard() {
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
                                     <span>Data de Pagamento:</span>
-                                    <span>{formatDataString(p.data_pagamento) || 'Pendente'}</span>
+                                    <span>{p.data_pagamento || 'Pendente'}</span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
                                     <div>
@@ -1279,51 +1072,25 @@ export default function Dashboard() {
                                           p.status ||
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
-
-                                        const isLocked = checkIsLocked(p)
-
                                         if (status === 'Confirmado')
                                           return (
                                             <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
                                               Confirmado
                                             </Badge>
                                           )
-                                        if (status === 'Pendente') {
-                                          if (isLocked) {
-                                            const lockDate =
-                                              p.data_liberacao ||
-                                              p.data_pagamento_v2 ||
-                                              p.expand?.colaborador_id?.data_pagamento_v2 ||
-                                              p.data_pagamento
-                                            return (
-                                              <TooltipProvider>
-                                                <Tooltip>
-                                                  <TooltipTrigger className="cursor-help">
-                                                    <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1">
-                                                      <Lock className="w-3 h-3" />
-                                                      Agendado
-                                                    </Badge>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent>
-                                                    <p>Liberado em: {formatDataString(lockDate)}</p>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              </TooltipProvider>
-                                            )
-                                          }
+                                        if (status === 'Pendente')
                                           return (
                                             <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
                                               Pendente
                                             </Badge>
                                           )
-                                        }
                                         if (status === 'Cancelado')
                                           return <Badge variant="destructive">Cancelado</Badge>
                                         return <Badge variant="outline">{status}</Badge>
                                       })()}
                                     </div>
                                     <div className="flex gap-2">
-                                      {p.foto_confirmacao_url ? (
+                                      {p.foto_confirmacao_url && (
                                         <Button
                                           variant="outline"
                                           size="sm"
@@ -1334,22 +1101,6 @@ export default function Dashboard() {
                                           <ImageIcon className="w-4 h-4 mr-2" />
                                           Foto
                                         </Button>
-                                      ) : (
-                                        (() => {
-                                          const isLocked = checkIsLocked(p)
-                                          const status = p.status || 'Pendente'
-                                          if (!isLocked && status === 'Pendente') {
-                                            return (
-                                              <Badge
-                                                variant="outline"
-                                                className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 self-center"
-                                              >
-                                                Foto Pendente
-                                              </Badge>
-                                            )
-                                          }
-                                          return null
-                                        })()
                                       )}
                                       {isAlcimara &&
                                         (() => {
@@ -1360,37 +1111,33 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const isLocked = checkIsLocked(p)
-
                                           return (
                                             <>
-                                              {status === 'Pendente' &&
-                                                isOutsideValidity &&
-                                                !isLocked && (
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={cn(
-                                                      'px-2 hover:bg-amber-100 dark:hover:bg-amber-900/50',
-                                                      p.liberado_pagamento
-                                                        ? 'text-emerald-500 hover:text-emerald-700'
-                                                        : 'text-amber-500 hover:text-amber-700',
-                                                    )}
-                                                    onClick={() => handleToggleRelease(p)}
-                                                    title={
-                                                      p.liberado_pagamento
-                                                        ? 'Bloquear Pagamento'
-                                                        : 'Liberar Pagamento'
-                                                    }
-                                                  >
-                                                    {p.liberado_pagamento ? (
-                                                      <Lock className="h-4 w-4 mr-2" />
-                                                    ) : (
-                                                      <Unlock className="h-4 w-4 mr-2" />
-                                                    )}
-                                                    {p.liberado_pagamento ? 'Bloquear' : 'Liberar'}
-                                                  </Button>
-                                                )}
+                                              {status === 'Pendente' && isOutsideValidity && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className={cn(
+                                                    'px-2 hover:bg-amber-100 dark:hover:bg-amber-900/50',
+                                                    p.liberado_pagamento
+                                                      ? 'text-emerald-500 hover:text-emerald-700'
+                                                      : 'text-amber-500 hover:text-amber-700',
+                                                  )}
+                                                  onClick={() => handleToggleRelease(p)}
+                                                  title={
+                                                    p.liberado_pagamento
+                                                      ? 'Bloquear Pagamento'
+                                                      : 'Liberar Pagamento'
+                                                  }
+                                                >
+                                                  {p.liberado_pagamento ? (
+                                                    <Lock className="h-4 w-4 mr-2" />
+                                                  ) : (
+                                                    <Unlock className="h-4 w-4 mr-2" />
+                                                  )}
+                                                  {p.liberado_pagamento ? 'Bloquear' : 'Liberar'}
+                                                </Button>
+                                              )}
                                               {status === 'Pendente' && (
                                                 <Button
                                                   variant="ghost"
@@ -1491,7 +1238,7 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Valor:</span>
-                <span className="text-emerald-600 dark:text-emerald-500 font-medium">
+                <span className="text-forest font-medium">
                   {paymentToCancel
                     ? formatBRL(
                         paymentToCancel.valor_pago ||
@@ -1504,7 +1251,7 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Data de Pagamento:</span>
-                <span>{formatDataString(paymentToCancel?.data_pagamento) || 'Pendente'}</span>
+                <span>{paymentToCancel?.data_pagamento || 'Pendente'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Filial:</span>

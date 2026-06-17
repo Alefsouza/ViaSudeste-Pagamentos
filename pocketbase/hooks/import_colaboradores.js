@@ -7,34 +7,24 @@ routerAdd(
       return e.badRequestError('Invalid payload, missing data array.')
     }
 
-    const metadata = body.metadata || {}
-    const customRef = metadata.referencia
-    const data_liberacao = metadata.data_liberacao || ''
-    const periodo_inicio = metadata.periodo_inicio || ''
-    const periodo_fim = metadata.periodo_fim || ''
-
     const col = $app.findCollectionByNameOrId('colaboradores')
     let count = 0
     let errors = []
 
     let nextRef = 1
-    if (customRef !== undefined && customRef !== null && customRef !== '') {
-      nextRef = Number(customRef)
-    } else {
-      try {
-        const records = $app.findRecordsByFilter(
-          'colaboradores',
-          'referencia > 0',
-          '-referencia',
-          1,
-          0,
-        )
-        if (records && records.length > 0) {
-          nextRef = records[0].getInt('referencia') + 1
-        }
-      } catch (_) {
-        // Ignora erro se não houver registros
+    try {
+      const records = $app.findRecordsByFilter(
+        'colaboradores',
+        'referencia > 0',
+        '-referencia',
+        1,
+        0,
+      )
+      if (records && records.length > 0) {
+        nextRef = records[0].getInt('referencia') + 1
       }
+    } catch (_) {
+      // Ignora erro se não houver registros
     }
 
     $app.runInTransaction((txApp) => {
@@ -69,11 +59,6 @@ routerAdd(
 
           record.set('referencia', nextRef)
           record.set('liberado_pagamento', false)
-
-          if (data_liberacao) record.set('data_liberacao', data_liberacao)
-          if (periodo_inicio) record.set('periodo_inicio', periodo_inicio)
-          if (periodo_fim) record.set('periodo_fim', periodo_fim)
-
           record.set('registro', registro)
           record.set('nome', nome)
           record.set('data', dataStr)
