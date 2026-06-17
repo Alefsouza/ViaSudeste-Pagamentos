@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import pb from '@/lib/pocketbase/client'
 import { getColaboradorByRegistro, updateColaborador } from '@/services/colaboradores'
 import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
-import { getErrorMessage } from '@/lib/pocketbase/errors'
+import { getErrorMessage, extractFieldErrors } from '@/lib/pocketbase/errors'
 import { createPagamento, updatePagamento } from '@/services/pagamentos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -556,34 +556,35 @@ export default function Camera() {
             ? parsedIdTipoPgto
             : undefined
 
-        const dataToSave: any = {
-          colaborador_id: colaborador.id,
-          valor_pago: record.valor_a_receber || record.valor || 0,
-          data_pagamento,
-          hora_pagamento,
-          user_id: user?.id,
-          status: 'Confirmado',
-          inicio: record.inicio,
-          termino: record.termino,
-          horas: validHoras,
-          idtipopgto: validIdTipoPgto,
-          tipo_pagamento: getTipoPagamentoDesc(record.idtipopgto),
-          registro: record.registro || colaborador.registro,
-          nome: record.nome || colaborador.nome,
-          filial: record.filial_id
-            ? Number(record.filial_id)
-            : colaborador.filial_id
-              ? Number(colaborador.filial_id)
-              : undefined,
-        }
+        const formData = new FormData()
+        formData.append('colaborador_id', colaborador.id)
+        formData.append('valor_pago', String(record.valor_a_receber || record.valor || 0))
+        formData.append('data_pagamento', data_pagamento)
+        formData.append('hora_pagamento', hora_pagamento)
+        if (user?.id) formData.append('user_id', user.id)
+        formData.append('status', 'Confirmado')
+        if (record.inicio) formData.append('inicio', record.inicio)
+        if (record.termino) formData.append('termino', record.termino)
+        if (validHoras !== undefined) formData.append('horas', String(validHoras))
+        if (validIdTipoPgto !== undefined) formData.append('idtipopgto', String(validIdTipoPgto))
+        formData.append('tipo_pagamento', getTipoPagamentoDesc(record.idtipopgto))
+        formData.append('registro', record.registro || colaborador.registro)
+        formData.append('nome', record.nome || colaborador.nome)
 
-        if (i === 0) {
-          dataToSave.foto_confirmacao = file
+        const filialVal = record.filial_id
+          ? Number(record.filial_id)
+          : colaborador.filial_id
+            ? Number(colaborador.filial_id)
+            : undefined
+        if (filialVal !== undefined) formData.append('filial', String(filialVal))
+
+        if (i === 0 && file) {
+          formData.append('foto_confirmacao', file)
         } else if (firstFileUrl) {
-          dataToSave.foto_confirmacao_url = firstFileUrl
+          formData.append('foto_confirmacao_url', firstFileUrl)
         }
 
-        const pagamentoRecord = await createPagamento(dataToSave)
+        const pagamentoRecord = await createPagamento(formData)
 
         if (i === 0) {
           firstFileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)
@@ -605,21 +606,23 @@ export default function Camera() {
         return
       }
 
-      const totalPago = payableRecords.reduce(
-        (acc: number, rec: any) => acc + (rec.valor_a_receber || rec.valor || 0),
-        0,
-      )
-
       toast({
         title: 'Sucesso',
-        description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(totalPago)}`,
+        description: 'Pagamento confirmado com sucesso!',
       })
       handleReset()
     } catch (err: any) {
       console.error(err)
 
       let errMsg = getErrorMessage(err)
-      if (err?.response?.message && Object.keys(err?.response?.data || {}).length === 0) {
+      if (err?.status === 400) {
+        const fieldErrors = extractFieldErrors(err)
+        if (Object.keys(fieldErrors).length > 0) {
+          errMsg = `Erro de validação: ${Object.values(fieldErrors).join(', ')}`
+        } else {
+          errMsg = 'Dados obrigatórios ausentes ou falha ao enviar a imagem.'
+        }
+      } else if (err?.response?.message && Object.keys(err?.response?.data || {}).length === 0) {
         errMsg = err.response.message
       }
 
