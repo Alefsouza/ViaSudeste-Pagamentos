@@ -1,4 +1,18 @@
 onRecordValidate((e) => {
+  const registro = e.record.getString('registro')
+  const nome = e.record.getString('nome')
+  const valor_pago = e.record.getFloat('valor_pago')
+
+  if (!registro) {
+    throw new BadRequestError('Registro é obrigatório.')
+  }
+  if (!nome) {
+    throw new BadRequestError('Nome é obrigatório.')
+  }
+  if (valor_pago <= 0) {
+    throw new BadRequestError('Valor pago deve ser maior que zero.')
+  }
+
   const hasUrl = !!e.record.getString('foto_confirmacao_url')
   const hasFile =
     e.record.getString('foto_confirmacao') !== '' ||

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import pb from '@/lib/pocketbase/client'
 import { getColaboradorByRegistro, updateColaborador } from '@/services/colaboradores'
 import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
+import { getErrorMessage } from '@/lib/pocketbase/errors'
 import { createPagamento, updatePagamento } from '@/services/pagamentos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -99,6 +100,12 @@ export default function Camera() {
   }, [registro, viewState])
 
   useRealtime('colaboradores', (e) => {
+    if (colaborador && e.record.registro === colaborador.registro) {
+      fetchColaboradorBackground()
+    }
+  })
+
+  useRealtime('pagamentos', (e) => {
     if (colaborador && e.record.registro === colaborador.registro) {
       fetchColaboradorBackground()
     }
@@ -297,7 +304,7 @@ export default function Camera() {
       setViewState('CAPTURING')
     } catch (err: any) {
       setViewState('SEARCH_FAILED')
-      const msg = err.message || 'Não há valor pendente'
+      const msg = getErrorMessage(err) || 'Não há valor pendente'
       setErrorMsg(msg)
       toast({
         title: 'Aviso',
@@ -427,9 +434,15 @@ export default function Camera() {
         })
         setFotoCapturada(fotoCaptured)
 
+        const fotoBase64 = fotoCaptured.includes(',') ? fotoCaptured.split(',')[1] : fotoCaptured
+        let fotoPredBase64 = fotoPredeterminada
+        if (fotoPredeterminada.startsWith('data:')) {
+          fotoPredBase64 = fotoPredeterminada.split(',')[1]
+        }
+
         const success = await reconhecimentoFacialService(
-          fotoPredeterminada,
-          fotoCaptured,
+          fotoPredBase64,
+          fotoBase64,
           colaborador?.registro,
         )
 
@@ -442,12 +455,14 @@ export default function Camera() {
         }
       } catch (err: any) {
         setViewState('RECOGNITION_FAILED')
+        const errMsg = getErrorMessage(err)
         if (
-          err.message &&
-          err.message !== 'Unknown error' &&
-          err.message !== 'Something went wrong.'
+          errMsg &&
+          errMsg !== 'Unknown error' &&
+          errMsg !== 'Something went wrong.' &&
+          errMsg !== 'An unexpected error occurred.'
         ) {
-          setErrorMsg(err.message)
+          setErrorMsg(errMsg)
         } else if (err.status === 401) {
           setErrorMsg('Credenciais da AWS inválidas. Verifique Secrets')
         } else if (err.status === 403) {
@@ -542,7 +557,7 @@ export default function Camera() {
             : undefined
 
         const dataToSave: any = {
-          colaborador_id: record.id,
+          colaborador_id: record.id || colaborador.id,
           valor_pago: record.valor_a_receber || record.valor || 0,
           data_pagamento,
           hora_pagamento,
@@ -553,9 +568,13 @@ export default function Camera() {
           horas: validHoras,
           idtipopgto: validIdTipoPgto,
           tipo_pagamento: getTipoPagamentoDesc(record.idtipopgto),
-          registro: record.registro,
-          nome: record.nome,
-          filial: record.filial_id ? Number(record.filial_id) : undefined,
+          registro: record.registro || colaborador.registro,
+          nome: record.nome || colaborador.nome,
+          filial: record.filial_id
+            ? Number(record.filial_id)
+            : colaborador.filial_id
+              ? Number(colaborador.filial_id)
+              : undefined,
         }
 
         if (i === 0) {
@@ -600,7 +619,7 @@ export default function Camera() {
       console.error(err)
       toast({
         title: 'Erro',
-        description: 'Erro ao confirmar pagamento. Tente novamente',
+        description: getErrorMessage(err) || 'Erro ao confirmar pagamento. Tente novamente',
         variant: 'destructive',
       })
       setViewState('RECOGNITION_SUCCESS')

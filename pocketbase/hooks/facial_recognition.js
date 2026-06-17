@@ -151,12 +151,17 @@ routerAdd(
     }
 
     const body = e.requestInfo().body || {}
-    const fotoPredeterminada = body.fotoPredeterminada || body.fotoDoBanco
-    const fotoCaptured = body.fotoCaptured || body.fotoCapturada
+    let fotoPredeterminada = body.fotoPredeterminada || body.fotoDoBanco
+    let fotoCaptured = body.fotoCaptured || body.fotoCapturada
     const registro = body.registro
 
     if (!fotoPredeterminada || !fotoCaptured) {
       return e.badRequestError('Missing images')
+    }
+
+    fotoCaptured = fotoCaptured.includes(',') ? fotoCaptured.split(',')[1] : fotoCaptured
+    if (fotoPredeterminada.startsWith('data:')) {
+      fotoPredeterminada = fotoPredeterminada.split(',')[1]
     }
 
     const userId = e.auth.id
