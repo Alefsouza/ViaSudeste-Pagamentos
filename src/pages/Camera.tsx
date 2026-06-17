@@ -521,7 +521,7 @@ export default function Camera() {
     }
 
     const now = new Date()
-    const data_pagamento = now.toISOString().replace('T', ' ')
+    const data_pagamento = now.toISOString()
     const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
 
     if (payableRecords.length === 0) {

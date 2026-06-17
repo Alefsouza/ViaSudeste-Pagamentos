@@ -36,7 +36,8 @@ onRecordValidate((e) => {
     startOfToday.setHours(0, 0, 0, 0)
 
     for (const dStr of datesToCheck) {
-      const parts = dStr.split(' ')[0].split('-')
+      const datePart = dStr.split(/[ T]/)[0]
+      const parts = datePart.split('-')
       if (parts.length === 3) {
         const y = parts[0].length === 4 ? parts[0] : parts[2]
         const m = parts[1]
