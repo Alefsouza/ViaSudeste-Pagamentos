@@ -23,6 +23,7 @@ import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
+import { toast as sonnerToast } from 'sonner'
 
 export function DashboardPaymentModal({
   maxRef,
@@ -34,6 +35,7 @@ export function DashboardPaymentModal({
   const { user } = useAuth()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
+  const canConfirm = user?.role === 'Administrador' || user?.role === 'recebedoria'
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState<any[]>([])
@@ -128,9 +130,13 @@ export function DashboardPaymentModal({
       let existingPaymentId = null
       try {
         // Detect if a "Pendente" or existing record already exists for this specific collaborator and reference period
+        let filterStr = `colaborador_id="${record.id}"`
+        if (record.inicio) {
+          filterStr += ` && inicio="${record.inicio}"`
+        }
         const existing = await pb
           .collection('pagamentos')
-          .getFirstListItem(`colaborador_id="${record.id}"`)
+          .getFirstListItem(filterStr, { sort: '-created' })
         existingPaymentId = existing.id
       } catch (e) {
         // Not found, will create
@@ -155,7 +161,14 @@ export function DashboardPaymentModal({
         msg =
           'Erro de validação ou conflito de dados (ex: registro duplicado ou campo obrigatório ausente).'
       }
-      toast({ title: 'Erro ao confirmar', description: msg, variant: 'destructive' })
+
+      if (err.status === 400 || err.status === 403) {
+        sonnerToast.error('Ação não permitida ou dados inválidos', {
+          description: err.status === 403 ? 'Você não tem permissão para realizar esta ação.' : msg,
+        })
+      } else {
+        toast({ title: 'Erro ao confirmar', description: msg, variant: 'destructive' })
+      }
     } finally {
       setSubmitting((prev) => ({ ...prev, [record.id]: false }))
     }
@@ -227,14 +240,18 @@ export function DashboardPaymentModal({
                       />
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        onClick={() => handleConfirm(r)}
-                        disabled={submitting[r.id]}
-                        className="bg-emerald-600 hover:bg-emerald-700"
-                      >
-                        Confirmar
-                      </Button>
+                      {canConfirm ? (
+                        <Button
+                          size="sm"
+                          onClick={() => handleConfirm(r)}
+                          disabled={submitting[r.id]}
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          Confirmar
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Sem permissão</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
