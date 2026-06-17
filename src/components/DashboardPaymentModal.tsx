@@ -21,7 +21,7 @@ import { formatBRL } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
-import { format } from 'date-fns'
+import { extractFieldErrors } from '@/lib/pocketbase/errors'
 
 export function DashboardPaymentModal({
   maxRef,
@@ -37,7 +37,6 @@ export function DashboardPaymentModal({
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState<any[]>([])
 
-  const [dates, setDates] = useState<Record<string, string>>({})
   const [photos, setPhotos] = useState<Record<string, File | null>>({})
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({})
 
@@ -46,7 +45,7 @@ export function DashboardPaymentModal({
     setLoading(true)
     try {
       const res = await pb.collection('colaboradores').getList(1, 50, {
-        filter: `(nome ~ "${search}" || registro = "${search}") && status != "Confirmado" && status != "Cancelado"`,
+        filter: `(nome ~ "${search}" || registro = "${search}") && foto_confirmacao_url = ""`,
         sort: '-created',
       })
 
@@ -59,12 +58,6 @@ export function DashboardPaymentModal({
       })
 
       setRecords(filtered)
-
-      const newDates: Record<string, string> = {}
-      filtered.forEach((r) => {
-        newDates[r.id] = format(new Date(), 'yyyy-MM-dd')
-      })
-      setDates(newDates)
     } catch (e) {
       toast({ title: 'Erro na busca', variant: 'destructive' })
     } finally {
@@ -73,21 +66,7 @@ export function DashboardPaymentModal({
   }
 
   const handleConfirm = async (record: any) => {
-    const confirmDate = dates[record.id]
     const confirmPhoto = photos[record.id]
-
-    if (!confirmDate) {
-      toast({ title: 'Data de pagamento é obrigatória.', variant: 'destructive' })
-      return
-    }
-
-    const selectedDate = new Date(confirmDate + 'T12:00:00')
-    const today = new Date()
-    today.setHours(23, 59, 59, 999)
-    if (selectedDate > today) {
-      toast({ title: 'A data de pagamento não pode ser no futuro.', variant: 'destructive' })
-      return
-    }
 
     if (!confirmPhoto) {
       toast({
@@ -102,21 +81,19 @@ export function DashboardPaymentModal({
       const formData = new FormData()
       formData.append('colaborador_id', record.id)
       formData.append('valor_pago', String(record.valor_a_receber || record.valor || 0))
-      formData.append('data_pagamento', confirmDate + ' 12:00:00.000Z')
+      formData.append('data_pagamento', new Date().toISOString())
       formData.append('status', 'Confirmado')
-      if (user?.id) formData.append('user_id', user.id)
       formData.append('foto_confirmacao', confirmPhoto)
 
       await pb.collection('pagamentos').create(formData)
 
       toast({ title: 'Pagamento confirmado com sucesso!' })
-      setRecords((prev) => prev.filter((r) => r.id !== record.id))
+      setOpen(false)
+      setRecords([])
       onRefresh()
     } catch (err: any) {
-      const data = err.response?.data || {}
-      const msgs = Object.values(data)
-        .map((v: any) => v?.message)
-        .filter(Boolean)
+      const errors = extractFieldErrors(err)
+      const msgs = Object.entries(errors).map(([field, msg]) => `${field}: ${msg}`)
       const msg = msgs.length > 0 ? msgs.join(', ') : err.message || 'Erro ao confirmar pagamento'
       toast({ title: 'Erro ao confirmar', description: msg, variant: 'destructive' })
     } finally {
@@ -158,7 +135,6 @@ export function DashboardPaymentModal({
                   <TableHead>Colaborador</TableHead>
                   <TableHead>Referência</TableHead>
                   <TableHead>Valor</TableHead>
-                  <TableHead>Data</TableHead>
                   <TableHead>Comprovante</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -178,15 +154,6 @@ export function DashboardPaymentModal({
                     </TableCell>
                     <TableCell className="font-bold text-emerald-600">
                       {formatBRL(r.valor_a_receber || r.valor)}
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="date"
-                        value={dates[r.id] || ''}
-                        max={format(new Date(), 'yyyy-MM-dd')}
-                        onChange={(e) => setDates((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                        className="w-36"
-                      />
                     </TableCell>
                     <TableCell>
                       <Input

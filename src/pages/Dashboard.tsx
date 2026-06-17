@@ -51,7 +51,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { DashboardPaymentModal } from '@/components/DashboardPaymentModal'
 import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
@@ -497,7 +496,6 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          <DashboardPaymentModal maxRef={maxRef} onRefresh={refreshAll} />
           {(selectedChartFilial || selectedChartDate || selectedChartRef || chartRefSearch) && (
             <Button
               variant="outline"
