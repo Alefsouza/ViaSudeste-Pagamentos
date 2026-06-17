@@ -17,7 +17,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Search, CheckCircle } from 'lucide-react'
-import { formatBRL } from '@/lib/formatters'
+import { formatBRL, checkIsLocked } from '@/lib/formatters'
+import { format } from 'date-fns'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
@@ -51,9 +52,11 @@ export function DashboardPaymentModal({
 
       const filtered = res.items.filter((r) => {
         if (r.foto_confirmacao_url) return false
-        const ref = r.referencia || 0
-        if (ref >= maxRef - 3) return true
         if (r.liberado_pagamento === true) return true
+        const ref = r.referencia || 0
+        if (ref >= maxRef - 3) {
+          return !checkIsLocked(r)
+        }
         return false
       })
 
@@ -80,14 +83,16 @@ export function DashboardPaymentModal({
     try {
       const formData = new FormData()
       formData.append('colaborador_id', record.id)
+      formData.append('registro', record.registro || '')
+      formData.append('nome', record.nome || '')
       formData.append('valor_pago', String(record.valor_a_receber || record.valor || 0))
-      formData.append('data_pagamento', new Date().toISOString())
+      formData.append('data_pagamento', format(new Date(), 'yyyy-MM-dd HH:mm:ss'))
       formData.append('status', 'Confirmado')
       formData.append('foto_confirmacao', confirmPhoto)
 
       await pb.collection('pagamentos').create(formData)
 
-      toast({ title: 'Pagamento confirmado com sucesso!' })
+      toast({ title: 'Pagamento aprovado com sucesso!' })
       setOpen(false)
       setRecords([])
       onRefresh()
