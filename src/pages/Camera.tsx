@@ -90,25 +90,7 @@ export default function Camera() {
   }, [colaborador])
 
   const visibleRecords = useMemo(() => {
-    const startOfToday = new Date()
-    startOfToday.setHours(0, 0, 0, 0)
-
-    return sortedRecords.filter((rec: any) => {
-      if (rec.status === 'Agendado' || rec.status === 'agendado') return false
-
-      if (rec.data_liberacao) {
-        const libDate = new Date(rec.data_liberacao)
-        const startOfLibDate = new Date(
-          libDate.getFullYear(),
-          libDate.getMonth(),
-          libDate.getDate(),
-        )
-        if (startOfLibDate > startOfToday) {
-          return false
-        }
-      }
-      return true
-    })
+    return sortedRecords
   }, [sortedRecords])
 
   const stopCamera = useCallback(() => {
@@ -142,36 +124,7 @@ export default function Camera() {
   ].includes(viewState)
 
   useEffect(() => {
-    if (colaborador) {
-      let maxBlockedFormatted: string | null = null
-      let maxLibTime = 0
-
-      const recordsToCheck =
-        colaborador.records && colaborador.records.length > 0 ? colaborador.records : [colaborador]
-
-      const startOfToday = new Date()
-      startOfToday.setHours(0, 0, 0, 0)
-
-      for (const rec of recordsToCheck) {
-        if (rec.data_liberacao) {
-          const libDate = new Date(rec.data_liberacao)
-          const startOfLibDate = new Date(
-            libDate.getFullYear(),
-            libDate.getMonth(),
-            libDate.getDate(),
-          )
-          if (startOfToday < startOfLibDate) {
-            if (startOfLibDate.getTime() > maxLibTime) {
-              maxLibTime = startOfLibDate.getTime()
-              maxBlockedFormatted = `${String(libDate.getDate()).padStart(2, '0')}/${String(libDate.getMonth() + 1).padStart(2, '0')}/${libDate.getFullYear()}`
-            }
-          }
-        }
-      }
-      setBlockedDate(maxBlockedFormatted)
-    } else {
-      setBlockedDate(null)
-    }
+    setBlockedDate(null)
   }, [colaborador])
 
   useEffect(() => {
@@ -513,11 +466,15 @@ export default function Camera() {
         description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(totalPago)}`,
       })
       handleReset()
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      const msg =
+        err?.message && !err?.message.includes('400')
+          ? err.message
+          : 'Erro ao confirmar pagamento. Verifique a conexão e tente novamente.'
       toast({
-        title: 'Erro',
-        description: 'Erro ao confirmar pagamento. Tente novamente',
+        title: 'Erro de processamento',
+        description: msg,
         variant: 'destructive',
       })
       setViewState('RECOGNITION_SUCCESS')

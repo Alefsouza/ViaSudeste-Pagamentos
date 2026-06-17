@@ -123,7 +123,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
   const allRecords = await pb
     .collection('colaboradores')
     .getFullList({
-      filter: `registro="${registro}" && (foto_confirmacao_url="" || foto_confirmacao_url=null)`,
+      filter: `registro="${registro}"`,
       sort: '-created',
     })
     .catch(() => [])
@@ -132,21 +132,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
     throw new Error('Não há valor pendente')
   }
 
-  const lastColab = await pb
-    .collection('colaboradores')
-    .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
-    .catch(() => null)
-
-  const maxRef = lastColab?.referencia || 0
-  const minValidRef = Math.max(1, maxRef - 3)
-
-  const validRecords = allRecords.filter(
-    (r) => (r.referencia && r.referencia >= minValidRef) || r.liberado_pagamento,
-  )
-
-  if (validRecords.length === 0) {
-    throw new Error('Não há valor pendente')
-  }
+  const validRecords = allRecords
 
   const totalValor = validRecords.reduce((acc, curr) => {
     const v = curr.valor_a_receber || curr.valor || 0
