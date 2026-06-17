@@ -97,7 +97,7 @@ export function DashboardPaymentModal({
       formData.append('valor_pago', String(record.valor_a_receber || record.valor || 0))
 
       const now = new Date()
-      formData.append('data_pagamento', format(now, 'yyyy-MM-dd HH:mm:ss'))
+      formData.append('data_pagamento', now.toISOString())
       formData.append('hora_pagamento', format(now, 'HH:mm:ss'))
       formData.append('status', 'Confirmado')
       formData.append('foto_confirmacao', confirmPhoto)
@@ -127,6 +127,7 @@ export function DashboardPaymentModal({
 
       let existingPaymentId = null
       try {
+        // Detect if a "Pendente" or existing record already exists for this specific collaborator and reference period
         const existing = await pb
           .collection('pagamentos')
           .getFirstListItem(`colaborador_id="${record.id}"`)
@@ -146,7 +147,7 @@ export function DashboardPaymentModal({
       setRecords([])
       onRefresh()
     } catch (err: any) {
-      console.error('Erro completo do servidor:', err.response, err.data, err)
+      console.error('Erro completo do servidor:', err.response, err.response?.data, err)
       const errors = extractFieldErrors(err)
       const msgs = Object.entries(errors).map(([field, msg]) => `Campo '${field}': ${msg}`)
       let msg = msgs.length > 0 ? msgs.join(', ') : err.message || 'Erro ao confirmar pagamento'
