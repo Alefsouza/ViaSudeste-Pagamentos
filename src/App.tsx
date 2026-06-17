@@ -63,7 +63,7 @@ const AppRoutes = () => (
       <Route
         path="/camera"
         element={
-          <ProtectedRoute allowedRoles={['recebedoria']}>
+          <ProtectedRoute allowedRoles={['recebedoria', 'Administrador']}>
             <Camera />
           </ProtectedRoute>
         }

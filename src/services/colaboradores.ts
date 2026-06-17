@@ -129,28 +129,56 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .catch(() => [])
 
   if (allRecords.length === 0) {
-    throw new Error('Não há valor pendente')
+    throw new Error('Não há registros para este colaborador')
   }
 
-  const validRecords = allRecords
+  const pagamentos = await pb
+    .collection('pagamentos')
+    .getFullList({
+      filter: `registro="${registro}"`,
+      fields: 'colaborador_id,status',
+      sort: 'created',
+    })
+    .catch(() => [])
 
-  const totalValor = validRecords.reduce((acc, curr) => {
+  const pagamentoStatusByColabId = new Map<string, string>()
+  for (const p of pagamentos) {
+    pagamentoStatusByColabId.set(p.colaborador_id, p.status)
+  }
+
+  const mappedRecords = allRecords.map((r) => {
+    const pagStatus = pagamentoStatusByColabId.get(r.id)
+    const isConfirmedViaPhoto = !!r.foto_confirmacao_url
+
+    let isPendente = false
+    if (pagStatus) {
+      isPendente = pagStatus === 'Pendente'
+    } else {
+      isPendente = !isConfirmedViaPhoto
+    }
+
+    const isLiberado = r.liberado_pagamento === true
+
+    return {
+      ...r,
+      isEligible: isLiberado && isPendente,
+    }
+  })
+
+  const firstColab = mappedRecords[0]
+
+  const totalValor = mappedRecords.reduce((acc, curr) => {
+    if (!curr.isEligible) return acc
     const v = curr.valor_a_receber || curr.valor || 0
     return acc + v
   }, 0)
-
-  if (totalValor === 0) {
-    throw new Error('Não há valor pendente')
-  }
-
-  const firstColab = validRecords[0]
 
   const colab = {
     ...firstColab,
     valor_a_receber: totalValor,
     valor: totalValor,
-    all_records_ids: validRecords.map((r) => r.id),
-    records: validRecords,
+    all_records_ids: mappedRecords.map((r) => r.id),
+    records: mappedRecords,
   }
 
   const result = { colab, fotoUrl, hasFotoRecord: true }

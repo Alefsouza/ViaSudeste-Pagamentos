@@ -90,7 +90,30 @@ export default function Camera() {
   }, [colaborador])
 
   const visibleRecords = useMemo(() => {
-    return sortedRecords
+    const eligible = sortedRecords.filter((r) => r.isEligible !== false)
+
+    // To get the 4 most recent by referencia, we first sort distinct referencias descending
+    const distinctRefs = Array.from(new Set(eligible.map((r: any) => Number(r.referencia) || 0)))
+    distinctRefs.sort((a, b) => b - a)
+
+    const top4Refs = new Set(distinctRefs.slice(0, 4))
+    const top4Records = eligible.filter((r: any) => top4Refs.has(Number(r.referencia) || 0))
+
+    // Then we re-sort by date ascending to keep the table chronological
+    return top4Records.sort((a, b) => {
+      const parseDate = (dStr: string) => {
+        if (!dStr) return 0
+        const matchIso = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (matchIso)
+          return new Date(`${matchIso[1]}-${matchIso[2]}-${matchIso[3]}T00:00:00`).getTime()
+        const matchBr = dStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
+        if (matchBr) return new Date(`${matchBr[3]}-${matchBr[2]}-${matchBr[1]}T00:00:00`).getTime()
+        return new Date(dStr).getTime()
+      }
+      const da = parseDate(a.data || a.data_pagamento || a.data_pagamento_v2 || '')
+      const db = parseDate(b.data || b.data_pagamento || b.data_pagamento_v2 || '')
+      return da - db
+    })
   }, [sortedRecords])
 
   const stopCamera = useCallback(() => {
@@ -386,9 +409,27 @@ export default function Camera() {
     }
 
     try {
-      let firstFileUrl = ''
+      // Re-validate to ensure backend consistency and prevent bypassing
+      const validationResult = await getColaboradorByRegistro(colaborador.registro)
+      const currentValidRecordsIds = new Set(
+        validationResult.colab.records
+          .filter((r: any) => r.isEligible !== false)
+          .map((r: any) => r.id),
+      )
 
-      const recordsToProcess = visibleRecords
+      const recordsToProcess = visibleRecords.filter((r) => currentValidRecordsIds.has(r.id))
+
+      if (recordsToProcess.length === 0) {
+        toast({
+          title: 'Aviso',
+          description: 'Os pagamentos selecionados não estão mais disponíveis para processamento.',
+          variant: 'destructive',
+        })
+        setViewState('RECOGNITION_SUCCESS')
+        return
+      }
+
+      let firstFileUrl = ''
 
       for (let i = 0; i < recordsToProcess.length; i++) {
         const record = recordsToProcess[i]
@@ -439,12 +480,9 @@ export default function Camera() {
       }
 
       try {
-        if (colaborador.all_records_ids && Array.isArray(colaborador.all_records_ids)) {
-          for (const id of colaborador.all_records_ids) {
-            await updateColaborador(id, { foto_confirmacao_url: firstFileUrl })
-          }
-        } else {
-          await updateColaborador(colaborador.id, { foto_confirmacao_url: firstFileUrl })
+        const idsToUpdate = recordsToProcess.map((r) => r.id)
+        for (const id of idsToUpdate) {
+          await updateColaborador(id, { foto_confirmacao_url: firstFileUrl })
         }
       } catch (err) {
         toast({
@@ -456,7 +494,7 @@ export default function Camera() {
         return
       }
 
-      const totalPago = visibleRecords.reduce(
+      const totalPago = recordsToProcess.reduce(
         (acc: number, rec: any) => acc + (rec.valor_a_receber || rec.valor || 0),
         0,
       )
@@ -747,7 +785,7 @@ export default function Camera() {
             <div className="flex flex-col items-center justify-center p-8 text-center bg-slate-50 dark:bg-slate-900 rounded-lg min-h-[300px]">
               <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
               <h3 className="text-lg font-medium text-slate-900 dark:text-white">
-                Não há pagamentos liberados
+                Não há pagamentos liberados.
               </h3>
               <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
                 Não há pagamentos disponíveis para processamento no momento.
