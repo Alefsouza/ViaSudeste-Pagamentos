@@ -521,7 +521,7 @@ export default function Camera() {
     }
 
     const now = new Date()
-    const data_pagamento = now.toISOString()
+    const data_pagamento = now.toISOString().replace('T', ' ')
     const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
 
     if (payableRecords.length === 0) {
@@ -557,7 +557,7 @@ export default function Camera() {
             : undefined
 
         const dataToSave: any = {
-          colaborador_id: record.id || colaborador.id,
+          colaborador_id: colaborador.id,
           valor_pago: record.valor_a_receber || record.valor || 0,
           data_pagamento,
           hora_pagamento,
@@ -615,11 +615,25 @@ export default function Camera() {
         description: `Pagamento confirmado para ${colaborador.nome} no valor de ${formatCurrency(totalPago)}`,
       })
       handleReset()
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+
+      let errMsg = getErrorMessage(err)
+      if (err?.response?.message && Object.keys(err?.response?.data || {}).length === 0) {
+        errMsg = err.response.message
+      }
+
+      if (
+        !errMsg ||
+        errMsg === 'An unexpected error occurred.' ||
+        errMsg === 'Failed to create record.'
+      ) {
+        errMsg = 'Erro ao confirmar pagamento. Verifique os dados e tente novamente.'
+      }
+
       toast({
         title: 'Erro',
-        description: getErrorMessage(err) || 'Erro ao confirmar pagamento. Tente novamente',
+        description: errMsg,
         variant: 'destructive',
       })
       setViewState('RECOGNITION_SUCCESS')
