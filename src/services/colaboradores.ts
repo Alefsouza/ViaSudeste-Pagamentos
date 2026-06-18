@@ -48,10 +48,36 @@ const buildFilterStr = (filters: any) => {
 }
 
 export const getColaboradoresPaginated = async (page: number, perPage: number, filters: any) => {
-  return pb.collection('colaboradores').getList(page, perPage, {
+  const result = await pb.collection('colaboradores').getList(page, perPage, {
     filter: buildFilterStr(filters),
     sort: '-data,-created',
   })
+
+  if (result.items.length > 0) {
+    const colabIds = result.items.map((i: any) => i.id)
+    const pagamentos = await pb
+      .collection('pagamentos')
+      .getFullList({
+        filter: colabIds.map((id: string) => `colaborador_id="${id}"`).join(' || '),
+        sort: 'created',
+      })
+      .catch(() => [])
+
+    const pagMap = new Map()
+    for (const p of pagamentos) {
+      pagMap.set(p.colaborador_id, p)
+    }
+
+    result.items = result.items.map((item: any) => {
+      const pag = pagMap.get(item.id)
+      if (pag) {
+        return { ...item, pagStatus: pag.status }
+      }
+      return item
+    })
+  }
+
+  return result
 }
 
 export const getColaboradoresStats = async (filters: any) => {
@@ -68,10 +94,32 @@ export const getColaboradoresStats = async (filters: any) => {
 }
 
 export const getColaboradoresAnalytics = async (filters: any) => {
-  return pb.collection('colaboradores').getFullList({
+  const records = await pb.collection('colaboradores').getFullList({
     filter: buildFilterStr(filters),
     sort: '-data,-created',
   })
+
+  if (records.length > 0) {
+    const pagamentos = await pb
+      .collection('pagamentos')
+      .getFullList({
+        fields: 'colaborador_id,status',
+        sort: 'created',
+      })
+      .catch(() => [])
+
+    const pagMap = new Map()
+    for (const p of pagamentos) {
+      pagMap.set(p.colaborador_id, p.status)
+    }
+
+    return records.map((r: any) => ({
+      ...r,
+      pagStatus: pagMap.get(r.id),
+    }))
+  }
+
+  return records
 }
 
 export const getColaboradorByRegistro = async (registro: string) => {
@@ -172,7 +220,13 @@ export const getColaboradorByRegistro = async (registro: string) => {
     const ref = r.referencia || 0
     let isLocked = false
     if (r.data_liberacao) {
-      isLocked = new Date(r.data_liberacao) > new Date()
+      const dataLiberacaoDate = new Date(r.data_liberacao)
+      if (!isNaN(dataLiberacaoDate.getTime())) {
+        const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
+        const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
+        const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
+        isLocked = todayStr < libStr
+      }
     }
 
     let isEligible = isPendente
