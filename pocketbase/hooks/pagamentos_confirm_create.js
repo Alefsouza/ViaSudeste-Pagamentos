@@ -97,7 +97,6 @@ onRecordAfterCreateSuccess((e) => {
     colab.set('valor_a_receber', novoValor)
 
     // Status Persistence: Update foto url
-    const fotoUrl = e.record.getString('foto_confirmacao_url')
     if (fotoUrl) {
       colab.set('foto_confirmacao_url', fotoUrl)
     }
