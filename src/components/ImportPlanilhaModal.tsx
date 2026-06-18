@@ -209,10 +209,19 @@ export function ImportPlanilhaModal({
             return ''
           }
           if (!isNaN(d.getTime())) {
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 12:00:00.000Z`
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 00:00:00.000Z`
           }
           return ''
         }
+
+        const formatUIDateToDB = (dateStr: string) => {
+          if (!dateStr) return ''
+          return `${dateStr} 00:00:00.000Z`
+        }
+
+        const uiDataLiberacao = formatUIDateToDB(dataLiberacao)
+        const uiPeriodoInicio = formatUIDateToDB(periodoInicio)
+        const uiPeriodoFim = formatUIDateToDB(periodoFim)
 
         const formattedData = normalizedData.map((row: any) => {
           const rawData = row['DATA']
@@ -222,7 +231,7 @@ export function ImportPlanilhaModal({
             : String(rawData || '')
 
           const dataPagamentoV2 = !isNaN(d.getTime())
-            ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 12:00:00.000Z`
+            ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 00:00:00.000Z`
             : ''
 
           let rawFilial = row['FILIAL'] !== undefined ? String(row['FILIAL']).trim() : ''
@@ -247,9 +256,11 @@ export function ImportPlanilhaModal({
             filial: filialMapped,
             filial_id: filialNumber,
             data_pagamento_v2: dataPagamentoV2,
-            data_liberacao: parseDateToDB(row['DATA_LIBERACAO'] || row['DATA LIBERACAO']),
-            periodo_inicio: parseDateToDB(row['PERIODO_INICIO'] || row['PERIODO INICIO']),
-            periodo_fim: parseDateToDB(row['PERIODO_FIM'] || row['PERIODO FIM']),
+            data_liberacao:
+              uiDataLiberacao || parseDateToDB(row['DATA_LIBERACAO'] || row['DATA LIBERACAO']),
+            periodo_inicio:
+              uiPeriodoInicio || parseDateToDB(row['PERIODO_INICIO'] || row['PERIODO INICIO']),
+            periodo_fim: uiPeriodoFim || parseDateToDB(row['PERIODO_FIM'] || row['PERIODO FIM']),
           }
         })
 
@@ -362,7 +373,9 @@ export function ImportPlanilhaModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full text-left my-2">
                 <div className="space-y-2">
-                  <Label htmlFor="dataLiberacao">Data de Liberação</Label>
+                  <Label htmlFor="dataLiberacao" className="flex gap-1">
+                    Data de Liberação <span className="text-rose-500">*</span>
+                  </Label>
                   <Input
                     id="dataLiberacao"
                     type="date"
@@ -372,7 +385,9 @@ export function ImportPlanilhaModal({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="periodoInicio">Período da Referência (Início)</Label>
+                  <Label htmlFor="periodoInicio" className="flex gap-1">
+                    Período de Ref. (Início) <span className="text-rose-500">*</span>
+                  </Label>
                   <Input
                     id="periodoInicio"
                     type="date"
@@ -382,7 +397,9 @@ export function ImportPlanilhaModal({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="periodoFim">Período da Referência (Fim)</Label>
+                  <Label htmlFor="periodoFim" className="flex gap-1">
+                    Período de Ref. (Fim) <span className="text-rose-500">*</span>
+                  </Label>
                   <Input
                     id="periodoFim"
                     type="date"
@@ -394,9 +411,20 @@ export function ImportPlanilhaModal({
               </div>
 
               {!confirming ? (
-                <Button onClick={() => setConfirming(true)} disabled={loading} className="w-full">
-                  Verificar Importação
-                </Button>
+                <div className="w-full space-y-2">
+                  <Button
+                    onClick={() => setConfirming(true)}
+                    disabled={loading || !dataLiberacao || !periodoInicio || !periodoFim}
+                    className="w-full"
+                  >
+                    Verificar Importação
+                  </Button>
+                  {(!dataLiberacao || !periodoInicio || !periodoFim) && (
+                    <p className="text-xs text-center text-muted-foreground">
+                      Preencha as três datas obrigatórias para continuar.
+                    </p>
+                  )}
+                </div>
               ) : (
                 <div className="w-full p-4 border rounded-md bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 animate-fade-in-up">
                   <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-4 text-center">

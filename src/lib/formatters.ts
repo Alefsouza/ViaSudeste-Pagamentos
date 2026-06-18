@@ -37,6 +37,17 @@ export const getTipoPagamento = (id?: number) => {
 export const formatBRL = (val: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 
+export const formatDateDBToBR = (dStr?: string | null) => {
+  if (!dStr) return 'N/A'
+  const datePart = dStr.split(' ')[0]
+  const parts = datePart.split('-')
+  if (parts.length === 3) {
+    const [y, m, day] = parts
+    return `${day}/${m}/${y}`
+  }
+  return dStr
+}
+
 export const checkIsLocked = (dataLiberacaoStr?: string) => {
   if (!dataLiberacaoStr) return false
   const dataLiberacaoDate = new Date(dataLiberacaoStr)

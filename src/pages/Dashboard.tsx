@@ -59,7 +59,13 @@ import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
-import { formatDataString, formatBRL, getTipoPagamento, checkIsLocked } from '@/lib/formatters'
+import {
+  formatDataString,
+  formatBRL,
+  getTipoPagamento,
+  checkIsLocked,
+  formatDateDBToBR,
+} from '@/lib/formatters'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   let status =
@@ -956,17 +962,6 @@ export default function Dashboard() {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload
 
-                            const formatDateStr = (d: string | null) => {
-                              if (!d) return 'Não informado'
-                              const datePart = d.split(' ')[0]
-                              const parts = datePart.split('-')
-                              if (parts.length === 3) {
-                                const [y, m, day] = parts
-                                return `${day}/${m}/${y}`
-                              }
-                              return d
-                            }
-
                             return (
                               <div className="rounded-lg border bg-background p-3 shadow-md text-sm space-y-1 min-w-[220px]">
                                 <div className="font-medium text-foreground mb-2 pb-1 border-b">
@@ -975,13 +970,13 @@ export default function Dashboard() {
                                 <div className="flex justify-between gap-4">
                                   <span className="text-muted-foreground">Data Início:</span>
                                   <span className="font-medium">
-                                    {formatDateStr(data.periodo_inicio)}
+                                    {formatDateDBToBR(data.periodo_inicio)}
                                   </span>
                                 </div>
                                 <div className="flex justify-between gap-4">
                                   <span className="text-muted-foreground">Data Final:</span>
                                   <span className="font-medium">
-                                    {formatDateStr(data.periodo_fim)}
+                                    {formatDateDBToBR(data.periodo_fim)}
                                   </span>
                                 </div>
                                 <div className="flex justify-between gap-4 pt-1 mt-1 border-t">
@@ -1201,11 +1196,7 @@ export default function Dashboard() {
                                                 <TooltipContent>
                                                   <p>
                                                     Liberado em:{' '}
-                                                    {p.data_liberacao
-                                                      ? new Date(
-                                                          p.data_liberacao,
-                                                        ).toLocaleDateString('pt-BR')
-                                                      : 'N/A'}
+                                                    {formatDateDBToBR(p.data_liberacao)}
                                                   </p>
                                                 </TooltipContent>
                                               </Tooltip>
@@ -1384,11 +1375,7 @@ export default function Dashboard() {
                                                 <TooltipContent>
                                                   <p>
                                                     Liberado em:{' '}
-                                                    {p.data_liberacao
-                                                      ? new Date(
-                                                          p.data_liberacao,
-                                                        ).toLocaleDateString('pt-BR')
-                                                      : 'N/A'}
+                                                    {formatDateDBToBR(p.data_liberacao)}
                                                   </p>
                                                 </TooltipContent>
                                               </Tooltip>
