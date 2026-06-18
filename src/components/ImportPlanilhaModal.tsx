@@ -184,6 +184,31 @@ export function ImportPlanilhaModal({
           return isNaN(num) ? 0 : Number(num.toFixed(2))
         }
 
+        const parseDateToDB = (val: any) => {
+          if (val === undefined || val === null || val === '') return ''
+          let d: Date
+          if (typeof val === 'number') {
+            const utcDate = new Date(Math.round((val - 25569) * 86400 * 1000))
+            d = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate())
+          } else if (typeof val === 'string') {
+            const dateOnly = String(val).split(' ')[0]
+            const parts = dateOnly.split('/')
+            if (parts.length === 3) {
+              let year = parseInt(parts[2])
+              if (year < 100) year += 2000 // handle YY format
+              d = new Date(year, parseInt(parts[1]) - 1, parseInt(parts[0]))
+            } else {
+              d = new Date(val)
+            }
+          } else {
+            return ''
+          }
+          if (!isNaN(d.getTime())) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 12:00:00.000Z`
+          }
+          return ''
+        }
+
         const formattedData = normalizedData.map((row: any) => {
           const rawData = row['DATA']
           const d = excelDateToJSDate(rawData)
@@ -217,6 +242,9 @@ export function ImportPlanilhaModal({
             filial: filialMapped,
             filial_id: filialNumber,
             data_pagamento_v2: dataPagamentoV2,
+            data_liberacao: parseDateToDB(row['DATA_LIBERACAO'] || row['DATA LIBERACAO']),
+            periodo_inicio: parseDateToDB(row['PERIODO_INICIO'] || row['PERIODO INICIO']),
+            periodo_fim: parseDateToDB(row['PERIODO_FIM'] || row['PERIODO FIM']),
           }
         })
 

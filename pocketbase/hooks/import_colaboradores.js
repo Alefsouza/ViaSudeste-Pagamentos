@@ -63,6 +63,10 @@ routerAdd(
           record.set('nome', nome)
           record.set('data', dataStr)
 
+          if (row.data_liberacao) record.set('data_liberacao', row.data_liberacao)
+          if (row.periodo_inicio) record.set('periodo_inicio', row.periodo_inicio)
+          if (row.periodo_fim) record.set('periodo_fim', row.periodo_fim)
+
           if (dataPagamentoV2) {
             record.set('data_pagamento_v2', dataPagamentoV2)
           } else if (dataStr) {
