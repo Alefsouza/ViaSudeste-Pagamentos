@@ -93,19 +93,8 @@ export default function Camera() {
   const visibleRecords = useMemo(() => {
     const relevantRecords = sortedRecords.filter((r) => r.isEligible !== false)
 
-    // To get the 4 most recent by referencia, we first sort distinct referencias descending
-    const distinctRefs = Array.from(
-      new Set(relevantRecords.map((r: any) => Number(r.referencia) || 0)),
-    )
-    distinctRefs.sort((a, b) => b - a)
-
-    const top4Refs = new Set(distinctRefs.slice(0, 4))
-    const top4Records = relevantRecords.filter(
-      (r: any) => top4Refs.has(Number(r.referencia) || 0) && r.isEligible !== false,
-    )
-
-    // Then we re-sort by date ascending to keep the table chronological
-    return top4Records.sort((a, b) => {
+    // Just re-sort by date ascending to keep the table chronological
+    return relevantRecords.sort((a, b) => {
       const parseDate = (dStr: string) => {
         if (!dStr) return 0
         const matchIso = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
@@ -213,7 +202,7 @@ export default function Camera() {
     try {
       const result = await getColaboradorByRegistro(registro)
       if (!result || !result.colab) {
-        const msg = 'não há valor para o colaborador receber'
+        const msg = 'Não há valor para o colaborador receber'
         setViewState('SEARCH_FAILED')
         setErrorMsg(msg)
         toast({
@@ -229,7 +218,7 @@ export default function Camera() {
       setViewState('CAPTURING')
     } catch (err: any) {
       setViewState('SEARCH_FAILED')
-      const msg = err.message || 'não há valor para o colaborador receber'
+      const msg = err.message || 'Não há valor para o colaborador receber'
       setErrorMsg(msg)
       toast({
         title: 'Aviso',
@@ -241,17 +230,28 @@ export default function Camera() {
 
   const formatDateSafe = (dStr?: string) => {
     if (!dStr) return 'Data não informada'
+    let cleanStr = dStr
+    if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
+    if (
+      !cleanStr.endsWith('Z') &&
+      cleanStr.split('T').length === 2 &&
+      !cleanStr.includes('+') &&
+      !cleanStr.match(/-\d{2}:\d{2}$/)
+    )
+      cleanStr += 'Z'
+    const d = new Date(cleanStr)
+    if (!isNaN(d.getTime())) {
+      const utcMinus3 = new Date(d.getTime() - 3 * 3600000)
+      const dd = String(utcMinus3.getUTCDate()).padStart(2, '0')
+      const mm = String(utcMinus3.getUTCMonth() + 1).padStart(2, '0')
+      const yyyy = utcMinus3.getUTCFullYear()
+      return `${dd}/${mm}/${yyyy}`
+    }
+
     const matchIso = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
     if (matchIso) return `${matchIso[3]}/${matchIso[2]}/${matchIso[1]}`
     const matchBr = dStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
     if (matchBr) return `${matchBr[1]}/${matchBr[2]}/${matchBr[3]}`
-    const d = new Date(dStr)
-    if (!isNaN(d.getTime())) {
-      const month = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      const year = d.getFullYear()
-      return `${day}/${month}/${year}`
-    }
     return dStr
   }
 
@@ -439,7 +439,9 @@ export default function Camera() {
 
     const now = new Date()
     const data_pagamento = now.toISOString()
-    const hora_pagamento = now.toLocaleTimeString('pt-BR', { hour12: false })
+    const utcMinus3 = new Date(now.getTime() - 3 * 3600000)
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    const hora_pagamento = `${pad(utcMinus3.getUTCHours())}:${pad(utcMinus3.getUTCMinutes())}`
 
     if (visibleRecords.length === 0) {
       toast({
@@ -623,7 +625,7 @@ export default function Camera() {
                       <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                       <span className="leading-snug">
                         {viewState === 'SEARCH_FAILED' && !errorMsg
-                          ? 'não há valor para o colaborador receber'
+                          ? 'Não há valor para o colaborador receber'
                           : errorMsg}
                       </span>
                     </div>

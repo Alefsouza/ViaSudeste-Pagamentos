@@ -100,7 +100,13 @@ export function DashboardPaymentModal({
 
       const now = new Date()
       formData.append('data_pagamento', now.toISOString())
-      formData.append('hora_pagamento', format(now, 'HH:mm:ss'))
+
+      const utcMinus3 = new Date(now.getTime() - 3 * 3600000)
+      const pad = (n: number) => n.toString().padStart(2, '0')
+      formData.append(
+        'hora_pagamento',
+        `${pad(utcMinus3.getUTCHours())}:${pad(utcMinus3.getUTCMinutes())}`,
+      )
       formData.append('status', 'Confirmado')
       formData.append('foto_confirmacao', confirmPhoto)
 
