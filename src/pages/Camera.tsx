@@ -90,8 +90,20 @@ export default function Camera() {
     })
   }, [colaborador])
 
+  const checkIsLocked = (dataLiberacaoStr?: string) => {
+    if (!dataLiberacaoStr) return false
+    const dataLiberacaoDate = new Date(dataLiberacaoStr)
+    if (isNaN(dataLiberacaoDate.getTime())) return false
+    const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
+    const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
+    const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
+    return todayStr < libStr
+  }
+
   const visibleRecords = useMemo(() => {
-    const relevantRecords = sortedRecords.filter((r) => r.isEligible !== false)
+    const relevantRecords = sortedRecords.filter(
+      (r) => r.isEligible !== false && (!checkIsLocked(r.data_liberacao) || r.isExplicitPendente),
+    )
 
     // Just re-sort by date ascending to keep the table chronological
     return relevantRecords.sort((a, b) => {
@@ -458,7 +470,10 @@ export default function Camera() {
       const validationResult = await getColaboradorByRegistro(colaborador.registro)
       const currentValidRecordsIds = new Set(
         validationResult.colab.records
-          .filter((r: any) => r.isEligible !== false)
+          .filter(
+            (r: any) =>
+              r.isEligible !== false && (!checkIsLocked(r.data_liberacao) || r.isExplicitPendente),
+          )
           .map((r: any) => r.id),
       )
 
@@ -516,7 +531,12 @@ export default function Camera() {
           dataToSave.foto_confirmacao_url = firstFileUrl
         }
 
-        const pagamentoRecord = await createPagamento(dataToSave)
+        let pagamentoRecord
+        if (record.pagamento_id) {
+          pagamentoRecord = await updatePagamento(record.pagamento_id, dataToSave)
+        } else {
+          pagamentoRecord = await createPagamento(dataToSave)
+        }
 
         if (i === 0) {
           firstFileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)

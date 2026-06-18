@@ -61,6 +61,35 @@ import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/p
 import { useToast } from '@/hooks/use-toast'
 import { formatDataString, formatBRL, getTipoPagamento } from '@/lib/formatters'
 
+export const checkIsLocked = (dataLiberacaoStr?: string) => {
+  if (!dataLiberacaoStr) return false
+  const dataLiberacaoDate = new Date(dataLiberacaoStr)
+  if (isNaN(dataLiberacaoDate.getTime())) return false
+  const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
+  const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
+  const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
+  return todayStr < libStr
+}
+
+export const getEvaluatedStatus = (curr: any, maxRef: number) => {
+  let status =
+    curr.pagStatus || curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+
+  if (status === 'Pendente' && curr.pagStatus !== 'Pendente') {
+    const isLocked = checkIsLocked(curr.data_liberacao)
+    const ref = curr.referencia || 0
+    const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
+
+    if (isLocked) {
+      status = 'Agendado'
+    } else if (isOutsideWindow && !curr.liberado_pagamento) {
+      status = 'Bloqueado'
+    }
+  }
+
+  return status
+}
+
 const formatLocalTime = (dateStr: string) => {
   if (!dateStr || dateStr === 'Pendente' || dateStr === '-' || dateStr === '') return dateStr
   let cleanStr = dateStr
@@ -353,19 +382,7 @@ export default function Dashboard() {
     return filteredStatsData.reduce(
       (acc, curr) => {
         const val = curr.valor_a_receber || curr.valor || 0
-        let status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-
-        if (status === 'Pendente') {
-          const isLocked = curr.data_liberacao && new Date(curr.data_liberacao) > new Date()
-          const ref = curr.referencia || 0
-          const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
-
-          if (isLocked) {
-            status = 'Agendado'
-          } else if (isOutsideWindow && !curr.liberado_pagamento) {
-            status = 'Bloqueado'
-          }
-        }
+        let status = getEvaluatedStatus(curr, maxRef)
 
         let acronym = ''
         const tipoNome = getTipoPagamento(curr.idtipopgto) || ''
@@ -431,20 +448,7 @@ export default function Dashboard() {
   const uniqueColabs = new Set(
     filteredStatsData
       .filter((c) => {
-        let status = c.status || (c.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
-
-        if (status === 'Pendente') {
-          const isLocked = c.data_liberacao && new Date(c.data_liberacao) > new Date()
-          const ref = c.referencia || 0
-          const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
-
-          if (isLocked) {
-            status = 'Agendado'
-          } else if (isOutsideWindow && !c.liberado_pagamento) {
-            status = 'Bloqueado'
-          }
-        }
-
+        let status = getEvaluatedStatus(c, maxRef)
         return status !== 'Agendado' && status !== 'Cancelado' && status !== 'Bloqueado'
       })
       .map((c) => c.registro || c.expand?.colaborador_id?.registro)
@@ -452,7 +456,7 @@ export default function Dashboard() {
   ).size
 
   const confirmedPayments = filteredStatsData.filter((c) => {
-    let status = c.status || (c.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+    let status = getEvaluatedStatus(c, maxRef)
     return status === 'Confirmado'
   })
 
@@ -1175,19 +1179,8 @@ export default function Dashboard() {
                                     <TableCell>{formatLocalTime(p.data_pagamento)}</TableCell>
                                     <TableCell>
                                       {(() => {
-                                        const status =
-                                          p.status ||
-                                          (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                        const status = getEvaluatedStatus(p, maxRef)
                                         if (!status) return null
-
-                                        const isLocked =
-                                          p.data_liberacao &&
-                                          new Date(p.data_liberacao) > new Date()
-
-                                        const ref = p.referencia || 0
-                                        const isOutsideWindow =
-                                          ref > 0 && maxRef > 0 && ref < maxRef - 3
-                                        const isBlocked = isOutsideWindow && !p.liberado_pagamento
 
                                         if (status === 'Confirmado')
                                           return (
@@ -1195,37 +1188,39 @@ export default function Dashboard() {
                                               Confirmado
                                             </Badge>
                                           )
+                                        if (status === 'Agendado') {
+                                          return (
+                                            <TooltipProvider>
+                                              <Tooltip>
+                                                <TooltipTrigger className="cursor-help">
+                                                  <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1 w-max">
+                                                    <Lock className="w-3 h-3" />
+                                                    Agendado
+                                                  </Badge>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                  <p>
+                                                    Liberado em:{' '}
+                                                    {p.data_liberacao
+                                                      ? new Date(
+                                                          p.data_liberacao,
+                                                        ).toLocaleDateString('pt-BR')
+                                                      : 'N/A'}
+                                                  </p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
+                                          )
+                                        }
+                                        if (status === 'Bloqueado') {
+                                          return (
+                                            <Badge className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 w-max">
+                                              <Lock className="w-3 h-3" />
+                                              Bloqueado
+                                            </Badge>
+                                          )
+                                        }
                                         if (status === 'Pendente') {
-                                          if (isLocked) {
-                                            return (
-                                              <TooltipProvider>
-                                                <Tooltip>
-                                                  <TooltipTrigger className="cursor-help">
-                                                    <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1 w-max">
-                                                      <Lock className="w-3 h-3" />
-                                                      Agendado
-                                                    </Badge>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent>
-                                                    <p>
-                                                      Liberado em:{' '}
-                                                      {new Date(
-                                                        p.data_liberacao,
-                                                      ).toLocaleDateString('pt-BR')}
-                                                    </p>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              </TooltipProvider>
-                                            )
-                                          }
-                                          if (isBlocked) {
-                                            return (
-                                              <Badge className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 w-max">
-                                                <Lock className="w-3 h-3" />
-                                                Bloqueado
-                                              </Badge>
-                                            )
-                                          }
                                           return (
                                             <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
                                               Pendente
@@ -1254,22 +1249,19 @@ export default function Dashboard() {
                                     {isAdmin && (
                                       <TableCell className="text-center">
                                         {(() => {
-                                          const status =
-                                            p.status ||
-                                            (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                          const status = getEvaluatedStatus(p, maxRef)
 
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const isLocked =
-                                            p.data_liberacao &&
-                                            new Date(p.data_liberacao) > new Date()
-
+                                          // If it explicitly was set to Pendente, it shouldn't show the Liberar/Bloquear button
+                                          // because it's already bypassing rules. But to be safe and match UI consistency,
+                                          // we show the button if it's considered outside validity, though it acts unlocked.
+                                          // Actually, if status is 'Pendente' (explicitly or legitimately), we allow toggling.
                                           return (
                                             <div className="flex justify-center gap-1">
-                                              {status === 'Pendente' &&
-                                                isOutsideValidity &&
-                                                !isLocked && (
+                                              {(status === 'Pendente' || status === 'Bloqueado') &&
+                                                isOutsideValidity && (
                                                   <Button
                                                     variant="ghost"
                                                     size="icon"
@@ -1293,7 +1285,9 @@ export default function Dashboard() {
                                                     )}
                                                   </Button>
                                                 )}
-                                              {status === 'Pendente' && (
+                                              {(status === 'Pendente' ||
+                                                status === 'Bloqueado' ||
+                                                status === 'Agendado') && (
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"
@@ -1368,19 +1362,8 @@ export default function Dashboard() {
                                   <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
                                     <div>
                                       {(() => {
-                                        const status =
-                                          p.status ||
-                                          (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                        const status = getEvaluatedStatus(p, maxRef)
                                         if (!status) return null
-
-                                        const isLocked =
-                                          p.data_liberacao &&
-                                          new Date(p.data_liberacao) > new Date()
-
-                                        const ref = p.referencia || 0
-                                        const isOutsideWindow =
-                                          ref > 0 && maxRef > 0 && ref < maxRef - 3
-                                        const isBlocked = isOutsideWindow && !p.liberado_pagamento
 
                                         if (status === 'Confirmado')
                                           return (
@@ -1388,37 +1371,39 @@ export default function Dashboard() {
                                               Confirmado
                                             </Badge>
                                           )
+                                        if (status === 'Agendado') {
+                                          return (
+                                            <TooltipProvider>
+                                              <Tooltip>
+                                                <TooltipTrigger className="cursor-help">
+                                                  <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1">
+                                                    <Lock className="w-3 h-3" />
+                                                    Agendado
+                                                  </Badge>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                  <p>
+                                                    Liberado em:{' '}
+                                                    {p.data_liberacao
+                                                      ? new Date(
+                                                          p.data_liberacao,
+                                                        ).toLocaleDateString('pt-BR')
+                                                      : 'N/A'}
+                                                  </p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
+                                          )
+                                        }
+                                        if (status === 'Bloqueado') {
+                                          return (
+                                            <Badge className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 w-max">
+                                              <Lock className="w-3 h-3" />
+                                              Bloqueado
+                                            </Badge>
+                                          )
+                                        }
                                         if (status === 'Pendente') {
-                                          if (isLocked) {
-                                            return (
-                                              <TooltipProvider>
-                                                <Tooltip>
-                                                  <TooltipTrigger className="cursor-help">
-                                                    <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1">
-                                                      <Lock className="w-3 h-3" />
-                                                      Agendado
-                                                    </Badge>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent>
-                                                    <p>
-                                                      Liberado em:{' '}
-                                                      {new Date(
-                                                        p.data_liberacao,
-                                                      ).toLocaleDateString('pt-BR')}
-                                                    </p>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              </TooltipProvider>
-                                            )
-                                          }
-                                          if (isBlocked) {
-                                            return (
-                                              <Badge className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 w-max">
-                                                <Lock className="w-3 h-3" />
-                                                Bloqueado
-                                              </Badge>
-                                            )
-                                          }
                                           return (
                                             <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
                                               Pendente
@@ -1445,22 +1430,15 @@ export default function Dashboard() {
                                       )}
                                       {isAdmin &&
                                         (() => {
-                                          const status =
-                                            p.status ||
-                                            (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+                                          const status = getEvaluatedStatus(p, maxRef)
 
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const isLocked =
-                                            p.data_liberacao &&
-                                            new Date(p.data_liberacao) > new Date()
-
                                           return (
                                             <>
-                                              {status === 'Pendente' &&
-                                                isOutsideValidity &&
-                                                !isLocked && (
+                                              {(status === 'Pendente' || status === 'Bloqueado') &&
+                                                isOutsideValidity && (
                                                   <Button
                                                     variant="ghost"
                                                     size="sm"
@@ -1485,7 +1463,9 @@ export default function Dashboard() {
                                                     {p.liberado_pagamento ? 'Bloquear' : 'Liberar'}
                                                   </Button>
                                                 )}
-                                              {status === 'Pendente' && (
+                                              {(status === 'Pendente' ||
+                                                status === 'Bloqueado' ||
+                                                status === 'Agendado') && (
                                                 <Button
                                                   variant="ghost"
                                                   size="sm"

@@ -18,13 +18,31 @@ onRecordAfterUpdateSuccess((e) => {
   const status = e.record.getString('status')
   const originalStatus = e.record.original().getString('status')
 
+  if (status === 'Pendente') {
+    // Ensure relation is established if missing
+    if (!colabId && colab) {
+      try {
+        const recordToUpdate = $app.findRecordById('pagamentos', e.record.id)
+        recordToUpdate.set('colaborador_id', colab.id)
+        $app.save(recordToUpdate)
+      } catch (err) {
+        console.log('Error updating colaborador_id relation', err.message)
+      }
+    }
+  }
+
   if (status === 'Confirmado') {
-    // Release Date Validation
+    // Release Date Validation (Timezone-Aware: UTC-3, Date-Only)
+    // Bypass if original status was 'Pendente' since those matured and are free to clear
     const dataLiberacaoStr = colab.getString('data_liberacao')
-    if (dataLiberacaoStr) {
-      const dataLiberacao = new Date(dataLiberacaoStr)
-      const agora = new Date()
-      if (agora < dataLiberacao) {
+    if (dataLiberacaoStr && originalStatus !== 'Pendente') {
+      const dataLiberacaoDate = new Date(dataLiberacaoStr)
+      const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
+
+      const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
+      const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
+
+      if (todayStr < libStr) {
         throw new BadRequestError(
           'Não é possível confirmar o pagamento: a data atual é anterior à data de liberação.',
           {
