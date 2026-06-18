@@ -257,10 +257,9 @@ export const getColaboradorByRegistro = async (registro: string) => {
     throw new Error('Não há valor para o colaborador receber')
   }
 
-  const firstColab = mappedRecords[0]
+  const firstColab = eligibleRecords[0]
 
-  const totalValor = mappedRecords.reduce((acc, curr) => {
-    if (!curr.isEligible) return acc
+  const totalValor = eligibleRecords.reduce((acc, curr) => {
     const v = curr.valor_a_receber || curr.valor || 0
     return acc + v
   }, 0)
@@ -269,8 +268,8 @@ export const getColaboradorByRegistro = async (registro: string) => {
     ...firstColab,
     valor_a_receber: totalValor,
     valor: totalValor,
-    all_records_ids: mappedRecords.map((r) => r.id),
-    records: mappedRecords,
+    all_records_ids: eligibleRecords.map((r) => r.id),
+    records: eligibleRecords,
   }
 
   const result = { colab, fotoUrl, hasFotoRecord: true }

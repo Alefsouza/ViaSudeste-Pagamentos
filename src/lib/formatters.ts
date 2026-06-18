@@ -36,3 +36,13 @@ export const getTipoPagamento = (id?: number) => {
 
 export const formatBRL = (val: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
+
+export const checkIsLocked = (dataLiberacaoStr?: string) => {
+  if (!dataLiberacaoStr) return false
+  const dataLiberacaoDate = new Date(dataLiberacaoStr)
+  if (isNaN(dataLiberacaoDate.getTime())) return false
+  const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
+  const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
+  const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
+  return todayStr < libStr
+}

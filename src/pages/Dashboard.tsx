@@ -59,17 +59,7 @@ import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
-import { formatDataString, formatBRL, getTipoPagamento } from '@/lib/formatters'
-
-export const checkIsLocked = (dataLiberacaoStr?: string) => {
-  if (!dataLiberacaoStr) return false
-  const dataLiberacaoDate = new Date(dataLiberacaoStr)
-  if (isNaN(dataLiberacaoDate.getTime())) return false
-  const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
-  const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
-  const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
-  return todayStr < libStr
-}
+import { formatDataString, formatBRL, getTipoPagamento, checkIsLocked } from '@/lib/formatters'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   let status =
@@ -421,7 +411,7 @@ export default function Dashboard() {
           if (acronym === 'HE') acc.pagoHE += val
           if (acronym === 'VR') acc.pagoVR += val
           if (acronym === 'FT') acc.pagoFT += val
-        } else if (status === 'Pendente' || status === 'Agendado') {
+        } else if (status === 'Pendente') {
           acc.pendente += val
           if (acronym === 'HE') acc.pendenteHE += val
           if (acronym === 'VR') acc.pendenteVR += val
