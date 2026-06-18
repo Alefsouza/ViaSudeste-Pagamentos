@@ -8,6 +8,16 @@ routerAdd(
     }
 
     const col = $app.findCollectionByNameOrId('colaboradores')
+    const globalDataLiberacao = body.dataLiberacao || ''
+    const globalPeriodoInicio = body.periodoInicio || ''
+    const globalPeriodoFim = body.periodoFim || ''
+
+    const toPBDate = (val) => {
+      if (!val) return ''
+      if (val.includes(' ')) return val
+      return val + ' 12:00:00.000Z'
+    }
+
     let count = 0
     let errors = []
 
@@ -63,9 +73,14 @@ routerAdd(
           record.set('nome', nome)
           record.set('data', dataStr)
 
-          if (row.data_liberacao) record.set('data_liberacao', row.data_liberacao)
-          if (row.periodo_inicio) record.set('periodo_inicio', row.periodo_inicio)
-          if (row.periodo_fim) record.set('periodo_fim', row.periodo_fim)
+          if (globalDataLiberacao) record.set('data_liberacao', toPBDate(globalDataLiberacao))
+          else if (row.data_liberacao) record.set('data_liberacao', row.data_liberacao)
+
+          if (globalPeriodoInicio) record.set('periodo_inicio', toPBDate(globalPeriodoInicio))
+          else if (row.periodo_inicio) record.set('periodo_inicio', row.periodo_inicio)
+
+          if (globalPeriodoFim) record.set('periodo_fim', toPBDate(globalPeriodoFim))
+          else if (row.periodo_fim) record.set('periodo_fim', row.periodo_fim)
 
           if (dataPagamentoV2) {
             record.set('data_pagamento_v2', dataPagamentoV2)

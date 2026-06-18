@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { UploadCloud, FileSpreadsheet, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export function ImportPlanilhaModal({
   open,
@@ -22,6 +24,9 @@ export function ImportPlanilhaModal({
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [dataLiberacao, setDataLiberacao] = useState('')
+  const [periodoInicio, setPeriodoInicio] = useState('')
+  const [periodoFim, setPeriodoFim] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -250,7 +255,12 @@ export function ImportPlanilhaModal({
 
         const res = await pb.send('/backend/v1/import/colaboradores', {
           method: 'POST',
-          body: JSON.stringify({ data: formattedData }),
+          body: JSON.stringify({
+            data: formattedData,
+            dataLiberacao,
+            periodoInicio,
+            periodoFim,
+          }),
         })
 
         if (res.errors && res.errors.length > 0) {
@@ -297,6 +307,9 @@ export function ImportPlanilhaModal({
         if (!val) {
           setFile(null)
           setConfirming(false)
+          setDataLiberacao('')
+          setPeriodoInicio('')
+          setPeriodoFim('')
         }
       }}
     >
@@ -346,6 +359,40 @@ export function ImportPlanilhaModal({
                   <X className="h-4 w-4" />
                 </Button>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full text-left my-2">
+                <div className="space-y-2">
+                  <Label htmlFor="dataLiberacao">Data de Liberação</Label>
+                  <Input
+                    id="dataLiberacao"
+                    type="date"
+                    value={dataLiberacao}
+                    onChange={(e) => setDataLiberacao(e.target.value)}
+                    disabled={loading || confirming}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="periodoInicio">Período da Referência (Início)</Label>
+                  <Input
+                    id="periodoInicio"
+                    type="date"
+                    value={periodoInicio}
+                    onChange={(e) => setPeriodoInicio(e.target.value)}
+                    disabled={loading || confirming}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="periodoFim">Período da Referência (Fim)</Label>
+                  <Input
+                    id="periodoFim"
+                    type="date"
+                    value={periodoFim}
+                    onChange={(e) => setPeriodoFim(e.target.value)}
+                    disabled={loading || confirming}
+                  />
+                </div>
+              </div>
+
               {!confirming ? (
                 <Button onClick={() => setConfirming(true)} disabled={loading} className="w-full">
                   Verificar Importação
