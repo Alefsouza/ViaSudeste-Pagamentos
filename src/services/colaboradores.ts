@@ -97,7 +97,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .catch(() => null)
 
   if (!anyColab) {
-    throw new Error('não há valor para o colaborador receber')
+    throw new Error('Não há valor para o colaborador receber')
   }
 
   const maxRefRecord = await pb
@@ -135,7 +135,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .catch(() => [])
 
   if (allRecords.length === 0) {
-    throw new Error('não há valor para o colaborador receber')
+    throw new Error('Não há valor para o colaborador receber')
   }
 
   const pagamentos = await pb
@@ -190,7 +190,7 @@ export const getColaboradorByRegistro = async (registro: string) => {
 
   const eligibleRecords = mappedRecords.filter((r) => r.isEligible)
   if (eligibleRecords.length === 0) {
-    throw new Error('não há valor para o colaborador receber')
+    throw new Error('Não há valor para o colaborador receber')
   }
 
   const firstColab = mappedRecords[0]

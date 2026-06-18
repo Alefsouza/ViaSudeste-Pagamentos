@@ -19,12 +19,16 @@ onRecordAfterUpdateSuccess((e) => {
   const originalStatus = e.record.original().getString('status')
 
   if (status === 'Confirmado') {
-    // Release Date Validation
+    // Release Date Validation (Timezone-Aware: UTC-3, Date-Only)
     const dataLiberacaoStr = colab.getString('data_liberacao')
     if (dataLiberacaoStr) {
-      const dataLiberacao = new Date(dataLiberacaoStr)
-      const agora = new Date()
-      if (agora < dataLiberacao) {
+      const dataLiberacaoDate = new Date(dataLiberacaoStr)
+      const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
+
+      const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
+      const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
+
+      if (todayStr < libStr) {
         throw new BadRequestError(
           'Não é possível confirmar o pagamento: a data atual é anterior à data de liberação.',
           {

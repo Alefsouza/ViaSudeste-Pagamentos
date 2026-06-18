@@ -61,6 +61,41 @@ import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/p
 import { useToast } from '@/hooks/use-toast'
 import { formatDataString, formatBRL, getTipoPagamento } from '@/lib/formatters'
 
+export const checkIsLocked = (dataLiberacaoStr?: string) => {
+  if (!dataLiberacaoStr) return false
+  const dataLiberacaoDate = new Date(dataLiberacaoStr)
+  if (isNaN(dataLiberacaoDate.getTime())) return false
+  const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
+  const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
+  const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
+  return todayStr < libStr
+}
+
+const formatLocalTime = (dateStr: string) => {
+  if (!dateStr || dateStr === 'Pendente' || dateStr === '-' || dateStr === '') return dateStr
+  let cleanStr = dateStr
+  if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
+  if (
+    !cleanStr.endsWith('Z') &&
+    cleanStr.split('T').length === 2 &&
+    !cleanStr.includes('+') &&
+    !cleanStr.match(/-\d{2}:\d{2}$/)
+  )
+    cleanStr += 'Z'
+  const d = new Date(cleanStr)
+  if (isNaN(d.getTime())) return dateStr
+
+  const utcMinus3 = new Date(d.getTime() - 3 * 3600000)
+  const dd = String(utcMinus3.getUTCDate()).padStart(2, '0')
+  const mm = String(utcMinus3.getUTCMonth() + 1).padStart(2, '0')
+  const yyyy = utcMinus3.getUTCFullYear()
+  const hh = String(utcMinus3.getUTCHours()).padStart(2, '0')
+  const mins = String(utcMinus3.getUTCMinutes()).padStart(2, '0')
+  const ss = String(utcMinus3.getUTCSeconds()).padStart(2, '0')
+
+  return `${dd}/${mm}/${yyyy} ${hh}:${mins}:${ss}`
+}
+
 export default function Dashboard() {
   const { toast } = useToast()
   const { user } = useAuth()
@@ -287,12 +322,34 @@ export default function Dashboard() {
           curr.data_pagamento.trim() === ''
         )
           return false
-        const dStr = curr.data_pagamento.split(',')[0].trim()
 
-        let dateKey = dStr
-        if (dStr.includes('/')) {
-          const p = dStr.split('/')
-          dateKey = `${p[2]}-${p[1]}-${p[0]}`
+        let cleanStr = curr.data_pagamento
+        if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
+        if (
+          !cleanStr.endsWith('Z') &&
+          cleanStr.split('T').length === 2 &&
+          !cleanStr.includes('+') &&
+          !cleanStr.match(/-\d{2}:\d{2}$/)
+        )
+          cleanStr += 'Z'
+        const d = new Date(cleanStr)
+        let dateKey = ''
+
+        if (!isNaN(d.getTime())) {
+          const utcMinus3 = new Date(d.getTime() - 3 * 3600000)
+          const yyyy = utcMinus3.getUTCFullYear()
+          const mm = String(utcMinus3.getUTCMonth() + 1).padStart(2, '0')
+          const dd = String(utcMinus3.getUTCDate()).padStart(2, '0')
+          dateKey = `${yyyy}-${mm}-${dd}`
+        } else {
+          let dStr = curr.data_pagamento.split(',')[0].trim()
+          if (dStr.includes(' ')) dStr = dStr.split(' ')[0]
+
+          dateKey = dStr
+          if (dateKey.includes('/')) {
+            const p = dateKey.split('/')
+            dateKey = `${p[2]}-${p[1]}-${p[0]}`
+          }
         }
 
         if (dateKey !== selectedChartDate) return false
@@ -347,7 +404,7 @@ export default function Dashboard() {
           if (acronym === 'HE') acc.pagoHE += val
           if (acronym === 'VR') acc.pagoVR += val
           if (acronym === 'FT') acc.pagoFT += val
-        } else if (status === 'Pendente') {
+        } else if (status === 'Pendente' || status === 'Agendado') {
           acc.pendente += val
           if (acronym === 'HE') acc.pendenteHE += val
           if (acronym === 'VR') acc.pendenteVR += val
@@ -387,7 +444,7 @@ export default function Dashboard() {
         let status = c.status || (c.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
 
         if (status === 'Pendente') {
-          const isLocked = c.data_liberacao && new Date(c.data_liberacao) > new Date()
+          const isLocked = checkIsLocked(c.data_liberacao)
           const ref = c.referencia || 0
           const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
 
@@ -439,12 +496,34 @@ export default function Dashboard() {
         curr.data_pagamento.trim() === ''
       )
         return acc
-      const dStr = curr.data_pagamento.split(',')[0].trim()
 
-      let dateKey = dStr
-      if (dStr.includes('/')) {
-        const p = dStr.split('/')
-        dateKey = `${p[2]}-${p[1]}-${p[0]}`
+      let cleanStr = curr.data_pagamento
+      if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
+      if (
+        !cleanStr.endsWith('Z') &&
+        cleanStr.split('T').length === 2 &&
+        !cleanStr.includes('+') &&
+        !cleanStr.match(/-\d{2}:\d{2}$/)
+      )
+        cleanStr += 'Z'
+      const d = new Date(cleanStr)
+      let dateKey = ''
+
+      if (!isNaN(d.getTime())) {
+        const utcMinus3 = new Date(d.getTime() - 3 * 3600000)
+        const yyyy = utcMinus3.getUTCFullYear()
+        const mm = String(utcMinus3.getUTCMonth() + 1).padStart(2, '0')
+        const dd = String(utcMinus3.getUTCDate()).padStart(2, '0')
+        dateKey = `${yyyy}-${mm}-${dd}`
+      } else {
+        let dStr = curr.data_pagamento.split(',')[0].trim()
+        if (dStr.includes(' ')) dStr = dStr.split(' ')[0]
+
+        dateKey = dStr
+        if (dateKey.includes('/')) {
+          const p = dateKey.split('/')
+          dateKey = `${p[2]}-${p[1]}-${p[0]}`
+        }
       }
 
       acc[dateKey] = (acc[dateKey] || 0) + (curr.valor_a_receber || curr.valor || 0)
@@ -459,7 +538,7 @@ export default function Dashboard() {
       const parts = date.split('-')
       return {
         date,
-        formattedDate: parts.length === 3 ? `${parts[2]}/${parts[1]}` : date,
+        formattedDate: parts.length >= 3 ? `${parts[2]}/${parts[1]}` : date,
         total,
       }
     })
@@ -1103,7 +1182,7 @@ export default function Dashboard() {
                                       {formatBRL(p.valor_a_receber || p.valor)}
                                     </TableCell>
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-                                    <TableCell>{p.data_pagamento || 'Pendente'}</TableCell>
+                                    <TableCell>{formatLocalTime(p.data_pagamento)}</TableCell>
                                     <TableCell>
                                       {(() => {
                                         const status =
@@ -1111,9 +1190,7 @@ export default function Dashboard() {
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
 
-                                        const isLocked =
-                                          p.data_liberacao &&
-                                          new Date(p.data_liberacao) > new Date()
+                                        const isLocked = checkIsLocked(p.data_liberacao)
 
                                         const ref = p.referencia || 0
                                         const isOutsideWindow =
@@ -1192,9 +1269,7 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const isLocked =
-                                            p.data_liberacao &&
-                                            new Date(p.data_liberacao) > new Date()
+                                          const isLocked = checkIsLocked(p.data_liberacao)
 
                                           return (
                                             <div className="flex justify-center gap-1">
@@ -1294,7 +1369,7 @@ export default function Dashboard() {
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
                                     <span>Data de Pagamento:</span>
-                                    <span>{p.data_pagamento || 'Pendente'}</span>
+                                    <span>{formatLocalTime(p.data_pagamento)}</span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
                                     <div>
@@ -1304,9 +1379,7 @@ export default function Dashboard() {
                                           (p.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
                                         if (!status) return null
 
-                                        const isLocked =
-                                          p.data_liberacao &&
-                                          new Date(p.data_liberacao) > new Date()
+                                        const isLocked = checkIsLocked(p.data_liberacao)
 
                                         const ref = p.referencia || 0
                                         const isOutsideWindow =
@@ -1383,9 +1456,7 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          const isLocked =
-                                            p.data_liberacao &&
-                                            new Date(p.data_liberacao) > new Date()
+                                          const isLocked = checkIsLocked(p.data_liberacao)
 
                                           return (
                                             <>
@@ -1532,7 +1603,7 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Data de Pagamento:</span>
-                <span>{paymentToCancel?.data_pagamento || 'Pendente'}</span>
+                <span>{formatLocalTime(paymentToCancel?.data_pagamento)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Filial:</span>
