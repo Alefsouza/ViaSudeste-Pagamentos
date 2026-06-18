@@ -14,8 +14,8 @@ routerAdd(
 
     const toPBDate = (val) => {
       if (!val) return ''
-      if (val.includes(' ')) return val
-      return val + ' 12:00:00.000Z'
+      const dateOnly = val.split(' ')[0]
+      return dateOnly + ' 03:00:00.000Z'
     }
 
     let count = 0
@@ -74,20 +74,20 @@ routerAdd(
           record.set('data', dataStr)
 
           if (globalDataLiberacao) record.set('data_liberacao', toPBDate(globalDataLiberacao))
-          else if (row.data_liberacao) record.set('data_liberacao', row.data_liberacao)
+          else if (row.data_liberacao) record.set('data_liberacao', toPBDate(row.data_liberacao))
 
           if (globalPeriodoInicio) record.set('periodo_inicio', toPBDate(globalPeriodoInicio))
-          else if (row.periodo_inicio) record.set('periodo_inicio', row.periodo_inicio)
+          else if (row.periodo_inicio) record.set('periodo_inicio', toPBDate(row.periodo_inicio))
 
           if (globalPeriodoFim) record.set('periodo_fim', toPBDate(globalPeriodoFim))
-          else if (row.periodo_fim) record.set('periodo_fim', row.periodo_fim)
+          else if (row.periodo_fim) record.set('periodo_fim', toPBDate(row.periodo_fim))
 
           if (dataPagamentoV2) {
-            record.set('data_pagamento_v2', dataPagamentoV2)
+            record.set('data_pagamento_v2', toPBDate(dataPagamentoV2))
           } else if (dataStr) {
             const parts = dataStr.split('/')
             if (parts.length === 3) {
-              record.set('data_pagamento_v2', `${parts[2]}-${parts[1]}-${parts[0]} 12:00:00.000Z`)
+              record.set('data_pagamento_v2', `${parts[2]}-${parts[1]}-${parts[0]} 03:00:00.000Z`)
             }
           }
 

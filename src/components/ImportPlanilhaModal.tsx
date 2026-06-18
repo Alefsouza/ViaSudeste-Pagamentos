@@ -209,14 +209,14 @@ export function ImportPlanilhaModal({
             return ''
           }
           if (!isNaN(d.getTime())) {
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 00:00:00.000Z`
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 03:00:00.000Z`
           }
           return ''
         }
 
         const formatUIDateToDB = (dateStr: string) => {
           if (!dateStr) return ''
-          return `${dateStr} 00:00:00.000Z`
+          return `${dateStr} 03:00:00.000Z`
         }
 
         const uiDataLiberacao = formatUIDateToDB(dataLiberacao)
@@ -231,7 +231,7 @@ export function ImportPlanilhaModal({
             : String(rawData || '')
 
           const dataPagamentoV2 = !isNaN(d.getTime())
-            ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 00:00:00.000Z`
+            ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 03:00:00.000Z`
             : ''
 
           let rawFilial = row['FILIAL'] !== undefined ? String(row['FILIAL']).trim() : ''
