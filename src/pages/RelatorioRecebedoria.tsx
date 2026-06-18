@@ -79,6 +79,9 @@ export default function RelatorioRecebedoria() {
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
 
+  const [referenciaFilter, setReferenciaFilter] = useState('')
+  const [debouncedReferenciaFilter, setDebouncedReferenciaFilter] = useState('')
+
   // Filter Options State
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
@@ -142,10 +145,11 @@ export default function RelatorioRecebedoria() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm)
+      setDebouncedReferenciaFilter(referenciaFilter)
       setPage(1)
     }, 500)
     return () => clearTimeout(handler)
-  }, [searchTerm])
+  }, [searchTerm, referenciaFilter])
 
   const loadData = async () => {
     if (!user) return
@@ -178,6 +182,13 @@ export default function RelatorioRecebedoria() {
         conditions.push(
           `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}" || colaborador_id.nome ~ "${debouncedSearchTerm}" || colaborador_id.registro ~ "${debouncedSearchTerm}")`,
         )
+      }
+
+      if (debouncedReferenciaFilter) {
+        const numRef = Number(debouncedReferenciaFilter)
+        if (!isNaN(numRef)) {
+          conditions.push(`colaborador_id.referencia = ${numRef}`)
+        }
       }
 
       if (statusFilter && statusFilter !== 'Todos') {
@@ -263,6 +274,7 @@ export default function RelatorioRecebedoria() {
     setGaragemFilter('Todos')
     setTipoPagamentoFilter('Todos')
     setSearchTerm('')
+    setReferenciaFilter('')
     setStartTime('')
     setEndTime('')
     setTimeError('')
@@ -306,12 +318,28 @@ export default function RelatorioRecebedoria() {
   const formatDateStringSafe = (dateStr: string) => {
     if (!dateStr || dateStr === '-') return '-'
     if (dateStr.includes('/')) return dateStr
+
+    if (dateStr.includes('Z')) {
+      const date = new Date(dateStr)
+      if (!isNaN(date.getTime())) {
+        const localDate = new Date(date.getTime() - 3 * 3600000)
+        const day = String(localDate.getUTCDate()).padStart(2, '0')
+        const month = String(localDate.getUTCMonth() + 1).padStart(2, '0')
+        const year = localDate.getUTCFullYear()
+        return `${day}/${month}/${year}`
+      }
+    }
+
     if (dateStr.includes('-')) {
-      const parts = dateStr.split(' ')[0].split('-')
+      const parts = dateStr.split(/[ T]/)[0].split('-')
       if (parts.length >= 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
     }
     return dateStr
   }
+
+  const blockedData = React.useMemo(() => {
+    return summaryData.filter((item: any) => item.status === 'Bloqueado')
+  }, [summaryData])
 
   // Summary Data grouping for simple table
   const summaryArray = React.useMemo(() => {
@@ -512,7 +540,7 @@ export default function RelatorioRecebedoria() {
 
       {/* Filters */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border space-y-4 print:hidden">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           <div className="space-y-2">
             <Label>Data Inicial</Label>
             <Input
@@ -563,6 +591,16 @@ export default function RelatorioRecebedoria() {
               placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-white dark:bg-slate-950"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Referência</Label>
+            <Input
+              placeholder="Buscar ref..."
+              value={referenciaFilter}
+              onChange={(e) => setReferenciaFilter(e.target.value)}
               className="bg-white dark:bg-slate-950"
             />
           </div>
@@ -649,9 +687,10 @@ export default function RelatorioRecebedoria() {
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4 w-full sm:w-auto grid grid-cols-2 print:hidden">
+          <TabsList className="mb-4 w-full sm:w-auto grid grid-cols-1 sm:grid-cols-3 print:hidden h-auto">
             <TabsTrigger value="detalhado">Relatório Detalhado</TabsTrigger>
             <TabsTrigger value="resumido">Relatório Resumido</TabsTrigger>
+            <TabsTrigger value="antigas">Relatório de Ref. Antigas</TabsTrigger>
           </TabsList>
 
           <TabsContent value="detalhado" className="mt-0 space-y-6">
@@ -1149,6 +1188,112 @@ export default function RelatorioRecebedoria() {
                   )}
                 </Table>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="antigas" className="mt-0 space-y-6">
+            <div className="rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+              <Table>
+                <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
+                  <TableRow>
+                    <TableHead>Registro</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Dt. Ref.</TableHead>
+                    <TableHead>Ref.</TableHead>
+                    <TableHead>Tipo de Pagamento</TableHead>
+                    <TableHead className="text-left">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    [...Array(5)].map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <Skeleton className="h-4 w-20" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-40" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-16" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-32" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : blockedData.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-48 text-center">
+                        <SearchX className="mx-auto h-10 w-10 text-slate-300 mb-3" />
+                        <p className="text-slate-500 font-medium">
+                          Nenhum pagamento bloqueado encontrado.
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    blockedData.map((item: any) => (
+                      <TableRow
+                        key={item.id}
+                        className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
+                      >
+                        <TableCell className="font-medium">
+                          {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          {item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'}
+                        </TableCell>
+                        <TableCell>{formatDateStringSafe(item.data_pagamento) || '-'}</TableCell>
+                        <TableCell>{item.expand?.colaborador_id?.referencia || '-'}</TableCell>
+                        <TableCell>
+                          {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento || 'Outros'}
+                        </TableCell>
+                        <TableCell className="text-left font-medium">
+                          {formatBRL(
+                            item.valor_pago ||
+                              item.expand?.colaborador_id?.valor_a_receber ||
+                              item.valor_a_receber ||
+                              item.valor ||
+                              0,
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+                {!loading && blockedData.length > 0 && (
+                  <tfoot className="bg-slate-50 dark:bg-slate-800/50 border-t-2 border-slate-300">
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="p-3 font-bold text-lg text-slate-900 dark:text-slate-100 uppercase text-left"
+                      >
+                        Total
+                      </td>
+                      <td className="p-3 text-lg text-left font-bold text-indigo-700 dark:text-indigo-400 double-underline">
+                        {formatBRL(
+                          blockedData.reduce(
+                            (acc: number, item: any) =>
+                              acc +
+                              (item.valor_pago ||
+                                item.expand?.colaborador_id?.valor_a_receber ||
+                                item.valor_a_receber ||
+                                item.valor ||
+                                0),
+                            0,
+                          ),
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </Table>
             </div>
           </TabsContent>
         </Tabs>
