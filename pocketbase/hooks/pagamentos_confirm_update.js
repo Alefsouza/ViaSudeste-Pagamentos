@@ -18,10 +18,24 @@ onRecordAfterUpdateSuccess((e) => {
   const status = e.record.getString('status')
   const originalStatus = e.record.original().getString('status')
 
+  if (status === 'Pendente') {
+    // Ensure relation is established if missing
+    if (!colabId && colab) {
+      try {
+        const recordToUpdate = $app.findRecordById('pagamentos', e.record.id)
+        recordToUpdate.set('colaborador_id', colab.id)
+        $app.save(recordToUpdate)
+      } catch (err) {
+        console.log('Error updating colaborador_id relation', err.message)
+      }
+    }
+  }
+
   if (status === 'Confirmado') {
     // Release Date Validation (Timezone-Aware: UTC-3, Date-Only)
+    // Bypass if original status was 'Pendente' since those matured and are free to clear
     const dataLiberacaoStr = colab.getString('data_liberacao')
-    if (dataLiberacaoStr) {
+    if (dataLiberacaoStr && originalStatus !== 'Pendente') {
       const dataLiberacaoDate = new Date(dataLiberacaoStr)
       const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
 

@@ -142,22 +142,26 @@ export const getColaboradorByRegistro = async (registro: string) => {
     .collection('pagamentos')
     .getFullList({
       filter: `registro="${registro}"`,
-      fields: 'colaborador_id,status',
+      fields: 'id,colaborador_id,status',
       sort: 'created',
     })
     .catch(() => [])
 
-  const pagamentoStatusByColabId = new Map<string, string>()
+  const pagamentoByColabId = new Map<string, any>()
   for (const p of pagamentos) {
-    pagamentoStatusByColabId.set(p.colaborador_id, p.status)
+    pagamentoByColabId.set(p.colaborador_id, p)
   }
 
   const mappedRecords = allRecords.map((r) => {
-    const pagStatus = pagamentoStatusByColabId.get(r.id)
+    const pag = pagamentoByColabId.get(r.id)
+    const pagStatus = pag?.status
+    const pagId = pag?.id
     const isConfirmedViaPhoto = !!r.foto_confirmacao_url
 
     let isPendente = false
     let isAgendado = false
+    const isExplicitPendente = pagStatus === 'Pendente'
+
     if (pagStatus) {
       isPendente = pagStatus === 'Pendente'
       isAgendado = pagStatus === 'Agendado'
@@ -172,7 +176,10 @@ export const getColaboradorByRegistro = async (registro: string) => {
     }
 
     let isEligible = isPendente
-    if (isEligible) {
+    if (isExplicitPendente) {
+      isEligible = true
+      isLocked = false
+    } else if (isEligible) {
       if (ref > 0 && maxRef > 0 && ref < maxRef - 3) {
         if (!r.liberado_pagamento) isEligible = false
       }
@@ -184,6 +191,9 @@ export const getColaboradorByRegistro = async (registro: string) => {
     return {
       ...r,
       isEligible,
+      isExplicitPendente,
+      pagamento_id: pagId,
+      pagStatus,
       isAgendado: isLocked || isAgendado,
     }
   })

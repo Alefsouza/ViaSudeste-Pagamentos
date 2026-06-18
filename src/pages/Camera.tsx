@@ -102,7 +102,7 @@ export default function Camera() {
 
   const visibleRecords = useMemo(() => {
     const relevantRecords = sortedRecords.filter(
-      (r) => r.isEligible !== false && !checkIsLocked(r.data_liberacao),
+      (r) => r.isEligible !== false && (!checkIsLocked(r.data_liberacao) || r.isExplicitPendente),
     )
 
     // Just re-sort by date ascending to keep the table chronological
@@ -470,7 +470,10 @@ export default function Camera() {
       const validationResult = await getColaboradorByRegistro(colaborador.registro)
       const currentValidRecordsIds = new Set(
         validationResult.colab.records
-          .filter((r: any) => r.isEligible !== false && !checkIsLocked(r.data_liberacao))
+          .filter(
+            (r: any) =>
+              r.isEligible !== false && (!checkIsLocked(r.data_liberacao) || r.isExplicitPendente),
+          )
           .map((r: any) => r.id),
       )
 
@@ -528,7 +531,12 @@ export default function Camera() {
           dataToSave.foto_confirmacao_url = firstFileUrl
         }
 
-        const pagamentoRecord = await createPagamento(dataToSave)
+        let pagamentoRecord
+        if (record.pagamento_id) {
+          pagamentoRecord = await updatePagamento(record.pagamento_id, dataToSave)
+        } else {
+          pagamentoRecord = await createPagamento(dataToSave)
+        }
 
         if (i === 0) {
           firstFileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)
