@@ -72,7 +72,8 @@ export const checkIsLocked = (dataLiberacaoStr?: string) => {
 }
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
-  let status = curr.pagStatus || curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+  let status =
+    curr.pagStatus || curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
 
   if (status === 'Pendente' && curr.pagStatus !== 'Pendente') {
     const isLocked = checkIsLocked(curr.data_liberacao)
@@ -1201,7 +1202,9 @@ export default function Dashboard() {
                                                   <p>
                                                     Liberado em:{' '}
                                                     {p.data_liberacao
-                                                      ? new Date(p.data_liberacao).toLocaleDateString('pt-BR')
+                                                      ? new Date(
+                                                          p.data_liberacao,
+                                                        ).toLocaleDateString('pt-BR')
                                                       : 'N/A'}
                                                   </p>
                                                 </TooltipContent>
@@ -1251,7 +1254,7 @@ export default function Dashboard() {
                                           const isOutsideValidity =
                                             p.referencia && maxRef > 0 && p.referencia < maxRef - 3
 
-                                          // If it explicitly was set to Pendente, it shouldn't show the Liberar/Bloquear button 
+                                          // If it explicitly was set to Pendente, it shouldn't show the Liberar/Bloquear button
                                           // because it's already bypassing rules. But to be safe and match UI consistency,
                                           // we show the button if it's considered outside validity, though it acts unlocked.
                                           // Actually, if status is 'Pendente' (explicitly or legitimately), we allow toggling.
@@ -1282,7 +1285,9 @@ export default function Dashboard() {
                                                     )}
                                                   </Button>
                                                 )}
-                                              {(status === 'Pendente' || status === 'Bloqueado' || status === 'Agendado') && (
+                                              {(status === 'Pendente' ||
+                                                status === 'Bloqueado' ||
+                                                status === 'Agendado') && (
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"
@@ -1374,12 +1379,15 @@ export default function Dashboard() {
                                                   <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1">
                                                     <Lock className="w-3 h-3" />
                                                     Agendado
-                                                  </TooltipTrigger>
+                                                  </Badge>
+                                                </TooltipTrigger>
                                                 <TooltipContent>
                                                   <p>
                                                     Liberado em:{' '}
                                                     {p.data_liberacao
-                                                      ? new Date(p.data_liberacao).toLocaleDateString('pt-BR')
+                                                      ? new Date(
+                                                          p.data_liberacao,
+                                                        ).toLocaleDateString('pt-BR')
                                                       : 'N/A'}
                                                   </p>
                                                 </TooltipContent>
@@ -1455,7 +1463,9 @@ export default function Dashboard() {
                                                     {p.liberado_pagamento ? 'Bloquear' : 'Liberar'}
                                                   </Button>
                                                 )}
-                                              {(status === 'Pendente' || status === 'Bloqueado' || status === 'Agendado') && (
+                                              {(status === 'Pendente' ||
+                                                status === 'Bloqueado' ||
+                                                status === 'Agendado') && (
                                                 <Button
                                                   variant="ghost"
                                                   size="sm"
