@@ -31,6 +31,22 @@ onRecordAfterCreateSuccess((e) => {
   }
 
   if (status === 'Confirmado') {
+    const fotoUrl = e.record.getString('foto_confirmacao_url')
+    const fotoFile = e.record.getString('foto_confirmacao')
+    const colabFotoUrl = colab ? colab.getString('foto_confirmacao_url') : ''
+
+    if (!fotoUrl && !fotoFile && !colabFotoUrl) {
+      throw new BadRequestError(
+        'Não é possível confirmar o pagamento: a foto de confirmação é obrigatória.',
+        {
+          status: new ValidationError(
+            'missing_photo',
+            'A foto de confirmação é obrigatória para o status Confirmado',
+          ),
+        },
+      )
+    }
+
     // Release Date Validation (Timezone-Aware: UTC-3, Date-Only)
     const dataLiberacaoStr = colab.getString('data_liberacao')
     if (dataLiberacaoStr) {

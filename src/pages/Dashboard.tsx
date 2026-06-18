@@ -75,6 +75,16 @@ export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   let status =
     curr.pagStatus || curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
 
+  const hasPhoto = !!(
+    curr.foto_confirmacao_url ||
+    curr.foto_confirmacao ||
+    curr.expand?.colaborador_id?.foto_confirmacao_url
+  )
+
+  if (status === 'Confirmado' && !hasPhoto) {
+    status = 'Pendente'
+  }
+
   if (status === 'Pendente' && curr.pagStatus !== 'Pendente') {
     const isLocked = checkIsLocked(curr.data_liberacao)
     const ref = curr.referencia || 0
