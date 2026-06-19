@@ -184,11 +184,8 @@ export default function RelatorioRecebedoria() {
         )
       }
 
-      if (debouncedReferenciaFilter) {
-        const numRef = Number(debouncedReferenciaFilter)
-        if (!isNaN(numRef)) {
-          conditions.push(`colaborador_id.referencia = ${numRef}`)
-        }
+      if (debouncedReferenciaFilter && !isNaN(Number(debouncedReferenciaFilter))) {
+        conditions.push(`colaborador_id.referencia = ${Number(debouncedReferenciaFilter)}`)
       }
 
       if (statusFilter && statusFilter !== 'Todos') {
@@ -235,6 +232,59 @@ export default function RelatorioRecebedoria() {
       const newTotalPages = Math.ceil(sortedData.length / 20) || 1
       setTotalPages(newTotalPages)
       setPage((p) => (p > newTotalPages ? newTotalPages : p))
+
+      // 1. Obter referências únicas para excluir as top 4
+      const allRefs = await pb.collection('colaboradores').getFullList({ fields: 'referencia' })
+      const uniqueRefs = Array.from(
+        new Set(allRefs.map((c) => c.referencia).filter((r) => typeof r === 'number' && r > 0)),
+      )
+        .sort((a, b) => b - a)
+        .slice(0, 4)
+
+      // 2. Buscar colaboradores da aba "Ref. Antigas" (exclui as top 4 refs, busca da coleção colaboradores)
+      const antigasConditions: string[] = ['referencia > 0']
+      if (uniqueRefs.length > 0) {
+        const notIn = uniqueRefs.map((r) => `referencia != ${r}`).join(' && ')
+        antigasConditions.push(`(${notIn})`)
+      }
+
+      if (debouncedSearchTerm) {
+        antigasConditions.push(
+          `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}")`,
+        )
+      }
+      if (debouncedReferenciaFilter && !isNaN(Number(debouncedReferenciaFilter))) {
+        antigasConditions.push(`referencia = ${Number(debouncedReferenciaFilter)}`)
+      }
+      if (garagemFilter && garagemFilter !== 'Todos') {
+        antigasConditions.push(`filial_id = ${garagemFilter}`)
+      }
+
+      let antigasRes = await pb.collection('colaboradores').getFullList({
+        filter: antigasConditions.join(' && '),
+        sort: '-referencia,-created',
+      })
+
+      if (antigasRes.length > 0) {
+        const colabIds = antigasRes.map((c) => c.id)
+        const confirmadosIds = new Set<string>()
+
+        // Check pagamentos with "Confirmado" status to exclude these colaboradores
+        const chunkSize = 50
+        for (let i = 0; i < colabIds.length; i += chunkSize) {
+          const chunk = colabIds.slice(i, i + chunkSize)
+          const chunkFilter = chunk.map((id) => `colaborador_id = "${id}"`).join(' || ')
+          const pags = await pb.collection('pagamentos').getFullList({
+            filter: `(${chunkFilter}) && status = "Confirmado"`,
+            fields: 'colaborador_id',
+          })
+          pags.forEach((p) => confirmadosIds.add(p.colaborador_id))
+        }
+
+        antigasRes = antigasRes.filter((c) => !confirmadosIds.has(c.id))
+      }
+
+      setAntigasData(antigasRes)
     } catch (err: any) {
       console.error(err)
       setError(true)
@@ -251,6 +301,7 @@ export default function RelatorioRecebedoria() {
     startTime,
     endTime,
     debouncedSearchTerm,
+    debouncedReferenciaFilter,
     statusFilter,
     usuarioFilter,
     garagemFilter,
@@ -265,6 +316,10 @@ export default function RelatorioRecebedoria() {
   }, [page, summaryData])
 
   useRealtime('pagamentos', () => {
+    loadData()
+  })
+
+  useRealtime('colaboradores', () => {
     loadData()
   })
 
@@ -337,9 +392,7 @@ export default function RelatorioRecebedoria() {
     return dateStr
   }
 
-  const blockedData = React.useMemo(() => {
-    return summaryData.filter((item: any) => item.status === 'Bloqueado')
-  }, [summaryData])
+  const [antigasData, setAntigasData] = useState<any[]>([])
 
   // Summary Data grouping for simple table
   const summaryArray = React.useMemo(() => {
@@ -1199,8 +1252,7 @@ export default function RelatorioRecebedoria() {
                     <TableHead>Registro</TableHead>
                     <TableHead>Nome</TableHead>
                     <TableHead>Dt. Ref.</TableHead>
-                    <TableHead>Ref.</TableHead>
-                    <TableHead>Tipo de Pagamento</TableHead>
+                    <TableHead>Referência</TableHead>
                     <TableHead className="text-left">Valor</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1221,71 +1273,56 @@ export default function RelatorioRecebedoria() {
                           <Skeleton className="h-4 w-16" />
                         </TableCell>
                         <TableCell>
-                          <Skeleton className="h-4 w-32" />
-                        </TableCell>
-                        <TableCell>
                           <Skeleton className="h-4 w-24" />
                         </TableCell>
                       </TableRow>
                     ))
-                  ) : blockedData.length === 0 ? (
+                  ) : antigasData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-48 text-center">
+                      <TableCell colSpan={5} className="h-48 text-center">
                         <SearchX className="mx-auto h-10 w-10 text-slate-300 mb-3" />
                         <p className="text-slate-500 font-medium">
-                          Nenhum pagamento bloqueado encontrado.
+                          Nenhum pagamento pendente de referências antigas encontrado.
                         </p>
+                        {debouncedReferenciaFilter && (
+                          <p className="text-sm text-slate-400 mt-1">
+                            A referência {debouncedReferenciaFilter} pode estar entre as mais
+                            recentes ou não ter pendências.
+                          </p>
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    blockedData.map((item: any) => (
+                    antigasData.map((item: any) => (
                       <TableRow
                         key={item.id}
                         className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                       >
-                        <TableCell className="font-medium">
-                          {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          {item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'}
-                        </TableCell>
-                        <TableCell>{formatDateStringSafe(item.data_pagamento) || '-'}</TableCell>
-                        <TableCell>{item.expand?.colaborador_id?.referencia || '-'}</TableCell>
-                        <TableCell>
-                          {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento || 'Outros'}
-                        </TableCell>
+                        <TableCell className="font-medium">{item.registro || 'N/A'}</TableCell>
+                        <TableCell>{item.nome || 'Desconhecido'}</TableCell>
+                        <TableCell>{formatDateStringSafe(item.data) || '-'}</TableCell>
+                        <TableCell>{item.referencia || '-'}</TableCell>
                         <TableCell className="text-left font-medium">
-                          {formatBRL(
-                            item.valor_pago ||
-                              item.expand?.colaborador_id?.valor_a_receber ||
-                              item.valor_a_receber ||
-                              item.valor ||
-                              0,
-                          )}
+                          {formatBRL(item.valor || item.valor_a_receber || 0)}
                         </TableCell>
                       </TableRow>
                     ))
                   )}
                 </TableBody>
-                {!loading && blockedData.length > 0 && (
+                {!loading && antigasData.length > 0 && (
                   <tfoot className="bg-slate-50 dark:bg-slate-800/50 border-t-2 border-slate-300">
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={4}
                         className="p-3 font-bold text-lg text-slate-900 dark:text-slate-100 uppercase text-left"
                       >
                         Total
                       </td>
                       <td className="p-3 text-lg text-left font-bold text-indigo-700 dark:text-indigo-400 double-underline">
                         {formatBRL(
-                          blockedData.reduce(
+                          antigasData.reduce(
                             (acc: number, item: any) =>
-                              acc +
-                              (item.valor_pago ||
-                                item.expand?.colaborador_id?.valor_a_receber ||
-                                item.valor_a_receber ||
-                                item.valor ||
-                                0),
+                              acc + (item.valor || item.valor_a_receber || 0),
                             0,
                           ),
                         )}
