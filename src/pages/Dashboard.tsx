@@ -197,6 +197,11 @@ export default function Dashboard() {
       }
 
       if (selectedChartDate) {
+        // Automatically convert ISO to DD/MM/YYYY text format before querying
+        const parts = selectedChartDate.split('-')
+        if (parts.length === 3) {
+          tableFiltersForAPI.data_pagamento_text = `${parts[2]}/${parts[1]}/${parts[0]}`
+        }
         tableFiltersForAPI.startDate = selectedChartDate
         tableFiltersForAPI.endDate = selectedChartDate
       }
@@ -1018,7 +1023,7 @@ export default function Dashboard() {
                     config={{ total: { label: 'Total Pago', color: 'hsl(var(--primary))' } }}
                     className="h-[300px] w-full"
                   >
-                    <LineChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <BarChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis
                         dataKey="formattedDate"
@@ -1032,26 +1037,40 @@ export default function Dashboard() {
                         axisLine={false}
                         tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
                       />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        stroke="var(--color-total)"
-                        strokeWidth={2}
-                        dot={{ r: 4, fill: 'var(--color-total)', strokeWidth: 2 }}
-                        activeDot={{
-                          r: 6,
-                          onClick: (_e: any, payload: any) => {
-                            const date = payload?.payload?.date
-                            if (date) {
-                              setSelectedChartDate((prev) => (prev === date ? null : date))
-                              setPage(1)
-                            }
-                          },
-                          style: { cursor: 'pointer' },
-                        }}
+                      <ChartTooltip
+                        cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
+                        content={<ChartTooltipContent />}
                       />
-                    </LineChart>
+                      <Bar
+                        dataKey="total"
+                        fill="var(--color-total)"
+                        radius={[4, 4, 0, 0]}
+                        onClick={(data) => {
+                          const date = data?.date || data?.payload?.date
+                          if (date) {
+                            setSelectedChartDate((prev) => (prev === date ? null : date))
+                            setPage(1)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {dailyData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill="var(--color-total)"
+                            style={{
+                              opacity: selectedChartDate
+                                ? selectedChartDate === entry.date
+                                  ? 1
+                                  : 0.3
+                                : 1,
+                              transition: 'opacity 0.2s',
+                              outline: 'none',
+                            }}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
                   </ChartContainer>
                 )}
               </CardContent>
@@ -1068,7 +1087,11 @@ export default function Dashboard() {
                   selectedChartRef ||
                   chartRefSearch) && (
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    (Filtro de gráfico ativo)
+                    (Filtro de gráfico ativo
+                    {selectedChartDate
+                      ? `: ${selectedChartDate.split('-').reverse().join('/')}`
+                      : ''}
+                    )
                   </span>
                 )}
               </CardTitle>
@@ -1106,7 +1129,9 @@ export default function Dashboard() {
                               colSpan={isAdmin ? 10 : 9}
                               className="h-24 text-center text-muted-foreground"
                             >
-                              Nenhum pagamento encontrado com os filtros atuais.
+                              {selectedChartDate
+                                ? 'Nenhuma transação encontrada para esta data.'
+                                : 'Nenhum pagamento encontrado com os filtros atuais.'}
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -1286,7 +1311,9 @@ export default function Dashboard() {
                   <div className="md:hidden space-y-6">
                     {Object.keys(groupedByRef).length === 0 ? (
                       <div className="text-center text-muted-foreground p-8">
-                        Nenhum pagamento encontrado.
+                        {selectedChartDate
+                          ? 'Nenhuma transação encontrada para esta data.'
+                          : 'Nenhum pagamento encontrado com os filtros atuais.'}
                       </div>
                     ) : (
                       Object.entries(groupedByRef).map(([refName, records]: [string, any]) => {
