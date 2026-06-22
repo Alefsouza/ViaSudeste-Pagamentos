@@ -1023,7 +1023,29 @@ export default function Dashboard() {
                     config={{ total: { label: 'Total Pago', color: 'hsl(var(--primary))' } }}
                     className="h-[300px] w-full"
                   >
-                    <BarChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <LineChart
+                      data={dailyData}
+                      margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                      onClick={(e: any) => {
+                        if (e && e.activePayload && e.activePayload.length > 0) {
+                          const rawDate = e.activePayload[0].payload.date
+                          if (rawDate) {
+                            let formattedForFilter = rawDate
+                            if (rawDate.includes('-')) {
+                              const parts = rawDate.split('T')[0].split('-')
+                              if (parts.length === 3 && parts[0].length === 4) {
+                                formattedForFilter = `${parts[2]}/${parts[1]}/${parts[0]}`
+                              }
+                            }
+                            setSelectedChartDate((prev: any) =>
+                              prev === formattedForFilter ? null : formattedForFilter,
+                            )
+                            setPage(1)
+                          }
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis
                         dataKey="formattedDate"
@@ -1038,39 +1060,23 @@ export default function Dashboard() {
                         tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
                       />
                       <ChartTooltip
-                        cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
+                        cursor={{
+                          stroke: 'hsl(var(--muted))',
+                          strokeWidth: 2,
+                          strokeDasharray: '3 3',
+                          fill: 'transparent',
+                        }}
                         content={<ChartTooltipContent />}
                       />
-                      <Bar
+                      <Line
+                        type="monotone"
                         dataKey="total"
-                        fill="var(--color-total)"
-                        radius={[4, 4, 0, 0]}
-                        onClick={(data) => {
-                          const date = data?.date || data?.payload?.date
-                          if (date) {
-                            setSelectedChartDate((prev) => (prev === date ? null : date))
-                            setPage(1)
-                          }
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {dailyData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill="var(--color-total)"
-                            style={{
-                              opacity: selectedChartDate
-                                ? selectedChartDate === entry.date
-                                  ? 1
-                                  : 0.3
-                                : 1,
-                              transition: 'opacity 0.2s',
-                              outline: 'none',
-                            }}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
+                        stroke="var(--color-total)"
+                        strokeWidth={3}
+                        dot={{ r: 4, fill: 'var(--color-total)', strokeWidth: 2 }}
+                        activeDot={{ r: 8, strokeWidth: 0, fill: 'var(--color-total)' }}
+                      />
+                    </LineChart>
                   </ChartContainer>
                 )}
               </CardContent>
@@ -1089,7 +1095,7 @@ export default function Dashboard() {
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
                     (Filtro de gráfico ativo
                     {selectedChartDate
-                      ? `: ${selectedChartDate.split('-').reverse().join('/')}`
+                      ? `: ${selectedChartDate.includes('/') ? selectedChartDate : selectedChartDate.split('-').reverse().join('/')}`
                       : ''}
                     )
                   </span>
