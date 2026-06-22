@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -27,7 +27,24 @@ export function ImportPlanilhaModal({
   const [dataLiberacao, setDataLiberacao] = useState('')
   const [periodoInicio, setPeriodoInicio] = useState('')
   const [periodoFim, setPeriodoFim] = useState('')
+  const [referencia, setReferencia] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (open) {
+      const fetchMaxRef = async () => {
+        try {
+          const rec = await pb
+            .collection('colaboradores')
+            .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
+          setReferencia(String((rec.referencia || 0) + 1))
+        } catch (e) {
+          setReferencia('1')
+        }
+      }
+      fetchMaxRef()
+    }
+  }, [open])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -222,6 +239,7 @@ export function ImportPlanilhaModal({
         const uiDataLiberacao = formatUIDateToDB(dataLiberacao)
         const uiPeriodoInicio = formatUIDateToDB(periodoInicio)
         const uiPeriodoFim = formatUIDateToDB(periodoFim)
+        const refNumber = Number(referencia) || 0
 
         const formattedData = normalizedData.map((row: any) => {
           const rawData = row['DATA']
@@ -261,6 +279,7 @@ export function ImportPlanilhaModal({
             periodo_inicio:
               uiPeriodoInicio || parseDateToDB(row['PERIODO_INICIO'] || row['PERIODO INICIO']),
             periodo_fim: uiPeriodoFim || parseDateToDB(row['PERIODO_FIM'] || row['PERIODO FIM']),
+            referencia: refNumber,
           }
         })
 
@@ -271,6 +290,7 @@ export function ImportPlanilhaModal({
             dataLiberacao,
             periodoInicio,
             periodoFim,
+            referencia: refNumber,
           }),
         })
 
@@ -321,6 +341,7 @@ export function ImportPlanilhaModal({
           setDataLiberacao('')
           setPeriodoInicio('')
           setPeriodoFim('')
+          setReferencia('')
         }
       }}
     >
@@ -371,10 +392,10 @@ export function ImportPlanilhaModal({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full text-left my-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 w-full text-left my-2">
                 <div className="space-y-2">
                   <Label htmlFor="dataLiberacao" className="flex gap-1">
-                    Data de Liberação <span className="text-rose-500">*</span>
+                    Liberação <span className="text-rose-500">*</span>
                   </Label>
                   <Input
                     id="dataLiberacao"
@@ -386,7 +407,7 @@ export function ImportPlanilhaModal({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="periodoInicio" className="flex gap-1">
-                    Período de Ref. (Início) <span className="text-rose-500">*</span>
+                    Início Ref. <span className="text-rose-500">*</span>
                   </Label>
                   <Input
                     id="periodoInicio"
@@ -398,7 +419,7 @@ export function ImportPlanilhaModal({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="periodoFim" className="flex gap-1">
-                    Período de Ref. (Fim) <span className="text-rose-500">*</span>
+                    Fim Ref. <span className="text-rose-500">*</span>
                   </Label>
                   <Input
                     id="periodoFim"
@@ -408,20 +429,34 @@ export function ImportPlanilhaModal({
                     disabled={loading || confirming}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="referencia" className="flex gap-1">
+                    Referência <span className="text-rose-500">*</span>
+                  </Label>
+                  <Input
+                    id="referencia"
+                    type="number"
+                    value={referencia}
+                    onChange={(e) => setReferencia(e.target.value)}
+                    disabled={loading || confirming}
+                  />
+                </div>
               </div>
 
               {!confirming ? (
                 <div className="w-full space-y-2">
                   <Button
                     onClick={() => setConfirming(true)}
-                    disabled={loading || !dataLiberacao || !periodoInicio || !periodoFim}
+                    disabled={
+                      loading || !dataLiberacao || !periodoInicio || !periodoFim || !referencia
+                    }
                     className="w-full"
                   >
                     Verificar Importação
                   </Button>
-                  {(!dataLiberacao || !periodoInicio || !periodoFim) && (
+                  {(!dataLiberacao || !periodoInicio || !periodoFim || !referencia) && (
                     <p className="text-xs text-center text-muted-foreground">
-                      Preencha as três datas obrigatórias para continuar.
+                      Preencha os campos obrigatórios para continuar.
                     </p>
                   )}
                 </div>

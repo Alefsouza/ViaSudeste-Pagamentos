@@ -728,22 +728,12 @@ export default function Dashboard() {
             <div className="flex items-center gap-1.5">
               <Label>Referência</Label>
             </div>
-            <Select
-              value={filters.referencia}
-              onValueChange={(val) => setFilters({ ...filters, referencia: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todas">Todas</SelectItem>
-                {availableRefs.map((r) => (
-                  <SelectItem key={r} value={String(r)}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              type="number"
+              placeholder="Todas"
+              value={filters.referencia === 'Todas' ? '' : filters.referencia}
+              onChange={(e) => setFilters({ ...filters, referencia: e.target.value || 'Todas' })}
+            />
           </div>
         </CardContent>
       </Card>
