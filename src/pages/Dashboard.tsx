@@ -341,43 +341,36 @@ export default function Dashboard() {
       }
 
       if (selectedChartDate) {
+        let dateKey: string | null = null
         if (
-          !curr.data_pagamento ||
-          curr.data_pagamento.trim() === '-' ||
-          curr.data_pagamento.trim() === ''
-        )
-          return false
+          curr.data_pagamento &&
+          curr.data_pagamento.trim() !== '-' &&
+          curr.data_pagamento.trim() !== ''
+        ) {
+          let str = curr.data_pagamento.trim()
+          if (str.includes('T')) str = str.split('T')[0]
+          else if (str.includes(' ')) str = str.split(' ')[0]
+          else if (str.includes(',')) str = str.split(',')[0].trim()
 
-        let cleanStr = curr.data_pagamento
-        if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
-        if (
-          !cleanStr.endsWith('Z') &&
-          cleanStr.split('T').length === 2 &&
-          !cleanStr.includes('+') &&
-          !cleanStr.match(/-\d{2}:\d{2}$/)
-        )
-          cleanStr += 'Z'
-        const d = new Date(cleanStr)
-        let dateKey = ''
-
-        if (!isNaN(d.getTime())) {
-          const utcMinus3 = new Date(d.getTime() - 3 * 3600000)
-          const yyyy = utcMinus3.getUTCFullYear()
-          const mm = String(utcMinus3.getUTCMonth() + 1).padStart(2, '0')
-          const dd = String(utcMinus3.getUTCDate()).padStart(2, '0')
-          dateKey = `${yyyy}-${mm}-${dd}`
-        } else {
-          let dStr = curr.data_pagamento.split(',')[0].trim()
-          if (dStr.includes(' ')) dStr = dStr.split(' ')[0]
-
-          dateKey = dStr
-          if (dateKey.includes('/')) {
-            const p = dateKey.split('/')
-            dateKey = `${p[2]}-${p[1]}-${p[0]}`
+          if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            dateKey = str
+          } else if (str.includes('/')) {
+            const parts = str.split('/')
+            if (parts.length === 3) {
+              if (parts[2].length === 4)
+                dateKey = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+              else if (parts[0].length === 4)
+                dateKey = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
+              else dateKey = str
+            } else {
+              dateKey = str
+            }
+          } else {
+            dateKey = str
           }
         }
 
-        if (dateKey !== selectedChartDate) return false
+        if (!dateKey || dateKey !== selectedChartDate) return false
       }
 
       return true
@@ -490,41 +483,36 @@ export default function Dashboard() {
       const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
       if (status !== 'Confirmado') return acc
 
+      let dateKey: string | null = null
       if (
-        !curr.data_pagamento ||
-        curr.data_pagamento.trim() === '-' ||
-        curr.data_pagamento.trim() === ''
-      )
-        return acc
+        curr.data_pagamento &&
+        curr.data_pagamento.trim() !== '-' &&
+        curr.data_pagamento.trim() !== ''
+      ) {
+        let str = curr.data_pagamento.trim()
+        if (str.includes('T')) str = str.split('T')[0]
+        else if (str.includes(' ')) str = str.split(' ')[0]
+        else if (str.includes(',')) str = str.split(',')[0].trim()
 
-      let cleanStr = curr.data_pagamento
-      if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
-      if (
-        !cleanStr.endsWith('Z') &&
-        cleanStr.split('T').length === 2 &&
-        !cleanStr.includes('+') &&
-        !cleanStr.match(/-\d{2}:\d{2}$/)
-      )
-        cleanStr += 'Z'
-      const d = new Date(cleanStr)
-      let dateKey = ''
-
-      if (!isNaN(d.getTime())) {
-        const utcMinus3 = new Date(d.getTime() - 3 * 3600000)
-        const yyyy = utcMinus3.getUTCFullYear()
-        const mm = String(utcMinus3.getUTCMonth() + 1).padStart(2, '0')
-        const dd = String(utcMinus3.getUTCDate()).padStart(2, '0')
-        dateKey = `${yyyy}-${mm}-${dd}`
-      } else {
-        let dStr = curr.data_pagamento.split(',')[0].trim()
-        if (dStr.includes(' ')) dStr = dStr.split(' ')[0]
-
-        dateKey = dStr
-        if (dateKey.includes('/')) {
-          const p = dateKey.split('/')
-          dateKey = `${p[2]}-${p[1]}-${p[0]}`
+        if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          dateKey = str
+        } else if (str.includes('/')) {
+          const parts = str.split('/')
+          if (parts.length === 3) {
+            if (parts[2].length === 4)
+              dateKey = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+            else if (parts[0].length === 4)
+              dateKey = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
+            else dateKey = str
+          } else {
+            dateKey = str
+          }
+        } else {
+          dateKey = str
         }
       }
+
+      if (!dateKey) return acc
 
       acc[dateKey] = (acc[dateKey] || 0) + (curr.valor_a_receber || curr.valor || 0)
       return acc
