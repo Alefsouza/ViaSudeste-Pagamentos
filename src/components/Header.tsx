@@ -18,7 +18,7 @@ import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
 import { UploadFotosModal } from '@/components/UploadFotosModal'
 import { ExportFolhaModal } from '@/components/ExportFolhaModal'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
-import logoImg from '@/assets/sem-nome-190-50-px-4ee9e.png'
+import { Logo } from '@/components/Logo'
 
 export function Header() {
   const { user, logout } = useAuth()
@@ -40,11 +40,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center">
-            <img
-              src={logoImg}
-              alt="Via Sudeste"
-              className="h-10 sm:h-12 w-auto object-contain shrink-0"
-            />
+            <Logo className="h-10 sm:h-12 shrink-0" />
           </div>
 
           {user.role === 'Administrador' ? (

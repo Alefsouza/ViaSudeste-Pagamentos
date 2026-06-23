@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
-import logoImg from '@/assets/sem-nome-190-50-px-4ee9e.png'
+import { Logo } from '@/components/Logo'
 
 export default function Index() {
   const [email, setEmail] = useState('')
@@ -79,11 +79,7 @@ export default function Index() {
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
       <Card className="w-full max-w-[450px] shadow-xl rounded-2xl border-slate-200 dark:border-slate-800 animate-slide-up">
         <CardHeader className="space-y-2 text-center pb-8">
-          <img
-            src={logoImg}
-            alt="Via Sudeste"
-            className="mx-auto h-16 sm:h-20 w-auto object-contain mb-6"
-          />
+          <Logo className="mx-auto h-16 sm:h-20 mb-6" />
           <CardTitle className="text-2xl font-bold tracking-tight">Bem-vindo de volta</CardTitle>
           <CardDescription className="text-base">
             Insira suas credenciais para acessar o sistema.
