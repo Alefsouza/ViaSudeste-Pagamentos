@@ -34,11 +34,13 @@ export const getPagamentosTotals = async (filters: any) => {
   }
 
   if (filters.startDate) {
-    filterConditions.push(`data_pagamento >= "${filters.startDate} 00:00:00"`)
+    filterConditions.push(
+      `updated >= "${filters.startDate} 00:00:00" && foto_confirmacao_url != ""`,
+    )
   }
 
   if (filters.endDate) {
-    filterConditions.push(`data_pagamento <= "${filters.endDate} 23:59:59"`)
+    filterConditions.push(`updated <= "${filters.endDate} 23:59:59" && foto_confirmacao_url != ""`)
   }
 
   const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : undefined
@@ -93,18 +95,20 @@ export const getPagamentosPaginated = async (page: number, perPage: number, filt
   }
 
   if (filters.startDate) {
-    filterConditions.push(`data_pagamento >= "${filters.startDate} 00:00:00"`)
+    filterConditions.push(
+      `updated >= "${filters.startDate} 00:00:00" && foto_confirmacao_url != ""`,
+    )
   }
 
   if (filters.endDate) {
-    filterConditions.push(`data_pagamento <= "${filters.endDate} 23:59:59"`)
+    filterConditions.push(`updated <= "${filters.endDate} 23:59:59" && foto_confirmacao_url != ""`)
   }
 
   const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : ''
 
   return pb.collection('pagamentos').getList(page, perPage, {
     filter: filterString,
-    sort: '-data_pagamento',
+    sort: '-updated',
     expand: 'colaborador_id',
   })
 }
@@ -140,11 +144,13 @@ export const getPagamentosAnalytics = async (filters: any) => {
   }
 
   if (filters.startDate) {
-    filterConditions.push(`data_pagamento >= "${filters.startDate} 00:00:00"`)
+    filterConditions.push(
+      `updated >= "${filters.startDate} 00:00:00" && foto_confirmacao_url != ""`,
+    )
   }
 
   if (filters.endDate) {
-    filterConditions.push(`data_pagamento <= "${filters.endDate} 23:59:59"`)
+    filterConditions.push(`updated <= "${filters.endDate} 23:59:59" && foto_confirmacao_url != ""`)
   }
 
   const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : ''

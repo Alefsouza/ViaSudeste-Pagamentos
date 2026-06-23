@@ -169,7 +169,7 @@ export default function RelatorioRecebedoria() {
 
       if (startDate && endDate) {
         conditions.push(
-          `data_pagamento >= "${startDate} 00:00:00" && data_pagamento <= "${endDate} 23:59:59"`,
+          `updated >= "${startDate} 00:00:00" && updated <= "${endDate} 23:59:59" && foto_confirmacao_url != ""`,
         )
       }
       if (startTime) {
@@ -447,7 +447,8 @@ export default function RelatorioRecebedoria() {
       const tipoName = matchedCategory
         ? matchedCategory.name
         : item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || 'Outros'
-      const dataPagamento = item.data_pagamento ? item.data_pagamento.split(' ')[0] : '-'
+      const dataPagamento =
+        item.foto_confirmacao_url && item.updated ? item.updated.split(' ')[0] : '-'
 
       const val =
         item.expand?.colaborador_id?.valor_a_receber ||
@@ -781,8 +782,9 @@ export default function RelatorioRecebedoria() {
                           {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
                         </TableCell>
                         <TableCell className="text-black py-2">
-                          {formatDateStringSafe(item.data_pagamento) || '-'}{' '}
-                          {item.hora_pagamento || ''}
+                          {item.foto_confirmacao_url && item.updated
+                            ? formatDateStringSafe(item.updated)
+                            : '-'}
                         </TableCell>
                         <TableCell className="text-black py-2">
                           {formatDateStringSafe(item.expand?.colaborador_id?.data) || '-'}
@@ -925,11 +927,11 @@ export default function RelatorioRecebedoria() {
                             {formatDateStringSafe(item.expand?.colaborador_id?.data) || '-'}
                           </TableCell>
                           <TableCell className="print:text-black">
-                            {formatDateStringSafe(item.data_pagamento) || '-'}
+                            {item.foto_confirmacao_url && item.updated
+                              ? formatDateStringSafe(item.updated)
+                              : '-'}
                           </TableCell>
-                          <TableCell className="print:text-black">
-                            {item.hora_pagamento || '-'}
-                          </TableCell>
+                          <TableCell className="print:text-black">{'-'}</TableCell>
                           <TableCell className="font-medium print:text-black text-left">
                             {formatBRL(
                               item.expand?.colaborador_id?.valor_a_receber ||
@@ -1031,8 +1033,9 @@ export default function RelatorioRecebedoria() {
                         </div>
                         <div className="flex justify-between items-center pt-3 border-t">
                           <div className="text-sm text-slate-500">
-                            {formatDateStringSafe(item.data_pagamento) || '-'}{' '}
-                            {item.hora_pagamento || ''}
+                            {item.foto_confirmacao_url && item.updated
+                              ? formatDateStringSafe(item.updated)
+                              : '-'}
                           </div>
                           <div className="flex gap-2">
                             <Button
@@ -1375,11 +1378,12 @@ export default function RelatorioRecebedoria() {
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
-                    Data e Hora
+                    Data de Pagamento
                   </span>
                   <p className="font-medium">
-                    {formatDateStringSafe(detailsModal.data_pagamento) || '-'}{' '}
-                    {detailsModal.hora_pagamento || ''}
+                    {detailsModal.foto_confirmacao_url && detailsModal.updated
+                      ? formatDateStringSafe(detailsModal.updated)
+                      : '-'}
                   </p>
                 </div>
                 <div>
