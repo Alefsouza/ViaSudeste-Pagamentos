@@ -6,7 +6,7 @@ export function Logo({ className }: { className?: string }) {
       <img
         src="/visual-edits/editedimage-1782217929291-removebg-preview-f9cfe521.png"
         alt="Via Sudeste Transportes S/A Logo"
-        className="h-full w-auto max-w-full object-contain dark:hidden drop-shadow-sm"
+        className="h-full w-auto max-w-full object-contain dark:hidden drop-shadow-sm text-center"
       />
       <img
         src="/logo-dark.svg"
