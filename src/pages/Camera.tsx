@@ -94,16 +94,24 @@ export default function Camera() {
     if (!dataLiberacaoStr) return false
     const dataLiberacaoDate = new Date(dataLiberacaoStr)
     if (isNaN(dataLiberacaoDate.getTime())) return false
-    const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
-    const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
-    const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
-    return todayStr < libStr
+    const now = new Date()
+    // Compare the dates directly in local time to avoid timezone drift hiding records
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    // Parse the libDate from the UTC timestamp (YYYY-MM-DD)
+    const libDate = new Date(
+      dataLiberacaoDate.getUTCFullYear(),
+      dataLiberacaoDate.getUTCMonth(),
+      dataLiberacaoDate.getUTCDate(),
+    )
+    return today < libDate
   }
 
   const visibleRecords = useMemo(() => {
-    const relevantRecords = sortedRecords.filter(
-      (r) => r.isEligible !== false && (!checkIsLocked(r.data_liberacao) || r.isExplicitPendente),
-    )
+    const relevantRecords = sortedRecords.filter((r) => {
+      // A record is pendente if it hasn't been paid/confirmed (no foto_confirmacao_url or explicitly marked)
+      const isPendente = !r.foto_confirmacao_url || r.status === 'Pendente' || r.isExplicitPendente
+      return r.isEligible !== false && isPendente && !checkIsLocked(r.data_liberacao)
+    })
 
     // Just re-sort by date ascending to keep the table chronological
     return relevantRecords.sort((a, b) => {
@@ -470,10 +478,11 @@ export default function Camera() {
       const validationResult = await getColaboradorByRegistro(colaborador.registro)
       const currentValidRecordsIds = new Set(
         validationResult.colab.records
-          .filter(
-            (r: any) =>
-              r.isEligible !== false && (!checkIsLocked(r.data_liberacao) || r.isExplicitPendente),
-          )
+          .filter((r: any) => {
+            const isPendente =
+              !r.foto_confirmacao_url || r.status === 'Pendente' || r.isExplicitPendente
+            return r.isEligible !== false && isPendente && !checkIsLocked(r.data_liberacao)
+          })
           .map((r: any) => r.id),
       )
 

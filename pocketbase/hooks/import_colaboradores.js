@@ -19,7 +19,21 @@ routerAdd(
 
           for (const [key, value] of Object.entries(item)) {
             if (value !== undefined && value !== '') {
-              record.set(key, value)
+              let finalValue = value
+              if (
+                ['data_liberacao', 'data_pagamento_v2', 'periodo_inicio', 'periodo_fim'].includes(
+                  key,
+                )
+              ) {
+                if (typeof finalValue === 'string') {
+                  const d = new Date(finalValue)
+                  if (isNaN(d.getTime())) {
+                    throw new Error(`Data inválida no campo ${key}: ${finalValue}`)
+                  }
+                  finalValue = d.toISOString().replace('T', ' ')
+                }
+              }
+              record.set(key, finalValue)
             }
           }
 
