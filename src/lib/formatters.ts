@@ -39,7 +39,7 @@ export const formatBRL = (val: number) =>
 
 export const formatDateDBToBR = (dStr?: string | null) => {
   if (!dStr) return 'N/A'
-  const datePart = dStr.split(' ')[0]
+  const datePart = dStr.split(' ')[0].split('T')[0]
   const parts = datePart.split('-')
   if (parts.length === 3) {
     const [y, m, day] = parts

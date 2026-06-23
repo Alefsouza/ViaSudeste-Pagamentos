@@ -337,12 +337,15 @@ export default function Dashboard() {
       if (selectedChartDate) {
         let dateKey: string | null = null
         let rawDate =
-          curr.data_pagamento &&
-          curr.data_pagamento.trim() !== '-' &&
-          curr.data_pagamento.trim() !== ''
-            ? curr.data_pagamento.trim()
+          (curr.pagamento_relacionado?.data_pagamento || curr.data_pagamento) &&
+          (curr.pagamento_relacionado?.data_pagamento || curr.data_pagamento).trim() !== '-' &&
+          (curr.pagamento_relacionado?.data_pagamento || curr.data_pagamento).trim() !== ''
+            ? (curr.pagamento_relacionado?.data_pagamento || curr.data_pagamento)
+                .trim()
+                .split(' ')[0]
+                .split('T')[0]
             : curr.data && curr.data.trim() !== '-'
-              ? curr.data.trim()
+              ? curr.data.trim().split(' ')[0].split('T')[0]
               : ''
 
         if (rawDate) {
@@ -479,12 +482,15 @@ export default function Dashboard() {
 
       let dateKey: string | null = null
       let rawDate =
-        curr.data_pagamento &&
-        curr.data_pagamento.trim() !== '-' &&
-        curr.data_pagamento.trim() !== ''
-          ? curr.data_pagamento.trim()
+        (curr.pagamento_relacionado?.data_pagamento || curr.data_pagamento) &&
+        (curr.pagamento_relacionado?.data_pagamento || curr.data_pagamento).trim() !== '-' &&
+        (curr.pagamento_relacionado?.data_pagamento || curr.data_pagamento).trim() !== ''
+          ? (curr.pagamento_relacionado?.data_pagamento || curr.data_pagamento)
+              .trim()
+              .split(' ')[0]
+              .split('T')[0]
           : curr.data && curr.data.trim() !== '-'
-            ? curr.data.trim()
+            ? curr.data.trim().split(' ')[0].split('T')[0]
             : ''
 
       if (rawDate) {
@@ -1162,7 +1168,17 @@ export default function Dashboard() {
                                       {formatBRL(getActualValue(p))}
                                     </TableCell>
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-                                    <TableCell>{p.data_pagamento || '-'}</TableCell>
+                                    <TableCell>
+                                      {(p.pagamento_relacionado?.data_pagamento ||
+                                        p.data_pagamento) &&
+                                      (p.pagamento_relacionado?.data_pagamento ||
+                                        p.data_pagamento) !== '-'
+                                        ? formatDateDBToBR(
+                                            p.pagamento_relacionado?.data_pagamento ||
+                                              p.data_pagamento,
+                                          )
+                                        : '-'}
+                                    </TableCell>
                                     <TableCell>
                                       {(() => {
                                         const status = getEvaluatedStatus(p, maxRef)
@@ -1340,7 +1356,17 @@ export default function Dashboard() {
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
                                     <span>Data de Pagamento:</span>
-                                    <span>{p.data_pagamento || '-'}</span>
+                                    <span>
+                                      {(p.pagamento_relacionado?.data_pagamento ||
+                                        p.data_pagamento) &&
+                                      (p.pagamento_relacionado?.data_pagamento ||
+                                        p.data_pagamento) !== '-'
+                                        ? formatDateDBToBR(
+                                            p.pagamento_relacionado?.data_pagamento ||
+                                              p.data_pagamento,
+                                          )
+                                        : '-'}
+                                    </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
                                     <div>
@@ -1549,7 +1575,17 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Data de Pagamento:</span>
-                <span>{paymentToCancel?.data_pagamento || '-'}</span>
+                <span>
+                  {(paymentToCancel?.pagamento_relacionado?.data_pagamento ||
+                    paymentToCancel?.data_pagamento) &&
+                  (paymentToCancel?.pagamento_relacionado?.data_pagamento ||
+                    paymentToCancel?.data_pagamento) !== '-'
+                    ? formatDateDBToBR(
+                        paymentToCancel?.pagamento_relacionado?.data_pagamento ||
+                          paymentToCancel?.data_pagamento,
+                      )
+                    : '-'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Filial:</span>
