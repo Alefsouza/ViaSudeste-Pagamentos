@@ -24,7 +24,10 @@ export function ImportPlanilhaModal({
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [dataLiberacao, setDataLiberacao] = useState('')
+  const [dataLiberacao, setDataLiberacao] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
   const [periodoInicio, setPeriodoInicio] = useState('')
   const [periodoFim, setPeriodoFim] = useState('')
   const [referencia, setReferencia] = useState('')
@@ -301,6 +304,10 @@ export function ImportPlanilhaModal({
         toast.success(`${res.count} registros importados com sucesso`)
         onOpenChange(false)
         setFile(null)
+        const d = new Date()
+        setDataLiberacao(
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+        )
       } catch (error: any) {
         const errorMsg = error.response?.message || error.message || 'Erro desconhecido'
         const isValidationError = errorMsg.includes('Arquivo invalido')
