@@ -51,7 +51,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { getPagamentosPaginated, getPagamentosAnalytics } from '@/services/pagamentos'
+import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
 import { useAuth } from '@/hooks/use-auth'
@@ -59,34 +59,16 @@ import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
-import {
-  formatDataString,
-  formatBRL,
-  getTipoPagamento,
-  checkIsLocked,
-  formatDateDBToBR,
-} from '@/lib/formatters'
+import { formatBRL, getTipoPagamento, checkIsLocked, formatDateDBToBR } from '@/lib/formatters'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
-  let status =
-    curr.pagStatus || curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+  let status = curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
 
-  const hasPhoto = !!(
-    curr.foto_confirmacao_url ||
-    curr.foto_confirmacao ||
-    curr.expand?.colaborador_id?.foto_confirmacao_url
-  )
+  const liberadoPagamento = curr.liberado_pagamento
+  const dataLiberacao = curr.data_liberacao
+  const ref = curr.referencia || 0
 
-  if (status === 'Confirmado' && !hasPhoto) {
-    status = 'Pendente'
-  }
-
-  const liberadoPagamento =
-    curr.liberado_pagamento ?? curr.expand?.colaborador_id?.liberado_pagamento
-  const dataLiberacao = curr.data_liberacao || curr.expand?.colaborador_id?.data_liberacao
-  const ref = curr.referencia || curr.expand?.colaborador_id?.referencia || 0
-
-  if (status === 'Pendente' && curr.pagStatus !== 'Pendente') {
+  if (status === 'Pendente') {
     const isLocked = checkIsLocked(dataLiberacao)
     const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
 
@@ -98,31 +80,6 @@ export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   }
 
   return status
-}
-
-const formatLocalTime = (dateStr: string) => {
-  if (!dateStr || dateStr === 'Pendente' || dateStr === '-' || dateStr === '') return dateStr
-  let cleanStr = dateStr
-  if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
-  if (
-    !cleanStr.endsWith('Z') &&
-    cleanStr.split('T').length === 2 &&
-    !cleanStr.includes('+') &&
-    !cleanStr.match(/-\d{2}:\d{2}$/)
-  )
-    cleanStr += 'Z'
-  const d = new Date(cleanStr)
-  if (isNaN(d.getTime())) return dateStr
-
-  const utcMinus3 = new Date(d.getTime() - 3 * 3600000)
-  const dd = String(utcMinus3.getUTCDate()).padStart(2, '0')
-  const mm = String(utcMinus3.getUTCMonth() + 1).padStart(2, '0')
-  const yyyy = utcMinus3.getUTCFullYear()
-  const hh = String(utcMinus3.getUTCHours()).padStart(2, '0')
-  const mins = String(utcMinus3.getUTCMinutes()).padStart(2, '0')
-  const ss = String(utcMinus3.getUTCSeconds()).padStart(2, '0')
-
-  return `${dd}/${mm}/${yyyy} ${hh}:${mins}:${ss}`
 }
 
 export default function Dashboard() {
@@ -177,7 +134,7 @@ export default function Dashboard() {
     setStatsLoading(true)
     setError(false)
     try {
-      const stats = await getPagamentosAnalytics(debouncedFilters)
+      const stats = await getColaboradoresAnalytics(debouncedFilters)
       setStatsData(stats)
     } catch (e: any) {
       setError(true)
@@ -209,7 +166,7 @@ export default function Dashboard() {
         tableFiltersForAPI.referencia = selectedChartRef
       }
 
-      const paginated = await getPagamentosPaginated(page, 20, tableFiltersForAPI)
+      const paginated = await getColaboradoresPaginated(page, 20, tableFiltersForAPI)
       setTableData(paginated)
     } catch (e: any) {
       // Error is caught by loadStats generally, preventing double toast
@@ -263,10 +220,9 @@ export default function Dashboard() {
 
   const handleToggleRelease = async (payment: any) => {
     try {
-      const liberadoPagamento =
-        payment.liberado_pagamento ?? payment.expand?.colaborador_id?.liberado_pagamento
+      const liberadoPagamento = payment.liberado_pagamento
       const newStatus = !liberadoPagamento
-      const targetId = payment.colaborador_id || payment.id
+      const targetId = payment.id
       await pb.collection('colaboradores').update(targetId, { liberado_pagamento: newStatus })
       toast({
         title: newStatus ? 'Pagamento liberado com sucesso.' : 'Pagamento bloqueado com sucesso.',
@@ -283,9 +239,9 @@ export default function Dashboard() {
   const handleDeletePayment = async () => {
     if (!paymentToCancel) return
     try {
-      await pb.collection('pagamentos').delete(paymentToCancel.id)
+      await pb.collection('colaboradores').delete(paymentToCancel.id)
 
-      toast({ title: 'Pagamento excluído com sucesso!' })
+      toast({ title: 'Registro excluído com sucesso!' })
       setPaymentToCancel(null)
       refreshAll()
     } catch (err: any) {
@@ -308,7 +264,7 @@ export default function Dashboard() {
       setKnownRefs((prev) => {
         const next = new Set(prev)
         statsData.forEach((c) => {
-          const actualRef = c.referencia ?? c.expand?.colaborador_id?.referencia
+          const actualRef = c.referencia
           if (actualRef != null) next.add(actualRef)
         })
         return next
@@ -316,9 +272,7 @@ export default function Dashboard() {
     }
   }, [statsData])
 
-  useRealtime('pagamentos', refreshAll)
   useRealtime('colaboradores', refreshAll)
-  useRealtime('fotos_colaboradores', refreshAll)
 
   const availableTipos = Array.from(knownTipos).sort()
   const availableRefs = Array.from(knownRefs).sort((a, b) => b - a)
@@ -327,21 +281,17 @@ export default function Dashboard() {
   const filteredStatsData = useMemo(() => {
     return statsData.filter((curr) => {
       const filialStr =
-        curr.filial === 1
-          ? 'Cursino'
-          : curr.filial === 2
-            ? 'Sapopemba'
-            : curr.filial || curr.expand?.colaborador_id?.filial || 'Outra'
+        curr.filial === 1 ? 'Cursino' : curr.filial === 2 ? 'Sapopemba' : curr.filial || 'Outra'
       if (selectedChartFilial && filialStr !== selectedChartFilial) return false
 
       if (selectedChartRef) {
-        const actualRef = curr.referencia ?? curr.expand?.colaborador_id?.referencia
+        const actualRef = curr.referencia
         const cRef = actualRef != null ? String(actualRef) : 'N/A'
         if (cRef !== selectedChartRef) return false
       }
 
       if (chartRefSearch) {
-        const actualRef = curr.referencia ?? curr.expand?.colaborador_id?.referencia
+        const actualRef = curr.referencia
         const cRef = actualRef != null ? String(actualRef) : 'N/A'
         if (!cRef.toLowerCase().includes(chartRefSearch.toLowerCase())) return false
       }
@@ -354,10 +304,6 @@ export default function Dashboard() {
           curr.data_pagamento.trim() !== ''
         ) {
           let str = curr.data_pagamento.trim()
-          if (str.includes('T')) str = str.split('T')[0]
-          else if (str.includes(' ')) str = str.split(' ')[0]
-          else if (str.includes(',')) str = str.split(',')[0].trim()
-
           if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
             dateKey = str
           } else if (str.includes('/')) {
@@ -386,7 +332,7 @@ export default function Dashboard() {
   const pagamentosTotals = useMemo(() => {
     return filteredStatsData.reduce(
       (acc, curr) => {
-        const val = curr.valor_pago || curr.valor_a_receber || curr.valor || 0
+        const val = curr.valor || curr.valor_a_receber || 0
         let status = getEvaluatedStatus(curr, maxRef)
 
         let acronym = ''
@@ -456,7 +402,7 @@ export default function Dashboard() {
         let status = getEvaluatedStatus(c, maxRef)
         return status !== 'Agendado' && status !== 'Cancelado' && status !== 'Bloqueado'
       })
-      .map((c) => c.registro || c.expand?.colaborador_id?.registro)
+      .map((c) => c.registro)
       .filter(Boolean),
   ).size
 
@@ -465,24 +411,17 @@ export default function Dashboard() {
     return status === 'Confirmado'
   })
 
-  const confirmedValues = confirmedPayments.map(
-    (c) => c.valor_pago || c.valor_a_receber || c.valor || 0,
-  )
+  const confirmedValues = confirmedPayments.map((c) => c.valor || c.valor_a_receber || 0)
   const maxPago = confirmedValues.length ? Math.max(...confirmedValues) : 0
   const minPago = confirmedValues.length ? Math.min(...confirmedValues) : 0
   const avgPago = confirmedValues.length ? pagamentosTotals.pago / confirmedValues.length : 0
 
-  // Chart Data Preparation (using full statsData so context remains visible)
+  // Chart Data Preparation
   const pieDataMap = statsData.reduce(
     (acc, curr) => {
       const filialStr =
-        curr.filial === 1
-          ? 'Cursino'
-          : curr.filial === 2
-            ? 'Sapopemba'
-            : curr.filial || curr.expand?.colaborador_id?.filial || 'Outra'
-      acc[filialStr] =
-        (acc[filialStr] || 0) + (curr.valor_pago || curr.valor_a_receber || curr.valor || 0)
+        curr.filial === 1 ? 'Cursino' : curr.filial === 2 ? 'Sapopemba' : curr.filial || 'Outra'
+      acc[filialStr] = (acc[filialStr] || 0) + (curr.valor || curr.valor_a_receber || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -492,7 +431,7 @@ export default function Dashboard() {
 
   const dailyDataMap = statsData.reduce(
     (acc, curr) => {
-      const status = curr.status || (curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente')
+      const status = curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
       if (status !== 'Confirmado') return acc
 
       let dateKey: string | null = null
@@ -502,10 +441,6 @@ export default function Dashboard() {
         curr.data_pagamento.trim() !== ''
       ) {
         let str = curr.data_pagamento.trim()
-        if (str.includes('T')) str = str.split('T')[0]
-        else if (str.includes(' ')) str = str.split(' ')[0]
-        else if (str.includes(',')) str = str.split(',')[0].trim()
-
         if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
           dateKey = str
         } else if (str.includes('/')) {
@@ -526,8 +461,7 @@ export default function Dashboard() {
 
       if (!dateKey) return acc
 
-      acc[dateKey] =
-        (acc[dateKey] || 0) + (curr.valor_pago || curr.valor_a_receber || curr.valor || 0)
+      acc[dateKey] = (acc[dateKey] || 0) + (curr.valor || curr.valor_a_receber || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -546,7 +480,7 @@ export default function Dashboard() {
 
   const refDataMap = statsData.reduce(
     (acc, curr) => {
-      const actualRef = curr.referencia ?? curr.expand?.colaborador_id?.referencia
+      const actualRef = curr.referencia
       const ref = actualRef != null ? String(actualRef) : 'N/A'
 
       if (chartRefSearch && !ref.toLowerCase().includes(chartRefSearch.toLowerCase())) {
@@ -555,14 +489,13 @@ export default function Dashboard() {
       if (!acc[ref]) {
         acc[ref] = { total: 0, periodo_inicio: null, periodo_fim: null }
       }
-      acc[ref].total += curr.valor_pago || curr.valor_a_receber || curr.valor || 0
+      acc[ref].total += curr.valor || curr.valor_a_receber || 0
 
       if (!acc[ref].periodo_inicio) {
-        acc[ref].periodo_inicio =
-          curr.periodo_inicio || curr.expand?.colaborador_id?.periodo_inicio || null
+        acc[ref].periodo_inicio = curr.periodo_inicio || null
       }
       if (!acc[ref].periodo_fim) {
-        acc[ref].periodo_fim = curr.periodo_fim || curr.expand?.colaborador_id?.periodo_fim || null
+        acc[ref].periodo_fim = curr.periodo_fim || null
       }
 
       return acc
@@ -586,7 +519,7 @@ export default function Dashboard() {
 
   // Group table items by Reference without aggregating their values
   const groupedByRef = (tableData?.items || []).reduce((acc: any, item: any) => {
-    const ref = item.referencia ?? item.expand?.colaborador_id?.referencia
+    const ref = item.referencia
     const refStr = ref != null ? `Referência: ${ref}` : 'Sem Referência'
     if (!acc[refStr]) acc[refStr] = []
     acc[refStr].push(item)
@@ -1145,7 +1078,7 @@ export default function Dashboard() {
                           Object.entries(groupedByRef).flatMap(
                             ([refName, records]: [string, any]) => {
                               const totalLines = filteredStatsData.filter((c) => {
-                                const cRef = c.referencia ?? c.expand?.colaborador_id?.referencia
+                                const cRef = c.referencia
                                 const cRefStr =
                                   cRef != null ? `Referência: ${cRef}` : 'Sem Referência'
                                 return cRefStr === refName
@@ -1166,26 +1099,22 @@ export default function Dashboard() {
                                 ...records.map((p: any) => (
                                   <TableRow key={p.id}>
                                     <TableCell className="font-medium pl-8">
-                                      {p.nome || p.expand?.colaborador_id?.nome || 'Desconhecido'}
+                                      {p.nome || 'Desconhecido'}
                                     </TableCell>
-                                    <TableCell>
-                                      {p.registro || p.expand?.colaborador_id?.registro || '-'}
-                                    </TableCell>
+                                    <TableCell>{p.registro || '-'}</TableCell>
                                     <TableCell>
                                       {p.filial === 1
                                         ? 'Cursino'
                                         : p.filial === 2
                                           ? 'Sapopemba'
-                                          : p.filial || p.expand?.colaborador_id?.filial || '-'}
+                                          : p.filial || '-'}
                                     </TableCell>
-                                    <TableCell>
-                                      {p.referencia ?? p.expand?.colaborador_id?.referencia ?? '-'}
-                                    </TableCell>
+                                    <TableCell>{p.referencia ?? '-'}</TableCell>
                                     <TableCell className="text-emerald-600 dark:text-emerald-500 font-medium text-left">
-                                      {formatBRL(p.valor_pago || p.valor_a_receber || p.valor || 0)}
+                                      {formatBRL(p.valor || p.valor_a_receber || 0)}
                                     </TableCell>
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-                                    <TableCell>{formatLocalTime(p.data_pagamento)}</TableCell>
+                                    <TableCell>{p.data_pagamento || '-'}</TableCell>
                                     <TableCell>
                                       {(() => {
                                         const status = getEvaluatedStatus(p, maxRef)
@@ -1210,10 +1139,7 @@ export default function Dashboard() {
                                                 <TooltipContent>
                                                   <p>
                                                     Liberado em:{' '}
-                                                    {formatDateDBToBR(
-                                                      p.data_liberacao ||
-                                                        p.expand?.colaborador_id?.data_liberacao,
-                                                    )}
+                                                    {formatDateDBToBR(p.data_liberacao)}
                                                   </p>
                                                 </TooltipContent>
                                               </Tooltip>
@@ -1259,14 +1185,11 @@ export default function Dashboard() {
                                         {(() => {
                                           const status = getEvaluatedStatus(p, maxRef)
 
-                                          const actualRef =
-                                            p.referencia ?? p.expand?.colaborador_id?.referencia
+                                          const actualRef = p.referencia
                                           const isOutsideValidity =
                                             actualRef && maxRef > 0 && actualRef < maxRef - 3
 
-                                          const liberadoPagamento =
-                                            p.liberado_pagamento ??
-                                            p.expand?.colaborador_id?.liberado_pagamento
+                                          const liberadoPagamento = p.liberado_pagamento
 
                                           return (
                                             <div className="flex justify-center gap-1">
@@ -1334,7 +1257,7 @@ export default function Dashboard() {
                     ) : (
                       Object.entries(groupedByRef).map(([refName, records]: [string, any]) => {
                         const totalLines = filteredStatsData.filter((c) => {
-                          const cRef = c.referencia ?? c.expand?.colaborador_id?.referencia
+                          const cRef = c.referencia
                           const cRefStr = cRef != null ? `Referência: ${cRef}` : 'Sem Referência'
                           return cRefStr === refName
                         }).length
@@ -1348,26 +1271,20 @@ export default function Dashboard() {
                               <Card key={p.id} className="shadow-sm">
                                 <CardContent className="p-4 flex flex-col gap-2">
                                   <div className="flex justify-between font-bold">
-                                    <span className="truncate">
-                                      {p.nome || p.expand?.colaborador_id?.nome || 'Desconhecido'}
-                                    </span>
+                                    <span className="truncate">{p.nome || 'Desconhecido'}</span>
                                     <span className="text-emerald-600 dark:text-emerald-500">
-                                      {formatBRL(p.valor_pago || p.valor_a_receber || p.valor || 0)}
+                                      {formatBRL(p.valor || p.valor_a_receber || 0)}
                                     </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
-                                    <span>
-                                      Reg: {p.registro || p.expand?.colaborador_id?.registro || '-'}
-                                    </span>
+                                    <span>Reg: {p.registro || '-'}</span>
                                     <span>
                                       {p.filial === 1
                                         ? 'Cursino'
                                         : p.filial === 2
                                           ? 'Sapopemba'
-                                          : p.filial || p.expand?.colaborador_id?.filial || '-'}
-                                      {(p.referencia ?? p.expand?.colaborador_id?.referencia)
-                                        ? ` (Ref: ${p.referencia ?? p.expand?.colaborador_id?.referencia})`
-                                        : ''}
+                                          : p.filial || '-'}
+                                      {p.referencia ? ` (Ref: ${p.referencia})` : ''}
                                     </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
@@ -1375,7 +1292,7 @@ export default function Dashboard() {
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
                                     <span>Data de Pagamento:</span>
-                                    <span>{formatLocalTime(p.data_pagamento)}</span>
+                                    <span>{p.data_pagamento || '-'}</span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
                                     <div>
@@ -1402,10 +1319,7 @@ export default function Dashboard() {
                                                 <TooltipContent>
                                                   <p>
                                                     Liberado em:{' '}
-                                                    {formatDateDBToBR(
-                                                      p.data_liberacao ||
-                                                        p.expand?.colaborador_id?.data_liberacao,
-                                                    )}
+                                                    {formatDateDBToBR(p.data_liberacao)}
                                                   </p>
                                                 </TooltipContent>
                                               </Tooltip>
@@ -1449,14 +1363,11 @@ export default function Dashboard() {
                                         (() => {
                                           const status = getEvaluatedStatus(p, maxRef)
 
-                                          const actualRef =
-                                            p.referencia ?? p.expand?.colaborador_id?.referencia
+                                          const actualRef = p.referencia
                                           const isOutsideValidity =
                                             actualRef && maxRef > 0 && actualRef < maxRef - 3
 
-                                          const liberadoPagamento =
-                                            p.liberado_pagamento ??
-                                            p.expand?.colaborador_id?.liberado_pagamento
+                                          const liberadoPagamento = p.liberado_pagamento
 
                                           return (
                                             <>
@@ -1580,28 +1491,19 @@ export default function Dashboard() {
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md space-y-2 text-sm border">
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Colaborador:</span>
-                <span>
-                  {paymentToCancel?.nome ||
-                    paymentToCancel?.expand?.colaborador_id?.nome ||
-                    'Desconhecido'}
-                </span>
+                <span>{paymentToCancel?.nome || 'Desconhecido'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Valor:</span>
                 <span className="text-emerald-600 dark:text-emerald-500 font-medium">
                   {paymentToCancel
-                    ? formatBRL(
-                        paymentToCancel.valor_pago ||
-                          paymentToCancel.valor_a_receber ||
-                          paymentToCancel.valor ||
-                          0,
-                      )
+                    ? formatBRL(paymentToCancel.valor || paymentToCancel.valor_a_receber || 0)
                     : ''}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Data de Pagamento:</span>
-                <span>{formatLocalTime(paymentToCancel?.data_pagamento)}</span>
+                <span>{paymentToCancel?.data_pagamento || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Filial:</span>
@@ -1610,7 +1512,7 @@ export default function Dashboard() {
                     ? 'Cursino'
                     : paymentToCancel?.filial === 2
                       ? 'Sapopemba'
-                      : paymentToCancel?.filial || paymentToCancel?.expand?.colaborador_id?.filial}
+                      : paymentToCancel?.filial}
                 </span>
               </div>
             </div>
