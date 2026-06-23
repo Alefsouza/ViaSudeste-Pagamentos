@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import pb from '@/lib/pocketbase/client'
-import { getColaboradorByRegistro, updateColaborador } from '@/services/colaboradores'
+import { updateColaborador } from '@/services/colaboradores'
 import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
 import { createPagamento, updatePagamento } from '@/services/pagamentos'
 import { Button } from '@/components/ui/button'
@@ -72,11 +72,26 @@ export default function Camera() {
     return arr.sort((a, b) => {
       const parseDate = (dStr: string) => {
         if (!dStr) return 0
+        let cleanStr = dStr
+        if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
+        if (
+          !cleanStr.endsWith('Z') &&
+          cleanStr.split('T').length === 2 &&
+          !cleanStr.includes('+') &&
+          !cleanStr.match(/-\d{2}:\d{2}$/)
+        ) {
+          cleanStr += 'Z'
+        }
+
+        const d = new Date(cleanStr)
+        if (!isNaN(d.getTime())) return d.getTime()
+
         const matchIso = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
         if (matchIso)
-          return new Date(`${matchIso[1]}-${matchIso[2]}-${matchIso[3]}T00:00:00`).getTime()
+          return new Date(`${matchIso[1]}-${matchIso[2]}-${matchIso[3]}T00:00:00Z`).getTime()
         const matchBr = dStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
-        if (matchBr) return new Date(`${matchBr[3]}-${matchBr[2]}-${matchBr[1]}T00:00:00`).getTime()
+        if (matchBr)
+          return new Date(`${matchBr[3]}-${matchBr[2]}-${matchBr[1]}T00:00:00Z`).getTime()
         return new Date(dStr).getTime()
       }
       const valA = a.data || a.data_pagamento || a.data_pagamento_v2 || ''
@@ -92,36 +107,59 @@ export default function Camera() {
 
   const checkIsLocked = (dataLiberacaoStr?: string) => {
     if (!dataLiberacaoStr) return false
-    const dataLiberacaoDate = new Date(dataLiberacaoStr)
-    if (isNaN(dataLiberacaoDate.getTime())) return false
+
+    let cleanStr = dataLiberacaoStr
+    if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
+    if (
+      !cleanStr.endsWith('Z') &&
+      cleanStr.split('T').length === 2 &&
+      !cleanStr.includes('+') &&
+      !cleanStr.match(/-\d{2}:\d{2}$/)
+    ) {
+      cleanStr += 'Z'
+    }
+
+    const libDate = new Date(cleanStr)
+    if (isNaN(libDate.getTime())) return false
+
     const now = new Date()
-    // Compare the dates directly in local time to avoid timezone drift hiding records
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    // Parse the libDate from the UTC timestamp (YYYY-MM-DD)
-    const libDate = new Date(
-      dataLiberacaoDate.getUTCFullYear(),
-      dataLiberacaoDate.getUTCMonth(),
-      dataLiberacaoDate.getUTCDate(),
-    )
-    return today < libDate
+    return now < libDate
   }
 
   const visibleRecords = useMemo(() => {
     const relevantRecords = sortedRecords.filter((r) => {
       // A record is pendente if it hasn't been paid/confirmed (no foto_confirmacao_url or explicitly marked)
       const isPendente = !r.foto_confirmacao_url || r.status === 'Pendente' || r.isExplicitPendente
-      return r.isEligible !== false && isPendente && !checkIsLocked(r.data_liberacao)
+      const isLiberado = r.liberado_pagamento === true
+      const isTimeValid = !checkIsLocked(r.data_liberacao)
+
+      return r.isEligible !== false && isPendente && isLiberado && isTimeValid
     })
 
     // Just re-sort by date ascending to keep the table chronological
     return relevantRecords.sort((a, b) => {
       const parseDate = (dStr: string) => {
         if (!dStr) return 0
+        let cleanStr = dStr
+        if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
+        if (
+          !cleanStr.endsWith('Z') &&
+          cleanStr.split('T').length === 2 &&
+          !cleanStr.includes('+') &&
+          !cleanStr.match(/-\d{2}:\d{2}$/)
+        ) {
+          cleanStr += 'Z'
+        }
+
+        const d = new Date(cleanStr)
+        if (!isNaN(d.getTime())) return d.getTime()
+
         const matchIso = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
         if (matchIso)
-          return new Date(`${matchIso[1]}-${matchIso[2]}-${matchIso[3]}T00:00:00`).getTime()
+          return new Date(`${matchIso[1]}-${matchIso[2]}-${matchIso[3]}T00:00:00Z`).getTime()
         const matchBr = dStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
-        if (matchBr) return new Date(`${matchBr[3]}-${matchBr[2]}-${matchBr[1]}T00:00:00`).getTime()
+        if (matchBr)
+          return new Date(`${matchBr[3]}-${matchBr[2]}-${matchBr[1]}T00:00:00Z`).getTime()
         return new Date(dStr).getTime()
       }
       const da = parseDate(a.data || a.data_pagamento || a.data_pagamento_v2 || '')
@@ -175,9 +213,16 @@ export default function Camera() {
   const fetchColaboradorSilent = useCallback(async () => {
     if (!registro) return
     try {
-      const result = await getColaboradorByRegistro(registro)
-      if (result && result.colab) {
-        setColaborador(result.colab)
+      const records = await pb
+        .collection('colaboradores')
+        .getFullList({ filter: `registro = "${registro}"` })
+      if (records && records.length > 0) {
+        setColaborador({
+          registro: records[0].registro,
+          nome: records[0].nome,
+          filial: records[0].filial,
+          records: records,
+        })
       }
     } catch (err) {
       // Silent fail, keep current view
@@ -220,25 +265,69 @@ export default function Camera() {
     setFotoCapturada(null)
 
     try {
-      const result = await getColaboradorByRegistro(registro)
-      if (!result || !result.colab) {
-        const msg = 'Não há valor para o colaborador receber'
+      const records = await pb.collection('colaboradores').getFullList({
+        filter: `registro = "${registro}"`,
+      })
+
+      if (!records || records.length === 0) {
+        const msg = 'Colaborador não encontrado para este registro.'
         setViewState('SEARCH_FAILED')
         setErrorMsg(msg)
-        toast({
-          title: 'Aviso',
-          description: msg,
-          variant: 'destructive',
-        })
+        toast({ title: 'Aviso', description: msg, variant: 'destructive' })
         return
       }
 
-      setColaborador(result.colab)
-      setFotoPredeterminada(result.fotoUrl)
+      const hasLiberado = records.some((r) => r.liberado_pagamento === true)
+      const hasPendente = records.some((r) => !r.foto_confirmacao_url || r.status === 'Pendente')
+      const hasValidTime = records.some((r) => !checkIsLocked(r.data_liberacao))
+
+      const availableRecords = records.filter((r) => {
+        const isPendente =
+          !r.foto_confirmacao_url || r.status === 'Pendente' || r.isExplicitPendente
+        const isLiberado = r.liberado_pagamento === true
+        const isTimeValid = !checkIsLocked(r.data_liberacao)
+        return isPendente && isLiberado && isTimeValid
+      })
+
+      if (availableRecords.length === 0) {
+        let msg = 'Não há valor para o colaborador receber no momento.'
+        if (!hasLiberado) {
+          msg = 'O pagamento ainda não foi liberado para este colaborador.'
+        } else if (!hasValidTime) {
+          msg = 'A data de liberação do pagamento ainda não foi atingida.'
+        } else if (!hasPendente) {
+          msg = 'Todos os pagamentos deste colaborador já foram confirmados.'
+        }
+
+        setViewState('SEARCH_FAILED')
+        setErrorMsg(msg)
+        toast({ title: 'Aviso', description: msg, variant: 'destructive' })
+        return
+      }
+
+      let fotoUrl = null
+      try {
+        const fotoRecord = await pb
+          .collection('fotos_colaboradores')
+          .getFirstListItem(`registro = "${registro}"`)
+        if (fotoRecord && fotoRecord.foto) {
+          fotoUrl = pb.files.getURL(fotoRecord, fotoRecord.foto)
+        }
+      } catch (err) {
+        // No photo found
+      }
+
+      setColaborador({
+        registro: records[0].registro,
+        nome: records[0].nome,
+        filial: records[0].filial,
+        records: records,
+      })
+      setFotoPredeterminada(fotoUrl)
       setViewState('CAPTURING')
     } catch (err: any) {
       setViewState('SEARCH_FAILED')
-      const msg = err.message || 'Não há valor para o colaborador receber'
+      const msg = err.message || 'Erro ao buscar dados do colaborador'
       setErrorMsg(msg)
       toast({
         title: 'Aviso',
@@ -475,13 +564,17 @@ export default function Camera() {
 
     try {
       // Re-validate to ensure backend consistency and prevent bypassing
-      const validationResult = await getColaboradorByRegistro(colaborador.registro)
+      const validationRecords = await pb.collection('colaboradores').getFullList({
+        filter: `registro = "${colaborador.registro}"`,
+      })
       const currentValidRecordsIds = new Set(
-        validationResult.colab.records
+        validationRecords
           .filter((r: any) => {
             const isPendente =
               !r.foto_confirmacao_url || r.status === 'Pendente' || r.isExplicitPendente
-            return r.isEligible !== false && isPendente && !checkIsLocked(r.data_liberacao)
+            const isLiberado = r.liberado_pagamento === true
+            const isTimeValid = !checkIsLocked(r.data_liberacao)
+            return r.isEligible !== false && isPendente && isLiberado && isTimeValid
           })
           .map((r: any) => r.id),
       )
