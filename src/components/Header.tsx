@@ -40,7 +40,19 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center">
-            <Logo className="h-10 sm:h-12 shrink-0" />
+            <Link
+              to={
+                user.role === 'Administrador'
+                  ? '/dashboard'
+                  : user.role === 'DP'
+                    ? '/dp/fotos'
+                    : '/camera'
+              }
+              className="hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest rounded-sm"
+              aria-label="Ir para a página inicial"
+            >
+              <Logo className="h-10 sm:h-12 shrink-0" />
+            </Link>
           </div>
 
           {user.role === 'Administrador' ? (
