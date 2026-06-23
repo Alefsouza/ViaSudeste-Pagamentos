@@ -43,7 +43,7 @@ export function Header() {
             <img
               src={logoImg}
               alt="Via Sudeste"
-              className="h-[36px] md:h-[44px] w-auto object-contain"
+              className="h-8 sm:h-10 md:h-[50px] w-auto aspect-[19/5] object-contain shrink-0"
             />
           </div>
 
