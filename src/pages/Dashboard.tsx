@@ -336,7 +336,8 @@ export default function Dashboard() {
 
       if (selectedChartDate) {
         let dateKey: string | null = null
-        const hasPhoto = curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
+        const hasPhoto =
+          curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
         let rawDate = ''
         if (hasPhoto) {
           const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
@@ -346,7 +347,8 @@ export default function Dashboard() {
         }
 
         if (rawDate) {
-          let str = rawDate          if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          let str = rawDate
+          if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
             dateKey = str
           } else if (str.includes('/')) {
             const parts = str.split('/')
@@ -1163,9 +1165,12 @@ export default function Dashboard() {
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
                                     <TableCell>
                                       {(() => {
-                                        const hasPhoto = p.pagamento_relacionado?.foto_confirmacao_url || p.foto_confirmacao_url
+                                        const hasPhoto =
+                                          p.pagamento_relacionado?.foto_confirmacao_url ||
+                                          p.foto_confirmacao_url
                                         if (hasPhoto) {
-                                          const updatedDate = p.pagamento_relacionado?.updated || p.updated
+                                          const updatedDate =
+                                            p.pagamento_relacionado?.updated || p.updated
                                           return updatedDate ? formatDateDBToBR(updatedDate) : '-'
                                         }
                                         return '-'
@@ -1350,9 +1355,12 @@ export default function Dashboard() {
                                     <span>Data de Pagamento:</span>
                                     <span>
                                       {(() => {
-                                        const hasPhoto = p.pagamento_relacionado?.foto_confirmacao_url || p.foto_confirmacao_url
+                                        const hasPhoto =
+                                          p.pagamento_relacionado?.foto_confirmacao_url ||
+                                          p.foto_confirmacao_url
                                         if (hasPhoto) {
-                                          const updatedDate = p.pagamento_relacionado?.updated || p.updated
+                                          const updatedDate =
+                                            p.pagamento_relacionado?.updated || p.updated
                                           return updatedDate ? formatDateDBToBR(updatedDate) : '-'
                                         }
                                         return '-'
@@ -1568,9 +1576,12 @@ export default function Dashboard() {
                 <span className="font-semibold text-muted-foreground">Data de Pagamento:</span>
                 <span>
                   {(() => {
-                    const hasPhoto = paymentToCancel?.pagamento_relacionado?.foto_confirmacao_url || paymentToCancel?.foto_confirmacao_url
+                    const hasPhoto =
+                      paymentToCancel?.pagamento_relacionado?.foto_confirmacao_url ||
+                      paymentToCancel?.foto_confirmacao_url
                     if (hasPhoto) {
-                      const updatedDate = paymentToCancel?.pagamento_relacionado?.updated || paymentToCancel?.updated
+                      const updatedDate =
+                        paymentToCancel?.pagamento_relacionado?.updated || paymentToCancel?.updated
                       return updatedDate ? formatDateDBToBR(updatedDate) : '-'
                     }
                     return '-'
