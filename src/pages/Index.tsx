@@ -82,7 +82,7 @@ export default function Index() {
           <img
             src={logoImg}
             alt="Via Sudeste"
-            className="mx-auto h-12 md:h-[50px] w-auto aspect-[19/5] object-contain mb-4"
+            className="mx-auto h-16 sm:h-20 w-auto object-contain mb-6"
           />
           <CardTitle className="text-2xl font-bold tracking-tight">Bem-vindo de volta</CardTitle>
           <CardDescription className="text-base">
