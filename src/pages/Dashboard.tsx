@@ -51,7 +51,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
+import {
+  getColaboradoresPaginated,
+  getColaboradoresAnalytics,
+  fetchPagamentosForColabs,
+  getPagamentosForColaboradoresFilter,
+} from '@/services/colaboradores'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
 import { useAuth } from '@/hooks/use-auth'
@@ -62,6 +67,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatBRL, getTipoPagamento, checkIsLocked, formatDateDBToBR } from '@/lib/formatters'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
+  if (curr.pagamento_relacionado?.status === 'Confirmado') return 'Confirmado'
   let status = curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
 
   const liberadoPagamento = curr.liberado_pagamento
@@ -80,6 +86,13 @@ export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   }
 
   return status
+}
+
+export const getActualValue = (curr: any) => {
+  if (curr.pagamento_relacionado?.status === 'Confirmado') {
+    return curr.pagamento_relacionado.valor_pago || 0
+  }
+  return curr.valor_a_receber || curr.valor || 0
 }
 
 export default function Dashboard() {
@@ -135,7 +148,17 @@ export default function Dashboard() {
     setError(false)
     try {
       const stats = await getColaboradoresAnalytics(debouncedFilters)
-      setStatsData(stats)
+      const pags = await getPagamentosForColaboradoresFilter(debouncedFilters)
+
+      const mergedStats = stats.map((colab) => {
+        const pag = pags.find((p) => p.colaborador_id === colab.id && p.status === 'Confirmado')
+        if (pag) {
+          colab.pagamento_relacionado = pag
+        }
+        return colab
+      })
+
+      setStatsData(mergedStats)
     } catch (e: any) {
       setError(true)
       toast({
@@ -167,6 +190,20 @@ export default function Dashboard() {
       }
 
       const paginated = await getColaboradoresPaginated(page, 20, tableFiltersForAPI)
+
+      const colabIds = paginated.items.map((i: any) => i.id)
+      const pags = await fetchPagamentosForColabs(colabIds)
+
+      paginated.items = paginated.items.map((colab: any) => {
+        const pag = pags
+          .filter((p) => p.colaborador_id === colab.id && p.status === 'Confirmado')
+          .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())[0]
+        if (pag) {
+          colab.pagamento_relacionado = pag
+        }
+        return colab
+      })
+
       setTableData(paginated)
     } catch (e: any) {
       // Error is caught by loadStats generally, preventing double toast
@@ -273,6 +310,7 @@ export default function Dashboard() {
   }, [statsData])
 
   useRealtime('colaboradores', refreshAll)
+  useRealtime('pagamentos', refreshAll)
 
   const availableTipos = Array.from(knownTipos).sort()
   const availableRefs = Array.from(knownRefs).sort((a, b) => b - a)
@@ -332,7 +370,7 @@ export default function Dashboard() {
   const pagamentosTotals = useMemo(() => {
     return filteredStatsData.reduce(
       (acc, curr) => {
-        const val = curr.valor || curr.valor_a_receber || 0
+        const val = getActualValue(curr)
         let status = getEvaluatedStatus(curr, maxRef)
 
         let acronym = ''
@@ -411,7 +449,7 @@ export default function Dashboard() {
     return status === 'Confirmado'
   })
 
-  const confirmedValues = confirmedPayments.map((c) => c.valor || c.valor_a_receber || 0)
+  const confirmedValues = confirmedPayments.map((c) => getActualValue(c))
   const maxPago = confirmedValues.length ? Math.max(...confirmedValues) : 0
   const minPago = confirmedValues.length ? Math.min(...confirmedValues) : 0
   const avgPago = confirmedValues.length ? pagamentosTotals.pago / confirmedValues.length : 0
@@ -421,7 +459,7 @@ export default function Dashboard() {
     (acc, curr) => {
       const filialStr =
         curr.filial === 1 ? 'Cursino' : curr.filial === 2 ? 'Sapopemba' : curr.filial || 'Outra'
-      acc[filialStr] = (acc[filialStr] || 0) + (curr.valor || curr.valor_a_receber || 0)
+      acc[filialStr] = (acc[filialStr] || 0) + getActualValue(curr)
       return acc
     },
     {} as Record<string, number>,
@@ -461,7 +499,7 @@ export default function Dashboard() {
 
       if (!dateKey) return acc
 
-      acc[dateKey] = (acc[dateKey] || 0) + (curr.valor || curr.valor_a_receber || 0)
+      acc[dateKey] = (acc[dateKey] || 0) + getActualValue(curr)
       return acc
     },
     {} as Record<string, number>,
@@ -489,7 +527,7 @@ export default function Dashboard() {
       if (!acc[ref]) {
         acc[ref] = { total: 0, periodo_inicio: null, periodo_fim: null }
       }
-      acc[ref].total += curr.valor || curr.valor_a_receber || 0
+      acc[ref].total += getActualValue(curr)
 
       if (!acc[ref].periodo_inicio) {
         acc[ref].periodo_inicio = curr.periodo_inicio || null
@@ -1111,7 +1149,7 @@ export default function Dashboard() {
                                     </TableCell>
                                     <TableCell>{p.referencia ?? '-'}</TableCell>
                                     <TableCell className="text-emerald-600 dark:text-emerald-500 font-medium text-left">
-                                      {formatBRL(p.valor || p.valor_a_receber || 0)}
+                                      {formatBRL(getActualValue(p))}
                                     </TableCell>
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
                                     <TableCell>{p.data_pagamento || '-'}</TableCell>
@@ -1273,7 +1311,7 @@ export default function Dashboard() {
                                   <div className="flex justify-between font-bold">
                                     <span className="truncate">{p.nome || 'Desconhecido'}</span>
                                     <span className="text-emerald-600 dark:text-emerald-500">
-                                      {formatBRL(p.valor || p.valor_a_receber || 0)}
+                                      {formatBRL(getActualValue(p))}
                                     </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
@@ -1496,9 +1534,7 @@ export default function Dashboard() {
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Valor:</span>
                 <span className="text-emerald-600 dark:text-emerald-500 font-medium">
-                  {paymentToCancel
-                    ? formatBRL(paymentToCancel.valor || paymentToCancel.valor_a_receber || 0)
-                    : ''}
+                  {paymentToCancel ? formatBRL(getActualValue(paymentToCancel)) : ''}
                 </span>
               </div>
               <div className="flex justify-between">

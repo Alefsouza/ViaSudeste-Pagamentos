@@ -24,47 +24,70 @@ function getDatesInRange(startDate: string, endDate: string): string[] {
   return dates
 }
 
-const buildFilterString = (filters: any) => {
+const buildFilterString = (filters: any, prefix = '') => {
   const conditions: string[] = []
 
   if (filters.search) {
-    conditions.push(`(nome ~ "${filters.search}" || registro ~ "${filters.search}")`)
+    conditions.push(
+      `(${prefix}nome ~ "${filters.search}" || ${prefix}registro ~ "${filters.search}")`,
+    )
   }
   if (filters.filial && filters.filial !== 'Todas') {
-    conditions.push(`filial = "${filters.filial}"`)
+    conditions.push(`${prefix}filial = "${filters.filial}"`)
   }
   if (filters.status && filters.status !== 'Todos') {
     if (filters.status === 'Confirmado') {
-      conditions.push(`foto_confirmacao_url != ""`)
+      conditions.push(`${prefix}foto_confirmacao_url != ""`)
     } else {
-      conditions.push(`foto_confirmacao_url = ""`)
+      conditions.push(`${prefix}foto_confirmacao_url = ""`)
     }
   }
   if (filters.tipoPagamento && filters.tipoPagamento !== 'Todos') {
-    conditions.push(`idtipopgto = ${filters.tipoPagamento}`)
+    conditions.push(`${prefix}idtipopgto = ${filters.tipoPagamento}`)
   }
   if (filters.referencia && filters.referencia !== 'Todas') {
-    conditions.push(`referencia = ${filters.referencia}`)
+    conditions.push(`${prefix}referencia = ${filters.referencia}`)
   }
 
   if (filters.data_pagamento_text) {
-    conditions.push(`data_pagamento ~ "${filters.data_pagamento_text}"`)
+    conditions.push(`${prefix}data_pagamento ~ "${filters.data_pagamento_text}"`)
   } else if (filters.startDate && filters.startDate === filters.endDate) {
     const d = filters.startDate.split('-')
     if (d.length === 3) {
-      conditions.push(`data_pagamento = "${d[2]}/${d[1]}/${d[0]}"`)
+      conditions.push(`${prefix}data_pagamento = "${d[2]}/${d[1]}/${d[0]}"`)
     }
   } else if (filters.startDate && filters.endDate) {
     const dates = getDatesInRange(filters.startDate, filters.endDate)
     if (dates.length > 0) {
-      const dateFilters = dates.map((d) => `data_pagamento = "${d}"`).join(' || ')
+      const dateFilters = dates.map((d) => `${prefix}data_pagamento = "${d}"`).join(' || ')
       conditions.push(`(${dateFilters})`)
     } else {
-      conditions.push(`data_pagamento = "NON_EXISTENT"`)
+      conditions.push(`${prefix}data_pagamento = "NON_EXISTENT"`)
     }
   }
 
   return conditions.length > 0 ? conditions.join(' && ') : undefined
+}
+
+export const fetchPagamentosForColabs = async (colabIds: string[]) => {
+  if (colabIds.length === 0) return []
+  const chunkSize = 100
+  const allPags = []
+  for (let i = 0; i < colabIds.length; i += chunkSize) {
+    const chunk = colabIds.slice(i, i + chunkSize)
+    const filter = chunk.map((id) => `colaborador_id="${id}"`).join(' || ')
+    const pags = await pb.collection('pagamentos').getFullList({ filter })
+    allPags.push(...pags)
+  }
+  return allPags
+}
+
+export const getPagamentosForColaboradoresFilter = async (filters: any = {}) => {
+  const filterString = buildFilterString(filters, 'colaborador_id.')
+  const finalFilter = filterString
+    ? `(${filterString}) && status = "Confirmado"`
+    : `status = "Confirmado"`
+  return pb.collection('pagamentos').getFullList({ filter: finalFilter })
 }
 
 export const getColaboradoresPaginated = async (
