@@ -18,6 +18,7 @@ import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
 import { UploadFotosModal } from '@/components/UploadFotosModal'
 import { ExportFolhaModal } from '@/components/ExportFolhaModal'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
+import logoImg from '@/assets/sem-nome-190-50-px-4ee9e.png'
 
 export function Header() {
   const { user, logout } = useAuth()
@@ -38,17 +39,12 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-4 md:gap-8">
-          <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white">
-            <div className="bg-gradient-to-tr from-mint to-mint-light p-2 rounded-lg text-white shadow-sm">
-              {user.role === 'Administrador' ? (
-                <LayoutDashboard size={20} />
-              ) : user.role === 'DP' ? (
-                <CameraIcon size={20} />
-              ) : (
-                <Camera size={20} />
-              )}
-            </div>
-            <span className="hidden sm:inline">Via Sudeste</span>
+          <div className="flex items-center">
+            <img
+              src={logoImg}
+              alt="Via Sudeste"
+              className="h-[36px] md:h-[44px] w-auto object-contain"
+            />
           </div>
 
           {user.role === 'Administrador' ? (
