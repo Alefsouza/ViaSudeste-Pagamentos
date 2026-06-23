@@ -103,8 +103,8 @@ export default function Dashboard() {
   const [paymentToCancel, setPaymentToCancel] = useState<any>(null)
   const [maxRef, setMaxRef] = useState<number>(0)
   const [filters, setFilters] = useState({
-    startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
-    endDate: format(new Date(), 'yyyy-MM-dd'),
+    startDate: '',
+    endDate: '',
     filial: 'Todas',
     search: '',
     status: 'Todos',
@@ -336,12 +336,17 @@ export default function Dashboard() {
 
       if (selectedChartDate) {
         let dateKey: string | null = null
-        if (
+        let rawDate =
           curr.data_pagamento &&
           curr.data_pagamento.trim() !== '-' &&
           curr.data_pagamento.trim() !== ''
-        ) {
-          let str = curr.data_pagamento.trim()
+            ? curr.data_pagamento.trim()
+            : curr.data && curr.data.trim() !== '-'
+              ? curr.data.trim()
+              : ''
+
+        if (rawDate) {
+          let str = rawDate
           if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
             dateKey = str
           } else if (str.includes('/')) {
@@ -473,12 +478,17 @@ export default function Dashboard() {
       if (status !== 'Confirmado') return acc
 
       let dateKey: string | null = null
-      if (
+      let rawDate =
         curr.data_pagamento &&
         curr.data_pagamento.trim() !== '-' &&
         curr.data_pagamento.trim() !== ''
-      ) {
-        let str = curr.data_pagamento.trim()
+          ? curr.data_pagamento.trim()
+          : curr.data && curr.data.trim() !== '-'
+            ? curr.data.trim()
+            : ''
+
+      if (rawDate) {
+        let str = rawDate
         if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
           dateKey = str
         } else if (str.includes('/')) {

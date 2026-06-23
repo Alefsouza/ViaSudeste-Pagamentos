@@ -50,17 +50,22 @@ const buildFilterString = (filters: any, prefix = '') => {
   }
 
   if (filters.data_pagamento_text) {
-    conditions.push(`${prefix}data_pagamento ~ "${filters.data_pagamento_text}"`)
+    conditions.push(
+      `(${prefix}data_pagamento ~ "${filters.data_pagamento_text}" || ${prefix}data ~ "${filters.data_pagamento_text}")`,
+    )
   } else if (filters.startDate && filters.startDate === filters.endDate) {
     const d = filters.startDate.split('-')
     if (d.length === 3) {
-      conditions.push(`${prefix}data_pagamento = "${d[2]}/${d[1]}/${d[0]}"`)
+      conditions.push(
+        `(${prefix}data_pagamento = "${d[2]}/${d[1]}/${d[0]}" || ${prefix}data = "${d[2]}/${d[1]}/${d[0]}")`,
+      )
     }
   } else if (filters.startDate && filters.endDate) {
     const dates = getDatesInRange(filters.startDate, filters.endDate)
     if (dates.length > 0) {
-      const dateFilters = dates.map((d) => `${prefix}data_pagamento = "${d}"`).join(' || ')
-      conditions.push(`(${dateFilters})`)
+      const dateFiltersPag = dates.map((d) => `${prefix}data_pagamento = "${d}"`).join(' || ')
+      const dateFiltersData = dates.map((d) => `${prefix}data = "${d}"`).join(' || ')
+      conditions.push(`((${dateFiltersPag}) || (${dateFiltersData}))`)
     } else {
       conditions.push(`${prefix}data_pagamento = "NON_EXISTENT"`)
     }
