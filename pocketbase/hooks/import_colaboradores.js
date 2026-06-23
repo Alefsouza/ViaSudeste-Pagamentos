@@ -41,6 +41,10 @@ routerAdd(
             record.set('referencia', body.referencia)
           }
 
+          if (item.liberado_pagamento === undefined) {
+            record.set('liberado_pagamento', true)
+          }
+
           txApp.save(record)
           count++
         } catch (err) {
@@ -48,6 +52,28 @@ routerAdd(
             `Erro na linha (Registro: ${item.registro || 'desconhecido'}): ${err.message}`,
           )
         }
+      }
+
+      try {
+        txApp
+          .db()
+          .newQuery(`
+          UPDATE colaboradores
+          SET liberado_pagamento = 0
+          WHERE (
+            referencia IS NULL
+            OR referencia NOT IN (
+              SELECT DISTINCT referencia
+              FROM colaboradores
+              WHERE referencia IS NOT NULL
+              ORDER BY referencia DESC
+              LIMIT 4
+            )
+          ) AND liberado_pagamento = 1
+        `)
+          .execute()
+      } catch (err) {
+        console.log('Erro na limpeza de referencias antigas:', err.message)
       }
     })
 
