@@ -1077,9 +1077,6 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="flex items-center flex-wrap gap-2">
                 Transações de Pagamentos
-                <Badge variant="secondary" className="font-normal text-xs">
-                  Ordenado por Referência <ArrowDown className="w-3 h-3 ml-1" />
-                </Badge>
                 {(selectedChartFilial ||
                   selectedChartDate ||
                   selectedChartRef ||
