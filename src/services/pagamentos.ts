@@ -61,3 +61,96 @@ export const getPagamentosTotals = async (filters: any) => {
 
   return { pago, pendente }
 }
+
+export const getPagamentosPaginated = async (page: number, perPage: number, filters: any) => {
+  const filterConditions: string[] = []
+
+  if (filters.search) {
+    filterConditions.push(
+      `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
+    )
+  }
+
+  if (filters.status && filters.status !== 'Todos') {
+    filterConditions.push(`status = "${filters.status}"`)
+  }
+
+  if (filters.tipoPagamento && filters.tipoPagamento !== 'Todos') {
+    filterConditions.push(`idtipopgto = ${filters.tipoPagamento}`)
+  }
+
+  if (filters.filial && filters.filial !== 'Todas') {
+    const filialId = filters.filial === 'Cursino' ? 1 : filters.filial === 'Sapopemba' ? 2 : null
+    if (filialId !== null) {
+      filterConditions.push(`(filial = ${filialId} || colaborador_id.filial = "${filters.filial}")`)
+    } else {
+      filterConditions.push(`colaborador_id.filial = "${filters.filial}"`)
+    }
+  }
+
+  if (filters.referencia && filters.referencia !== 'Todas') {
+    filterConditions.push(`colaborador_id.referencia = ${filters.referencia}`)
+  }
+
+  if (filters.startDate) {
+    filterConditions.push(`data_pagamento >= "${filters.startDate} 00:00:00"`)
+  }
+
+  if (filters.endDate) {
+    filterConditions.push(`data_pagamento <= "${filters.endDate} 23:59:59"`)
+  }
+
+  const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : ''
+
+  return pb.collection('pagamentos').getList(page, perPage, {
+    filter: filterString,
+    sort: '-data_pagamento',
+    expand: 'colaborador_id',
+  })
+}
+
+export const getPagamentosAnalytics = async (filters: any) => {
+  const filterConditions: string[] = []
+
+  if (filters.search) {
+    filterConditions.push(
+      `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
+    )
+  }
+
+  if (filters.status && filters.status !== 'Todos') {
+    filterConditions.push(`status = "${filters.status}"`)
+  }
+
+  if (filters.tipoPagamento && filters.tipoPagamento !== 'Todos') {
+    filterConditions.push(`idtipopgto = ${filters.tipoPagamento}`)
+  }
+
+  if (filters.filial && filters.filial !== 'Todas') {
+    const filialId = filters.filial === 'Cursino' ? 1 : filters.filial === 'Sapopemba' ? 2 : null
+    if (filialId !== null) {
+      filterConditions.push(`(filial = ${filialId} || colaborador_id.filial = "${filters.filial}")`)
+    } else {
+      filterConditions.push(`colaborador_id.filial = "${filters.filial}"`)
+    }
+  }
+
+  if (filters.referencia && filters.referencia !== 'Todas') {
+    filterConditions.push(`colaborador_id.referencia = ${filters.referencia}`)
+  }
+
+  if (filters.startDate) {
+    filterConditions.push(`data_pagamento >= "${filters.startDate} 00:00:00"`)
+  }
+
+  if (filters.endDate) {
+    filterConditions.push(`data_pagamento <= "${filters.endDate} 23:59:59"`)
+  }
+
+  const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : ''
+
+  return pb.collection('pagamentos').getFullList({
+    filter: filterString,
+    expand: 'colaborador_id',
+  })
+}

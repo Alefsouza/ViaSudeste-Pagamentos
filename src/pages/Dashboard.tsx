@@ -51,7 +51,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { getColaboradoresPaginated, getColaboradoresAnalytics } from '@/services/colaboradores'
+import { getPagamentosPaginated, getPagamentosAnalytics } from '@/services/pagamentos'
 import { useRealtime } from '@/hooks/use-realtime'
 import { format, subDays } from 'date-fns'
 import { useAuth } from '@/hooks/use-auth'
@@ -81,14 +81,18 @@ export const getEvaluatedStatus = (curr: any, maxRef: number) => {
     status = 'Pendente'
   }
 
+  const liberadoPagamento =
+    curr.liberado_pagamento ?? curr.expand?.colaborador_id?.liberado_pagamento
+  const dataLiberacao = curr.data_liberacao || curr.expand?.colaborador_id?.data_liberacao
+  const ref = curr.referencia || curr.expand?.colaborador_id?.referencia || 0
+
   if (status === 'Pendente' && curr.pagStatus !== 'Pendente') {
-    const isLocked = checkIsLocked(curr.data_liberacao)
-    const ref = curr.referencia || 0
+    const isLocked = checkIsLocked(dataLiberacao)
     const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
 
     if (isLocked) {
       status = 'Agendado'
-    } else if (isOutsideWindow && !curr.liberado_pagamento) {
+    } else if (isOutsideWindow && !liberadoPagamento) {
       status = 'Bloqueado'
     }
   }
@@ -173,7 +177,7 @@ export default function Dashboard() {
     setStatsLoading(true)
     setError(false)
     try {
-      const stats = await getColaboradoresAnalytics(debouncedFilters)
+      const stats = await getPagamentosAnalytics(debouncedFilters)
       setStatsData(stats)
     } catch (e: any) {
       setError(true)
@@ -197,11 +201,6 @@ export default function Dashboard() {
       }
 
       if (selectedChartDate) {
-        // Automatically convert ISO to DD/MM/YYYY text format before querying
-        const parts = selectedChartDate.split('-')
-        if (parts.length === 3) {
-          tableFiltersForAPI.data_pagamento_text = `${parts[2]}/${parts[1]}/${parts[0]}`
-        }
         tableFiltersForAPI.startDate = selectedChartDate
         tableFiltersForAPI.endDate = selectedChartDate
       }
@@ -210,7 +209,7 @@ export default function Dashboard() {
         tableFiltersForAPI.referencia = selectedChartRef
       }
 
-      const paginated = await getColaboradoresPaginated(page, 20, tableFiltersForAPI)
+      const paginated = await getPagamentosPaginated(page, 20, tableFiltersForAPI)
       setTableData(paginated)
     } catch (e: any) {
       // Error is caught by loadStats generally, preventing double toast
@@ -264,8 +263,11 @@ export default function Dashboard() {
 
   const handleToggleRelease = async (payment: any) => {
     try {
-      const newStatus = !payment.liberado_pagamento
-      await pb.collection('colaboradores').update(payment.id, { liberado_pagamento: newStatus })
+      const liberadoPagamento =
+        payment.liberado_pagamento ?? payment.expand?.colaborador_id?.liberado_pagamento
+      const newStatus = !liberadoPagamento
+      const targetId = payment.colaborador_id || payment.id
+      await pb.collection('colaboradores').update(targetId, { liberado_pagamento: newStatus })
       toast({
         title: newStatus ? 'Pagamento liberado com sucesso.' : 'Pagamento bloqueado com sucesso.',
       })
@@ -281,19 +283,9 @@ export default function Dashboard() {
   const handleDeletePayment = async () => {
     if (!paymentToCancel) return
     try {
-      const colabId = paymentToCancel.id
+      await pb.collection('pagamentos').delete(paymentToCancel.id)
 
-      const pagamentos = await pb.collection('pagamentos').getFullList({
-        filter: `colaborador_id = "${colabId}"`,
-      })
-
-      for (const pag of pagamentos) {
-        await pb.collection('pagamentos').delete(pag.id)
-      }
-
-      await pb.collection('colaboradores').delete(colabId)
-
-      toast({ title: 'Registro e pagamentos associados excluídos com sucesso!' })
+      toast({ title: 'Pagamento excluído com sucesso!' })
       setPaymentToCancel(null)
       refreshAll()
     } catch (err: any) {
@@ -316,7 +308,8 @@ export default function Dashboard() {
       setKnownRefs((prev) => {
         const next = new Set(prev)
         statsData.forEach((c) => {
-          if (c.referencia != null) next.add(c.referencia)
+          const actualRef = c.referencia ?? c.expand?.colaborador_id?.referencia
+          if (actualRef != null) next.add(actualRef)
         })
         return next
       })
@@ -333,15 +326,23 @@ export default function Dashboard() {
   // Derived filtered stats for Summary Cards based on interactive chart selections
   const filteredStatsData = useMemo(() => {
     return statsData.filter((curr) => {
-      if (selectedChartFilial && (curr.filial || 'Outra') !== selectedChartFilial) return false
+      const filialStr =
+        curr.filial === 1
+          ? 'Cursino'
+          : curr.filial === 2
+            ? 'Sapopemba'
+            : curr.filial || curr.expand?.colaborador_id?.filial || 'Outra'
+      if (selectedChartFilial && filialStr !== selectedChartFilial) return false
 
       if (selectedChartRef) {
-        const cRef = curr.referencia ? String(curr.referencia) : 'N/A'
+        const actualRef = curr.referencia ?? curr.expand?.colaborador_id?.referencia
+        const cRef = actualRef != null ? String(actualRef) : 'N/A'
         if (cRef !== selectedChartRef) return false
       }
 
       if (chartRefSearch) {
-        const cRef = curr.referencia ? String(curr.referencia) : 'N/A'
+        const actualRef = curr.referencia ?? curr.expand?.colaborador_id?.referencia
+        const cRef = actualRef != null ? String(actualRef) : 'N/A'
         if (!cRef.toLowerCase().includes(chartRefSearch.toLowerCase())) return false
       }
 
@@ -385,7 +386,7 @@ export default function Dashboard() {
   const pagamentosTotals = useMemo(() => {
     return filteredStatsData.reduce(
       (acc, curr) => {
-        const val = curr.valor_a_receber || curr.valor || 0
+        const val = curr.valor_pago || curr.valor_a_receber || curr.valor || 0
         let status = getEvaluatedStatus(curr, maxRef)
 
         let acronym = ''
@@ -474,8 +475,14 @@ export default function Dashboard() {
   // Chart Data Preparation (using full statsData so context remains visible)
   const pieDataMap = statsData.reduce(
     (acc, curr) => {
-      const filial = curr.filial || 'Outra'
-      acc[filial] = (acc[filial] || 0) + (curr.valor_a_receber || curr.valor || 0)
+      const filialStr =
+        curr.filial === 1
+          ? 'Cursino'
+          : curr.filial === 2
+            ? 'Sapopemba'
+            : curr.filial || curr.expand?.colaborador_id?.filial || 'Outra'
+      acc[filialStr] =
+        (acc[filialStr] || 0) + (curr.valor_pago || curr.valor_a_receber || curr.valor || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -519,7 +526,8 @@ export default function Dashboard() {
 
       if (!dateKey) return acc
 
-      acc[dateKey] = (acc[dateKey] || 0) + (curr.valor_a_receber || curr.valor || 0)
+      acc[dateKey] =
+        (acc[dateKey] || 0) + (curr.valor_pago || curr.valor_a_receber || curr.valor || 0)
       return acc
     },
     {} as Record<string, number>,
@@ -538,14 +546,16 @@ export default function Dashboard() {
 
   const refDataMap = statsData.reduce(
     (acc, curr) => {
-      const ref = curr.referencia ? String(curr.referencia) : 'N/A'
+      const actualRef = curr.referencia ?? curr.expand?.colaborador_id?.referencia
+      const ref = actualRef != null ? String(actualRef) : 'N/A'
+
       if (chartRefSearch && !ref.toLowerCase().includes(chartRefSearch.toLowerCase())) {
         return acc
       }
       if (!acc[ref]) {
         acc[ref] = { total: 0, periodo_inicio: null, periodo_fim: null }
       }
-      acc[ref].total += curr.valor_a_receber || curr.valor || 0
+      acc[ref].total += curr.valor_pago || curr.valor_a_receber || curr.valor || 0
 
       if (!acc[ref].periodo_inicio) {
         acc[ref].periodo_inicio =
@@ -1030,16 +1040,7 @@ export default function Dashboard() {
                         if (e && e.activePayload && e.activePayload.length > 0) {
                           const rawDate = e.activePayload[0].payload.date
                           if (rawDate) {
-                            let formattedForFilter = rawDate
-                            if (rawDate.includes('-')) {
-                              const parts = rawDate.split('T')[0].split('-')
-                              if (parts.length === 3 && parts[0].length === 4) {
-                                formattedForFilter = `${parts[2]}/${parts[1]}/${parts[0]}`
-                              }
-                            }
-                            setSelectedChartDate((prev: any) =>
-                              prev === formattedForFilter ? null : formattedForFilter,
-                            )
+                            setSelectedChartDate((prev: any) => (prev === rawDate ? null : rawDate))
                             setPage(1)
                           }
                         }
@@ -1171,13 +1172,17 @@ export default function Dashboard() {
                                       {p.registro || p.expand?.colaborador_id?.registro || '-'}
                                     </TableCell>
                                     <TableCell>
-                                      {p.filial || p.expand?.colaborador_id?.filial || '-'}
+                                      {p.filial === 1
+                                        ? 'Cursino'
+                                        : p.filial === 2
+                                          ? 'Sapopemba'
+                                          : p.filial || p.expand?.colaborador_id?.filial || '-'}
                                     </TableCell>
                                     <TableCell>
-                                      {p.referencia || p.expand?.colaborador_id?.referencia || '-'}
+                                      {p.referencia ?? p.expand?.colaborador_id?.referencia ?? '-'}
                                     </TableCell>
                                     <TableCell className="text-emerald-600 dark:text-emerald-500 font-medium text-left">
-                                      {formatBRL(p.valor_a_receber || p.valor)}
+                                      {formatBRL(p.valor_pago || p.valor_a_receber || p.valor || 0)}
                                     </TableCell>
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
                                     <TableCell>{formatLocalTime(p.data_pagamento)}</TableCell>
@@ -1205,7 +1210,10 @@ export default function Dashboard() {
                                                 <TooltipContent>
                                                   <p>
                                                     Liberado em:{' '}
-                                                    {formatDateDBToBR(p.data_liberacao)}
+                                                    {formatDateDBToBR(
+                                                      p.data_liberacao ||
+                                                        p.expand?.colaborador_id?.data_liberacao,
+                                                    )}
                                                   </p>
                                                 </TooltipContent>
                                               </Tooltip>
@@ -1251,13 +1259,15 @@ export default function Dashboard() {
                                         {(() => {
                                           const status = getEvaluatedStatus(p, maxRef)
 
+                                          const actualRef =
+                                            p.referencia ?? p.expand?.colaborador_id?.referencia
                                           const isOutsideValidity =
-                                            p.referencia && maxRef > 0 && p.referencia < maxRef - 3
+                                            actualRef && maxRef > 0 && actualRef < maxRef - 3
 
-                                          // If it explicitly was set to Pendente, it shouldn't show the Liberar/Bloquear button
-                                          // because it's already bypassing rules. But to be safe and match UI consistency,
-                                          // we show the button if it's considered outside validity, though it acts unlocked.
-                                          // Actually, if status is 'Pendente' (explicitly or legitimately), we allow toggling.
+                                          const liberadoPagamento =
+                                            p.liberado_pagamento ??
+                                            p.expand?.colaborador_id?.liberado_pagamento
+
                                           return (
                                             <div className="flex justify-center gap-1">
                                               {(status === 'Pendente' || status === 'Bloqueado') &&
@@ -1267,18 +1277,18 @@ export default function Dashboard() {
                                                     size="icon"
                                                     className={cn(
                                                       'hover:bg-amber-100 dark:hover:bg-amber-900/50',
-                                                      p.liberado_pagamento
+                                                      liberadoPagamento
                                                         ? 'text-emerald-500 hover:text-emerald-700'
                                                         : 'text-amber-500 hover:text-amber-700',
                                                     )}
                                                     onClick={() => handleToggleRelease(p)}
                                                     title={
-                                                      p.liberado_pagamento
+                                                      liberadoPagamento
                                                         ? 'Bloquear Pagamento'
                                                         : 'Liberar Pagamento'
                                                     }
                                                   >
-                                                    {p.liberado_pagamento ? (
+                                                    {liberadoPagamento ? (
                                                       <Lock className="h-4 w-4" />
                                                     ) : (
                                                       <Unlock className="h-4 w-4" />
@@ -1342,7 +1352,7 @@ export default function Dashboard() {
                                       {p.nome || p.expand?.colaborador_id?.nome || 'Desconhecido'}
                                     </span>
                                     <span className="text-emerald-600 dark:text-emerald-500">
-                                      {formatBRL(p.valor_a_receber || p.valor)}
+                                      {formatBRL(p.valor_pago || p.valor_a_receber || p.valor || 0)}
                                     </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
@@ -1350,8 +1360,14 @@ export default function Dashboard() {
                                       Reg: {p.registro || p.expand?.colaborador_id?.registro || '-'}
                                     </span>
                                     <span>
-                                      {p.filial || p.expand?.colaborador_id?.filial || '-'}
-                                      {p.referencia ? ` (Ref: ${p.referencia})` : ''}
+                                      {p.filial === 1
+                                        ? 'Cursino'
+                                        : p.filial === 2
+                                          ? 'Sapopemba'
+                                          : p.filial || p.expand?.colaborador_id?.filial || '-'}
+                                      {(p.referencia ?? p.expand?.colaborador_id?.referencia)
+                                        ? ` (Ref: ${p.referencia ?? p.expand?.colaborador_id?.referencia})`
+                                        : ''}
                                     </span>
                                   </div>
                                   <div className="text-sm text-muted-foreground flex justify-between">
@@ -1386,7 +1402,10 @@ export default function Dashboard() {
                                                 <TooltipContent>
                                                   <p>
                                                     Liberado em:{' '}
-                                                    {formatDateDBToBR(p.data_liberacao)}
+                                                    {formatDateDBToBR(
+                                                      p.data_liberacao ||
+                                                        p.expand?.colaborador_id?.data_liberacao,
+                                                    )}
                                                   </p>
                                                 </TooltipContent>
                                               </Tooltip>
@@ -1430,8 +1449,14 @@ export default function Dashboard() {
                                         (() => {
                                           const status = getEvaluatedStatus(p, maxRef)
 
+                                          const actualRef =
+                                            p.referencia ?? p.expand?.colaborador_id?.referencia
                                           const isOutsideValidity =
-                                            p.referencia && maxRef > 0 && p.referencia < maxRef - 3
+                                            actualRef && maxRef > 0 && actualRef < maxRef - 3
+
+                                          const liberadoPagamento =
+                                            p.liberado_pagamento ??
+                                            p.expand?.colaborador_id?.liberado_pagamento
 
                                           return (
                                             <>
@@ -1442,23 +1467,23 @@ export default function Dashboard() {
                                                     size="sm"
                                                     className={cn(
                                                       'px-2 hover:bg-amber-100 dark:hover:bg-amber-900/50',
-                                                      p.liberado_pagamento
+                                                      liberadoPagamento
                                                         ? 'text-emerald-500 hover:text-emerald-700'
                                                         : 'text-amber-500 hover:text-amber-700',
                                                     )}
                                                     onClick={() => handleToggleRelease(p)}
                                                     title={
-                                                      p.liberado_pagamento
+                                                      liberadoPagamento
                                                         ? 'Bloquear Pagamento'
                                                         : 'Liberar Pagamento'
                                                     }
                                                   >
-                                                    {p.liberado_pagamento ? (
+                                                    {liberadoPagamento ? (
                                                       <Lock className="h-4 w-4 mr-2" />
                                                     ) : (
                                                       <Unlock className="h-4 w-4 mr-2" />
                                                     )}
-                                                    {p.liberado_pagamento ? 'Bloquear' : 'Liberar'}
+                                                    {liberadoPagamento ? 'Bloquear' : 'Liberar'}
                                                   </Button>
                                                 )}
                                               {(status === 'Pendente' ||
@@ -1551,10 +1576,7 @@ export default function Dashboard() {
             <DialogTitle>Excluir Pagamento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p>
-              Tem certeza que deseja excluir este registro e todos os pagamentos associados? Esta
-              ação não pode ser desfeita.
-            </p>
+            <p>Tem certeza que deseja excluir este pagamento? Esta ação não pode ser desfeita.</p>
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md space-y-2 text-sm border">
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Colaborador:</span>
@@ -1583,7 +1605,13 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Filial:</span>
-                <span>{paymentToCancel?.filial}</span>
+                <span>
+                  {paymentToCancel?.filial === 1
+                    ? 'Cursino'
+                    : paymentToCancel?.filial === 2
+                      ? 'Sapopemba'
+                      : paymentToCancel?.filial || paymentToCancel?.expand?.colaborador_id?.filial}
+                </span>
               </div>
             </div>
           </div>
