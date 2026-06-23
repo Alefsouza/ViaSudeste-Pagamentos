@@ -33,14 +33,16 @@ export const getPagamentosTotals = async (filters: any) => {
     }
   }
 
+  const dateFilters: string[] = []
   if (filters.startDate) {
-    filterConditions.push(
-      `updated >= "${filters.startDate} 00:00:00" && foto_confirmacao_url != ""`,
-    )
+    dateFilters.push(`updated >= "${filters.startDate} 00:00:00"`)
   }
-
   if (filters.endDate) {
-    filterConditions.push(`updated <= "${filters.endDate} 23:59:59" && foto_confirmacao_url != ""`)
+    dateFilters.push(`updated <= "${filters.endDate} 23:59:59"`)
+  }
+  if (dateFilters.length > 0) {
+    const dStr = dateFilters.join(' && ')
+    filterConditions.push(`((${dStr} && foto_confirmacao_url != "") || foto_confirmacao_url = "")`)
   }
 
   const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : undefined
@@ -94,14 +96,16 @@ export const getPagamentosPaginated = async (page: number, perPage: number, filt
     filterConditions.push(`colaborador_id.referencia = ${filters.referencia}`)
   }
 
+  const dateFilters2: string[] = []
   if (filters.startDate) {
-    filterConditions.push(
-      `updated >= "${filters.startDate} 00:00:00" && foto_confirmacao_url != ""`,
-    )
+    dateFilters2.push(`updated >= "${filters.startDate} 00:00:00"`)
   }
-
   if (filters.endDate) {
-    filterConditions.push(`updated <= "${filters.endDate} 23:59:59" && foto_confirmacao_url != ""`)
+    dateFilters2.push(`updated <= "${filters.endDate} 23:59:59"`)
+  }
+  if (dateFilters2.length > 0) {
+    const dStr = dateFilters2.join(' && ')
+    filterConditions.push(`((${dStr} && foto_confirmacao_url != "") || foto_confirmacao_url = "")`)
   }
 
   const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : ''
@@ -143,14 +147,16 @@ export const getPagamentosAnalytics = async (filters: any) => {
     filterConditions.push(`colaborador_id.referencia = ${filters.referencia}`)
   }
 
+  const dateFilters3: string[] = []
   if (filters.startDate) {
-    filterConditions.push(
-      `updated >= "${filters.startDate} 00:00:00" && foto_confirmacao_url != ""`,
-    )
+    dateFilters3.push(`updated >= "${filters.startDate} 00:00:00"`)
   }
-
   if (filters.endDate) {
-    filterConditions.push(`updated <= "${filters.endDate} 23:59:59" && foto_confirmacao_url != ""`)
+    dateFilters3.push(`updated <= "${filters.endDate} 23:59:59"`)
+  }
+  if (dateFilters3.length > 0) {
+    const dStr = dateFilters3.join(' && ')
+    filterConditions.push(`((${dStr} && foto_confirmacao_url != "") || foto_confirmacao_url = "")`)
   }
 
   const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : ''

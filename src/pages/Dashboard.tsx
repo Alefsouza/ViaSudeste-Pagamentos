@@ -52,13 +52,11 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  getColaboradoresPaginated,
   getColaboradoresAnalytics,
   fetchPagamentosForColabs,
   getPagamentosForColaboradoresFilter,
 } from '@/services/colaboradores'
 import { useRealtime } from '@/hooks/use-realtime'
-import { format, subDays } from 'date-fns'
 import { useAuth } from '@/hooks/use-auth'
 import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -117,11 +115,9 @@ export default function Dashboard() {
   const [page, setPage] = useState(1)
 
   const [statsLoading, setStatsLoading] = useState(true)
-  const [tableLoading, setTableLoading] = useState(true)
   const [error, setError] = useState(false)
 
   const [statsData, setStatsData] = useState<any[]>([])
-  const [tableData, setTableData] = useState<any>(null)
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
 
   // Chart Interactive Filters
@@ -143,15 +139,25 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [filters])
 
-  const loadStats = async () => {
+  const loadData = async () => {
     setStatsLoading(true)
     setError(false)
     try {
-      const stats = await getColaboradoresAnalytics(debouncedFilters)
-      const pags = await getPagamentosForColaboradoresFilter(debouncedFilters)
+      // Fetch all core data ignoring date and status, so we can do complex merged filtering on the frontend
+      const apiFilters = {
+        ...debouncedFilters,
+        startDate: '',
+        endDate: '',
+        status: 'Todos',
+      }
 
-      const mergedStats = stats.map((colab) => {
-        const pag = pags.find((p) => p.colaborador_id === colab.id && p.status === 'Confirmado')
+      const stats = await getColaboradoresAnalytics(apiFilters)
+      const pags = await getPagamentosForColaboradoresFilter(apiFilters)
+
+      const mergedStats = stats.map((colab: any) => {
+        const pag = pags.find(
+          (p: any) => p.colaborador_id === colab.id && p.status === 'Confirmado',
+        )
         if (pag) {
           colab.pagamento_relacionado = pag
         }
@@ -171,51 +177,6 @@ export default function Dashboard() {
     }
   }
 
-  const loadTable = async () => {
-    setTableLoading(true)
-    try {
-      const tableFiltersForAPI = { ...debouncedFilters }
-
-      if (selectedChartFilial && selectedChartFilial !== 'Outra') {
-        tableFiltersForAPI.filial = selectedChartFilial
-      }
-
-      if (selectedChartDate) {
-        tableFiltersForAPI.startDate = selectedChartDate
-        tableFiltersForAPI.endDate = selectedChartDate
-      }
-
-      if (selectedChartRef && selectedChartRef !== 'N/A') {
-        tableFiltersForAPI.referencia = selectedChartRef
-      }
-
-      const paginated = await getColaboradoresPaginated(page, 20, tableFiltersForAPI)
-
-      const colabIds = paginated.items.map((i: any) => i.id)
-      const pags = await fetchPagamentosForColabs(colabIds)
-
-      paginated.items = paginated.items.map((colab: any) => {
-        const pag = pags
-          .filter((p) => p.colaborador_id === colab.id && p.status === 'Confirmado')
-          .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())[0]
-        if (pag) {
-          colab.pagamento_relacionado = pag
-        }
-        return colab
-      })
-
-      setTableData(paginated)
-    } catch (e: any) {
-      // Error is caught by loadStats generally, preventing double toast
-    } finally {
-      setTableLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadStats()
-  }, [debouncedFilters])
-
   const loadMaxRef = async () => {
     try {
       const rec = await pb
@@ -232,27 +193,22 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    loadTable()
+    loadData()
   }, [
-    debouncedFilters,
-    page,
-    selectedChartFilial,
-    selectedChartDate,
-    selectedChartRef,
-    chartRefSearch,
+    debouncedFilters.search,
+    debouncedFilters.filial,
+    debouncedFilters.tipoPagamento,
+    debouncedFilters.referencia,
   ])
 
   const refreshAll = useCallback(() => {
-    loadStats()
-    loadTable()
+    loadData()
     loadMaxRef()
   }, [
-    debouncedFilters,
-    page,
-    selectedChartFilial,
-    selectedChartDate,
-    selectedChartRef,
-    chartRefSearch,
+    debouncedFilters.search,
+    debouncedFilters.filial,
+    debouncedFilters.tipoPagamento,
+    debouncedFilters.referencia,
   ])
 
   const handleToggleRelease = async (payment: any) => {
@@ -315,9 +271,44 @@ export default function Dashboard() {
   const availableTipos = Array.from(knownTipos).sort()
   const availableRefs = Array.from(knownRefs).sort((a, b) => b - a)
 
-  // Derived filtered stats for Summary Cards based on interactive chart selections
-  const filteredStatsData = useMemo(() => {
+  // baseStatsData applies the global date and status filters
+  const baseStatsData = useMemo(() => {
     return statsData.filter((curr) => {
+      const evaluatedStatus = getEvaluatedStatus(curr, maxRef)
+      if (debouncedFilters.status !== 'Todos' && evaluatedStatus !== debouncedFilters.status)
+        return false
+
+      if (debouncedFilters.startDate || debouncedFilters.endDate) {
+        if (evaluatedStatus === 'Confirmado') {
+          const hasPhoto =
+            curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
+          let updatedStr = ''
+          if (hasPhoto) {
+            updatedStr = curr.pagamento_relacionado?.updated || curr.updated
+          }
+          if (updatedStr) {
+            const rawDate = updatedStr.split(' ')[0].split('T')[0]
+            if (debouncedFilters.startDate && rawDate < debouncedFilters.startDate) return false
+            if (debouncedFilters.endDate && rawDate > debouncedFilters.endDate) return false
+          } else {
+            return false
+          }
+        }
+        // If not Confirmado (e.g. Pendente), we maintain visibility by letting it pass the date filter.
+      }
+      return true
+    })
+  }, [
+    statsData,
+    debouncedFilters.status,
+    debouncedFilters.startDate,
+    debouncedFilters.endDate,
+    maxRef,
+  ])
+
+  // filteredStatsData applies the interactive chart filters on top
+  const filteredStatsData = useMemo(() => {
+    return baseStatsData.filter((curr) => {
       const filialStr =
         curr.filial === 1 ? 'Cursino' : curr.filial === 2 ? 'Sapopemba' : curr.filial || 'Outra'
       if (selectedChartFilial && filialStr !== selectedChartFilial) return false
@@ -371,7 +362,28 @@ export default function Dashboard() {
 
       return true
     })
-  }, [statsData, selectedChartFilial, selectedChartDate, selectedChartRef, chartRefSearch])
+  }, [baseStatsData, selectedChartFilial, selectedChartDate, selectedChartRef, chartRefSearch])
+
+  const tableData = useMemo(() => {
+    const sorted = [...filteredStatsData].sort((a, b) => {
+      const getUpdate = (item: any) => {
+        const hasPhoto =
+          item.pagamento_relacionado?.foto_confirmacao_url || item.foto_confirmacao_url
+        if (hasPhoto) {
+          return item.pagamento_relacionado?.updated || item.updated || ''
+        }
+        return item.created || ''
+      }
+      return new Date(getUpdate(b)).getTime() - new Date(getUpdate(a)).getTime()
+    })
+
+    const startIndex = (page - 1) * 20
+    const items = sorted.slice(startIndex, startIndex + 20)
+    return {
+      items,
+      totalPages: Math.ceil(sorted.length / 20) || 1,
+    }
+  }, [filteredStatsData, page])
 
   const pagamentosTotals = useMemo(() => {
     return filteredStatsData.reduce(
@@ -460,8 +472,8 @@ export default function Dashboard() {
   const minPago = confirmedValues.length ? Math.min(...confirmedValues) : 0
   const avgPago = confirmedValues.length ? pagamentosTotals.pago / confirmedValues.length : 0
 
-  // Chart Data Preparation
-  const pieDataMap = statsData.reduce(
+  // Chart Data Preparation using baseStatsData to show global filtered context without interactive charts applied yet
+  const pieDataMap = baseStatsData.reduce(
     (acc, curr) => {
       const filialStr =
         curr.filial === 1 ? 'Cursino' : curr.filial === 2 ? 'Sapopemba' : curr.filial || 'Outra'
@@ -473,38 +485,17 @@ export default function Dashboard() {
 
   const pieData = Object.entries(pieDataMap).map(([name, value]) => ({ name, value }))
 
-  const dailyDataMap = statsData.reduce(
+  const dailyDataMap = baseStatsData.reduce(
     (acc, curr) => {
-      const status = curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
+      const status = getEvaluatedStatus(curr, maxRef)
       if (status !== 'Confirmado') return acc
 
       let dateKey: string | null = null
       const hasPhoto = curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
-      let rawDate = ''
       if (hasPhoto) {
         const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
         if (updatedDate) {
-          rawDate = updatedDate.split(' ')[0].split('T')[0]
-        }
-      }
-
-      if (rawDate) {
-        let str = rawDate
-        if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          dateKey = str
-        } else if (str.includes('/')) {
-          const parts = str.split('/')
-          if (parts.length === 3) {
-            if (parts[2].length === 4)
-              dateKey = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-            else if (parts[0].length === 4)
-              dateKey = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
-            else dateKey = str
-          } else {
-            dateKey = str
-          }
-        } else {
-          dateKey = str
+          dateKey = updatedDate.split(' ')[0].split('T')[0]
         }
       }
 
@@ -527,7 +518,7 @@ export default function Dashboard() {
       }
     })
 
-  const refDataMap = statsData.reduce(
+  const refDataMap = baseStatsData.reduce(
     (acc, curr) => {
       const actualRef = curr.referencia
       const ref = actualRef != null ? String(actualRef) : 'N/A'
@@ -564,10 +555,10 @@ export default function Dashboard() {
       periodo_fim: data.periodo_fim,
     }))
 
-  const isEmpty = statsData.length === 0 && !statsLoading
+  const isEmpty = baseStatsData.length === 0 && !statsLoading
 
   // Group table items by Reference without aggregating their values
-  const groupedByRef = (tableData?.items || []).reduce((acc: any, item: any) => {
+  const groupedByRef = (tableData.items || []).reduce((acc: any, item: any) => {
     const ref = item.referencia
     const refStr = ref != null ? `Referência: ${ref}` : 'Sem Referência'
     if (!acc[refStr]) acc[refStr] = []
@@ -1015,51 +1006,59 @@ export default function Dashboard() {
                     config={{ total: { label: 'Total Pago', color: 'hsl(var(--primary))' } }}
                     className="h-[300px] w-full"
                   >
-                    <LineChart
-                      data={dailyData}
-                      margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                      onClick={(e: any) => {
-                        if (e && e.activePayload && e.activePayload.length > 0) {
-                          const rawDate = e.activePayload[0].payload.date
-                          if (rawDate) {
-                            setSelectedChartDate((prev: any) => (prev === rawDate ? null : rawDate))
-                            setPage(1)
+                    {dailyData.length === 0 ? (
+                      <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
+                        Nenhum pagamento confirmado no período
+                      </div>
+                    ) : (
+                      <LineChart
+                        data={dailyData}
+                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                        onClick={(e: any) => {
+                          if (e && e.activePayload && e.activePayload.length > 0) {
+                            const rawDate = e.activePayload[0].payload.date
+                            if (rawDate) {
+                              setSelectedChartDate((prev: any) =>
+                                prev === rawDate ? null : rawDate,
+                              )
+                              setPage(1)
+                            }
                           }
-                        }
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis
-                        dataKey="formattedDate"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
-                      />
-                      <ChartTooltip
-                        cursor={{
-                          stroke: 'hsl(var(--muted))',
-                          strokeWidth: 2,
-                          strokeDasharray: '3 3',
-                          fill: 'transparent',
                         }}
-                        content={<ChartTooltipContent />}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        stroke="var(--color-total)"
-                        strokeWidth={3}
-                        dot={{ r: 4, fill: 'var(--color-total)', strokeWidth: 2 }}
-                        activeDot={{ r: 8, strokeWidth: 0, fill: 'var(--color-total)' }}
-                      />
-                    </LineChart>
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="formattedDate"
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(v) => `R$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
+                        />
+                        <ChartTooltip
+                          cursor={{
+                            stroke: 'hsl(var(--muted))',
+                            strokeWidth: 2,
+                            strokeDasharray: '3 3',
+                            fill: 'transparent',
+                          }}
+                          content={<ChartTooltipContent />}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="total"
+                          stroke="var(--color-total)"
+                          strokeWidth={3}
+                          dot={{ r: 4, fill: 'var(--color-total)', strokeWidth: 2 }}
+                          activeDot={{ r: 8, strokeWidth: 0, fill: 'var(--color-total)' }}
+                        />
+                      </LineChart>
+                    )}
                   </ChartContainer>
                 )}
               </CardContent>
@@ -1086,7 +1085,7 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {tableLoading ? (
+              {statsLoading ? (
                 <div className="space-y-4">
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />
