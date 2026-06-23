@@ -366,6 +366,13 @@ export default function Dashboard() {
 
   const tableData = useMemo(() => {
     const sorted = [...filteredStatsData].sort((a, b) => {
+      const refA = a.referencia ?? -1
+      const refB = b.referencia ?? -1
+
+      if (refA !== refB) {
+        return refB - refA
+      }
+
       const getUpdate = (item: any) => {
         const hasPhoto =
           item.pagamento_relacionado?.foto_confirmacao_url || item.foto_confirmacao_url
@@ -1068,13 +1075,16 @@ export default function Dashboard() {
           {/* Table */}
           <Card>
             <CardHeader>
-              <CardTitle>
+              <CardTitle className="flex items-center flex-wrap gap-2">
                 Transações de Pagamentos
+                <Badge variant="secondary" className="font-normal text-xs">
+                  Ordenado por Referência <ArrowDown className="w-3 h-3 ml-1" />
+                </Badge>
                 {(selectedChartFilial ||
                   selectedChartDate ||
                   selectedChartRef ||
                   chartRefSearch) && (
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  <span className="text-sm font-normal text-muted-foreground">
                     (Filtro de gráfico ativo
                     {selectedChartDate
                       ? `: ${selectedChartDate.includes('/') ? selectedChartDate : selectedChartDate.split('-').reverse().join('/')}`
@@ -1101,7 +1111,9 @@ export default function Dashboard() {
                           <TableHead>Colaborador</TableHead>
                           <TableHead>Registro</TableHead>
                           <TableHead>Filial</TableHead>
-                          <TableHead>Ref</TableHead>
+                          <TableHead className="whitespace-nowrap">
+                            Ref <ArrowDown className="inline-block w-3 h-3 ml-1" />
+                          </TableHead>
                           <TableHead className="text-left">Valor</TableHead>
                           <TableHead>Tipo de Pagamento</TableHead>
                           <TableHead>Data de Pagamento</TableHead>

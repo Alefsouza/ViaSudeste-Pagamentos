@@ -104,7 +104,7 @@ export const getColaboradoresPaginated = async (
 
   return pb.collection('colaboradores').getList(page, perPage, {
     filter: filterString,
-    sort: '-created',
+    sort: '-referencia,-created',
     expand: 'colaborador_id',
   })
 }
@@ -114,7 +114,7 @@ export const getColaboradoresAnalytics = async (filters: any = {}) => {
 
   return pb.collection('colaboradores').getFullList({
     filter: filterString,
-    sort: '-created',
+    sort: '-referencia,-created',
     expand: 'colaborador_id',
   })
 }
