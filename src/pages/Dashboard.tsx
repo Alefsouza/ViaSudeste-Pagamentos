@@ -97,6 +97,8 @@ export default function Dashboard() {
   const { toast } = useToast()
   const { user } = useAuth()
   const isAdmin = user?.role === 'Administrador'
+  const isAlcimara = user?.email === 'alcimara.cabral@viasudeste.com'
+  const canManagePayments = isAdmin && isAlcimara
 
   const [paymentToCancel, setPaymentToCancel] = useState<any>(null)
   const [maxRef, setMaxRef] = useState<number>(0)
@@ -212,6 +214,14 @@ export default function Dashboard() {
   ])
 
   const handleToggleRelease = async (payment: any) => {
+    if (!isAlcimara) {
+      toast({
+        title: 'Ação não permitida',
+        description: 'Você não tem permissão para liberar pagamentos.',
+        variant: 'destructive',
+      })
+      return
+    }
     try {
       const liberadoPagamento = payment.liberado_pagamento
       const newStatus = !liberadoPagamento
@@ -231,6 +241,14 @@ export default function Dashboard() {
 
   const handleDeletePayment = async () => {
     if (!paymentToCancel) return
+    if (!isAlcimara) {
+      toast({
+        title: 'Ação não permitida',
+        description: 'Você não tem permissão para excluir registros.',
+        variant: 'destructive',
+      })
+      return
+    }
     try {
       await pb.collection('colaboradores').delete(paymentToCancel.id)
 
@@ -1125,14 +1143,16 @@ export default function Dashboard() {
                           <TableHead>Data de Pagamento</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-center">Foto</TableHead>
-                          {isAdmin && <TableHead className="text-center">Ações</TableHead>}
+                          {canManagePayments && (
+                            <TableHead className="text-center">Ações</TableHead>
+                          )}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {Object.keys(groupedByRef).length === 0 ? (
                           <TableRow>
                             <TableCell
-                              colSpan={isAdmin ? 10 : 9}
+                              colSpan={canManagePayments ? 10 : 9}
                               className="h-24 text-center text-muted-foreground"
                             >
                               {selectedChartDate
@@ -1155,7 +1175,7 @@ export default function Dashboard() {
                                   className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                                 >
                                   <TableCell
-                                    colSpan={isAdmin ? 10 : 9}
+                                    colSpan={canManagePayments ? 10 : 9}
                                     className="font-semibold text-slate-700 dark:text-slate-300"
                                   >
                                     {refName} - {totalLines}{' '}
@@ -1258,7 +1278,7 @@ export default function Dashboard() {
                                         </Button>
                                       )}
                                     </TableCell>
-                                    {isAdmin && (
+                                    {canManagePayments && (
                                       <TableCell className="text-center">
                                         {(() => {
                                           const status = getEvaluatedStatus(p, maxRef)
@@ -1449,7 +1469,7 @@ export default function Dashboard() {
                                           Foto
                                         </Button>
                                       )}
-                                      {isAdmin &&
+                                      {canManagePayments &&
                                         (() => {
                                           const status = getEvaluatedStatus(p, maxRef)
 
