@@ -119,6 +119,7 @@ export default function Dashboard() {
   const [statsLoading, setStatsLoading] = useState(true)
   const [error, setError] = useState(false)
   const [isRetrying, setIsRetrying] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
 
   const [statsData, setStatsData] = useState<any[]>([])
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
@@ -219,11 +220,11 @@ export default function Dashboard() {
         setIsRetrying(true)
         isFetchingRef.current = false
 
-        // Auto retry after 5 seconds instead of showing a hard error
+        // Auto retry after 2 seconds instead of showing a hard error (e.g. database busy during normalization)
         if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
         retryTimeoutRef.current = setTimeout(() => {
           performFetch(showLoading)
-        }, 5000)
+        }, 2000)
       }
     },
     [toast],
@@ -318,16 +319,24 @@ export default function Dashboard() {
     }
   }, [statsData])
 
-  useRealtime('colaboradores', () => scheduleRefresh(false))
-  useRealtime('pagamentos', () => scheduleRefresh(false))
+  useRealtime('colaboradores', () => scheduleRefresh(), !isImporting)
+  useRealtime('pagamentos', () => scheduleRefresh(), !isImporting)
 
   useEffect(() => {
-    window.addEventListener('import-end', scheduleRefresh)
+    const handleImportStart = () => setIsImporting(true)
+    const handleImportEnd = () => {
+      setIsImporting(false)
+      performFetch(true)
+    }
+
+    window.addEventListener('import-start', handleImportStart)
+    window.addEventListener('import-end', handleImportEnd)
     return () => {
-      window.removeEventListener('import-end', scheduleRefresh)
+      window.removeEventListener('import-start', handleImportStart)
+      window.removeEventListener('import-end', handleImportEnd)
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
     }
-  }, [scheduleRefresh])
+  }, [performFetch])
 
   const availableTipos = Array.from(knownTipos).sort()
   const availableRefs = Array.from(knownRefs).sort((a, b) => b - a)
@@ -644,7 +653,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
               Painel do Gestor
             </h1>
-            {isRetrying && (
+            {(isRetrying || isImporting) && (
               <Badge
                 variant="outline"
                 className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 animate-pulse flex items-center gap-1.5"
@@ -669,7 +678,9 @@ export default function Dashboard() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Atualizando dados...
+                {isImporting
+                  ? 'Importação em andamento...'
+                  : 'Finalizando sincronização de dados...'}
               </Badge>
             )}
           </div>
