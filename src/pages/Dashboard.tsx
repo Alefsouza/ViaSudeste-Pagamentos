@@ -328,7 +328,7 @@ export default function Dashboard() {
   const filteredStatsData = useMemo(() => {
     return baseStatsData.filter((curr) => {
       const filialStr =
-        curr.filial === 1 ? 'Cursino' : curr.filial === 2 ? 'Sapopemba' : curr.filial || 'Outra'
+        curr.filial === 2 ? 'Cursino' : curr.filial === 4 ? 'Sapopemba' : curr.filial || 'Outra'
       if (selectedChartFilial && filialStr !== selectedChartFilial) return false
 
       if (selectedChartRef) {
@@ -501,7 +501,7 @@ export default function Dashboard() {
   const pieDataMap = baseStatsData.reduce(
     (acc, curr) => {
       const filialStr =
-        curr.filial === 1 ? 'Cursino' : curr.filial === 2 ? 'Sapopemba' : curr.filial || 'Outra'
+        curr.filial === 2 ? 'Cursino' : curr.filial === 4 ? 'Sapopemba' : curr.filial || 'Outra'
       acc[filialStr] = (acc[filialStr] || 0) + getActualValue(curr)
       return acc
     },
@@ -1189,9 +1189,9 @@ export default function Dashboard() {
                                     </TableCell>
                                     <TableCell>{p.registro || '-'}</TableCell>
                                     <TableCell>
-                                      {p.filial === 1
+                                      {p.filial === 2
                                         ? 'Cursino'
-                                        : p.filial === 2
+                                        : p.filial === 4
                                           ? 'Sapopemba'
                                           : p.filial || '-'}
                                     </TableCell>
@@ -1377,9 +1377,9 @@ export default function Dashboard() {
                                   <div className="text-sm text-muted-foreground flex justify-between">
                                     <span>Reg: {p.registro || '-'}</span>
                                     <span>
-                                      {p.filial === 1
+                                      {p.filial === 2
                                         ? 'Cursino'
-                                        : p.filial === 2
+                                        : p.filial === 4
                                           ? 'Sapopemba'
                                           : p.filial || '-'}
                                       {p.referencia ? ` (Ref: ${p.referencia})` : ''}
@@ -1628,9 +1628,9 @@ export default function Dashboard() {
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Filial:</span>
                 <span>
-                  {paymentToCancel?.filial === 1
+                  {paymentToCancel?.filial === 2
                     ? 'Cursino'
-                    : paymentToCancel?.filial === 2
+                    : paymentToCancel?.filial === 4
                       ? 'Sapopemba'
                       : paymentToCancel?.filial}
                 </span>

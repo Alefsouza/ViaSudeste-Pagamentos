@@ -261,8 +261,8 @@ export function ImportPlanilhaModal({
             filialNumber = Number(rawFilial)
           }
           let filialMapped = ''
-          if (filialNumber === 2) filialMapped = 'Sapopemba'
-          else if (filialNumber === 3 || filialNumber === 4) filialMapped = 'Cursino'
+          if (filialNumber === 2) filialMapped = 'Cursino'
+          else if (filialNumber === 4) filialMapped = 'Sapopemba'
 
           return {
             registro: String(row['REGISTRO'] || ''),
