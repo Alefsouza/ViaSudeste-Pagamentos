@@ -12,12 +12,23 @@ import {
   Users,
   Camera as CameraIcon,
   FileDown,
+  KeyRound,
+  ChevronDown,
 } from 'lucide-react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
 import { UploadFotosModal } from '@/components/UploadFotosModal'
 import { ExportFolhaModal } from '@/components/ExportFolhaModal'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { ChangePasswordModal } from '@/components/ChangePasswordModal'
 import { Logo } from '@/components/Logo'
 
 export function Header() {
@@ -27,6 +38,7 @@ export function Header() {
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [exportFolhaModalOpen, setExportFolhaModalOpen] = useState(false)
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false)
 
   if (!user) return null
 
@@ -158,33 +170,41 @@ export function Header() {
                 ? 'DP'
                 : 'Recebedoria'}
           </Badge>
-          <div className="text-sm font-medium text-slate-600 dark:text-slate-300 hidden md:block">
-            {user.name}
-          </div>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleLogout}
-                  className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                  title="Sair"
-                >
-                  <LogOut size={20} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Sair do sistema</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors outline-none focus-visible:ring-2 focus-visible:ring-forest rounded-sm px-1 py-0.5">
+                <span className="max-w-[120px] truncate">{user.name}</span>
+                <ChevronDown size={14} className="text-slate-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setChangePasswordModalOpen(true)}
+                className="cursor-pointer"
+              >
+                <KeyRound size={16} className="mr-2 text-slate-500" />
+                <span>Alterar Senha</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="cursor-pointer text-rose-600 focus:text-rose-700 focus:bg-rose-50 dark:focus:bg-rose-950/30"
+              >
+                <LogOut size={16} className="mr-2" />
+                <span>Sair</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <ImportPlanilhaModal open={importModalOpen} onOpenChange={setImportModalOpen} />
       <UploadFotosModal open={uploadModalOpen} onOpenChange={setUploadModalOpen} />
       <ExportFolhaModal open={exportFolhaModalOpen} onOpenChange={setExportFolhaModalOpen} />
+      <ChangePasswordModal
+        open={changePasswordModalOpen}
+        onOpenChange={setChangePasswordModalOpen}
+      />
     </header>
   )
 }
