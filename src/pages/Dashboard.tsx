@@ -428,15 +428,20 @@ export default function Dashboard() {
         return refB - refA
       }
 
-      const getUpdate = (item: any) => {
-        const hasPhoto =
-          item.pagamento_relacionado?.foto_confirmacao_url || item.foto_confirmacao_url
-        if (hasPhoto) {
-          return item.pagamento_relacionado?.updated || item.updated || ''
-        }
-        return item.created || ''
+      const statusA = getEvaluatedStatus(a, maxRef)
+      const statusB = getEvaluatedStatus(b, maxRef)
+
+      const weightA = statusA === 'Pendente' ? 0 : 1
+      const weightB = statusB === 'Pendente' ? 0 : 1
+
+      if (weightA !== weightB) {
+        return weightA - weightB
       }
-      return new Date(getUpdate(b)).getTime() - new Date(getUpdate(a)).getTime()
+
+      const regA = String(a.registro || '')
+      const regB = String(b.registro || '')
+
+      return regA.localeCompare(regB, undefined, { numeric: true })
     })
 
     const startIndex = (page - 1) * 20
@@ -445,7 +450,7 @@ export default function Dashboard() {
       items,
       totalPages: Math.ceil(sorted.length / 20) || 1,
     }
-  }, [filteredStatsData, page])
+  }, [filteredStatsData, page, maxRef])
 
   const pagamentosTotals = useMemo(() => {
     return filteredStatsData.reduce(
