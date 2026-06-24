@@ -118,6 +118,7 @@ export default function Dashboard() {
 
   const [statsLoading, setStatsLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
 
   const [statsData, setStatsData] = useState<any[]>([])
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
@@ -132,6 +133,7 @@ export default function Dashboard() {
   const isFetchingRef = useRef(false)
   const pendingRefreshRef = useRef(false)
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const debouncedFiltersRef = useRef(debouncedFilters)
 
   useEffect(() => {
@@ -204,14 +206,8 @@ export default function Dashboard() {
         setStatsData(mergedStats)
         setMaxRef(result.maxRef)
         setError(false)
-      } catch (e: any) {
-        setError(true)
-        toast({
-          title: 'Erro de conexão',
-          description: e.response?.message || 'Falha ao carregar as estatísticas.',
-          variant: 'destructive',
-        })
-      } finally {
+        setIsRetrying(false)
+
         isFetchingRef.current = false
         if (showLoading) setStatsLoading(false)
 
@@ -219,6 +215,15 @@ export default function Dashboard() {
           pendingRefreshRef.current = false
           performFetch(false)
         }
+      } catch (e: any) {
+        setIsRetrying(true)
+        isFetchingRef.current = false
+
+        // Auto retry after 5 seconds instead of showing a hard error
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = setTimeout(() => {
+          performFetch(showLoading)
+        }, 5000)
       }
     },
     [toast],
@@ -320,6 +325,7 @@ export default function Dashboard() {
     window.addEventListener('import-end', scheduleRefresh)
     return () => {
       window.removeEventListener('import-end', scheduleRefresh)
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
     }
   }, [scheduleRefresh])
 
@@ -506,18 +512,6 @@ export default function Dashboard() {
     )
   }, [filteredStatsData])
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center p-12 space-y-4 h-full">
-        <AlertCircle className="h-12 w-12 text-rose-500" />
-        <p className="text-lg font-medium">Erro ao carregar dados</p>
-        <Button onClick={() => performFetch(true)} variant="outline">
-          Tentar novamente
-        </Button>
-      </div>
-    )
-  }
-
   // Calculations
   const uniqueColabs = new Set(
     filteredStatsData
@@ -646,9 +640,39 @@ export default function Dashboard() {
     <div className="container mx-auto py-8 px-4 space-y-8 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Painel do Gestor
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Painel do Gestor
+            </h1>
+            {isRetrying && (
+              <Badge
+                variant="outline"
+                className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 animate-pulse flex items-center gap-1.5"
+              >
+                <svg
+                  className="animate-spin h-3.5 w-3.5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Atualizando dados...
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">
             Analise a distribuição de pagamentos e monitore as filiais.
           </p>
