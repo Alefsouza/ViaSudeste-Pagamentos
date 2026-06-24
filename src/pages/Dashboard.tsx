@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -128,6 +128,16 @@ export default function Dashboard() {
   const [selectedChartRef, setSelectedChartRef] = useState<string | null>(null)
   const [chartRefSearch, setChartRefSearch] = useState('')
 
+  // Concurrency & Debounce Refs
+  const isFetchingRef = useRef(false)
+  const pendingRefreshRef = useRef(false)
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const debouncedFiltersRef = useRef(debouncedFilters)
+
+  useEffect(() => {
+    debouncedFiltersRef.current = debouncedFilters
+  }, [debouncedFilters])
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilters((prev) => {
@@ -141,76 +151,96 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [filters])
 
-  const loadData = async () => {
-    setStatsLoading(true)
-    setError(false)
+  const fetchCoreData = async (filtersToUse: any, retries = 3, backoff = 1000): Promise<any> => {
     try {
-      // Fetch all core data ignoring date and status, so we can do complex merged filtering on the frontend
       const apiFilters = {
-        ...debouncedFilters,
+        ...filtersToUse,
         startDate: '',
         endDate: '',
         status: 'Todos',
       }
 
-      const stats = await getColaboradoresAnalytics(apiFilters)
-      const pags = await getPagamentosForColaboradoresFilter(apiFilters)
+      const [stats, pags, maxRefRec] = await Promise.all([
+        getColaboradoresAnalytics(apiFilters),
+        getPagamentosForColaboradoresFilter(apiFilters),
+        pb
+          .collection('colaboradores')
+          .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
+          .catch(() => ({ referencia: 0 })),
+      ])
 
-      const mergedStats = stats.map((colab: any) => {
-        const pag = pags.find(
-          (p: any) => p.colaborador_id === colab.id && p.status === 'Confirmado',
-        )
-        if (pag) {
-          colab.pagamento_relacionado = pag
-        }
-        return colab
-      })
-
-      setStatsData(mergedStats)
+      return { stats, pags, maxRef: maxRefRec?.referencia || 0 }
     } catch (e: any) {
-      setError(true)
-      toast({
-        title: 'Erro de conexão',
-        description: e.response?.message || 'Falha ao carregar as estatísticas.',
-        variant: 'destructive',
-      })
-    } finally {
-      setStatsLoading(false)
+      if (e.status === 429 && retries > 0) {
+        await new Promise((r) => setTimeout(r, backoff))
+        return fetchCoreData(filtersToUse, retries - 1, backoff * 2)
+      }
+      throw e
     }
   }
 
-  const loadMaxRef = async () => {
-    try {
-      const rec = await pb
-        .collection('colaboradores')
-        .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
-      setMaxRef(rec.referencia || 0)
-    } catch (e) {
-      setMaxRef(0)
+  const performFetch = useCallback(
+    async (showLoading = true) => {
+      if (isFetchingRef.current) {
+        pendingRefreshRef.current = true
+        return
+      }
+
+      isFetchingRef.current = true
+      if (showLoading) setStatsLoading(true)
+
+      try {
+        const result = await fetchCoreData(debouncedFiltersRef.current)
+        const mergedStats = result.stats.map((colab: any) => {
+          const pag = result.pags.find(
+            (p: any) => p.colaborador_id === colab.id && p.status === 'Confirmado',
+          )
+          if (pag) {
+            colab.pagamento_relacionado = pag
+          }
+          return colab
+        })
+
+        setStatsData(mergedStats)
+        setMaxRef(result.maxRef)
+        setError(false)
+      } catch (e: any) {
+        setError(true)
+        toast({
+          title: 'Erro de conexão',
+          description: e.response?.message || 'Falha ao carregar as estatísticas.',
+          variant: 'destructive',
+        })
+      } finally {
+        isFetchingRef.current = false
+        if (showLoading) setStatsLoading(false)
+
+        if (pendingRefreshRef.current) {
+          pendingRefreshRef.current = false
+          performFetch(false)
+        }
+      }
+    },
+    [toast],
+  )
+
+  const scheduleRefresh = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
     }
-  }
+    debounceTimeoutRef.current = setTimeout(() => {
+      performFetch(false)
+    }, 1000)
+  }, [performFetch])
 
   useEffect(() => {
-    loadMaxRef()
-  }, [])
-
-  useEffect(() => {
-    loadData()
+    performFetch(true)
   }, [
     debouncedFilters.search,
     debouncedFilters.filial,
     debouncedFilters.tipoPagamento,
     debouncedFilters.referencia,
-  ])
-
-  const refreshAll = useCallback(() => {
-    loadData()
-    loadMaxRef()
-  }, [
-    debouncedFilters.search,
-    debouncedFilters.filial,
-    debouncedFilters.tipoPagamento,
-    debouncedFilters.referencia,
+    performFetch,
   ])
 
   const handleToggleRelease = async (payment: any) => {
@@ -230,7 +260,7 @@ export default function Dashboard() {
       toast({
         title: newStatus ? 'Pagamento liberado com sucesso.' : 'Pagamento bloqueado com sucesso.',
       })
-      refreshAll()
+      scheduleRefresh()
     } catch (err: any) {
       toast({
         title: 'Erro ao alterar o status do pagamento. Tente novamente.',
@@ -254,7 +284,7 @@ export default function Dashboard() {
 
       toast({ title: 'Registro excluído com sucesso!' })
       setPaymentToCancel(null)
-      refreshAll()
+      scheduleRefresh()
     } catch (err: any) {
       toast({
         title: 'Erro ao excluir o registro. Por favor, tente novamente.',
@@ -283,15 +313,15 @@ export default function Dashboard() {
     }
   }, [statsData])
 
-  useRealtime('colaboradores', refreshAll)
-  useRealtime('pagamentos', refreshAll)
+  useRealtime('colaboradores', scheduleRefresh)
+  useRealtime('pagamentos', scheduleRefresh)
 
   useEffect(() => {
-    window.addEventListener('import-end', refreshAll)
+    window.addEventListener('import-end', scheduleRefresh)
     return () => {
-      window.removeEventListener('import-end', refreshAll)
+      window.removeEventListener('import-end', scheduleRefresh)
     }
-  }, [refreshAll])
+  }, [scheduleRefresh])
 
   const availableTipos = Array.from(knownTipos).sort()
   const availableRefs = Array.from(knownRefs).sort((a, b) => b - a)
@@ -476,7 +506,7 @@ export default function Dashboard() {
       <div className="flex flex-col items-center justify-center p-12 space-y-4 h-full">
         <AlertCircle className="h-12 w-12 text-rose-500" />
         <p className="text-lg font-medium">Erro ao carregar dados</p>
-        <Button onClick={refreshAll} variant="outline">
+        <Button onClick={() => performFetch(true)} variant="outline">
           Tentar novamente
         </Button>
       </div>
