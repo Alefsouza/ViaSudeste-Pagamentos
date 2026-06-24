@@ -123,7 +123,7 @@ export default function Camera() {
     if (isNaN(libDate.getTime())) return false
 
     const now = new Date()
-    return now < libDate
+    return now.getTime() < libDate.getTime()
   }
 
   const visibleRecords = useMemo(() => {

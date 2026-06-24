@@ -39,6 +39,7 @@ export const formatBRL = (val: number) =>
 
 export const formatDateDBToBR = (dStr?: string | null) => {
   if (!dStr) return 'N/A'
+  // Isolate the YYYY-MM-DD part from ISO strings to avoid timezone shifts
   const datePart = dStr.split(' ')[0].split('T')[0]
   const parts = datePart.split('-')
   if (parts.length === 3) {
@@ -50,10 +51,19 @@ export const formatDateDBToBR = (dStr?: string | null) => {
 
 export const checkIsLocked = (dataLiberacaoStr?: string) => {
   if (!dataLiberacaoStr) return false
-  const dataLiberacaoDate = new Date(dataLiberacaoStr)
-  if (isNaN(dataLiberacaoDate.getTime())) return false
-  const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
-  const todayStr = `${agoraUtc3.getUTCFullYear()}-${String(agoraUtc3.getUTCMonth() + 1).padStart(2, '0')}-${String(agoraUtc3.getUTCDate()).padStart(2, '0')}`
-  const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${String(dataLiberacaoDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dataLiberacaoDate.getUTCDate()).padStart(2, '0')}`
-  return todayStr < libStr
+  let cleanStr = dataLiberacaoStr
+  if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
+  if (
+    !cleanStr.endsWith('Z') &&
+    cleanStr.split('T').length === 2 &&
+    !cleanStr.includes('+') &&
+    !cleanStr.match(/-\d{2}:\d{2}$/)
+  ) {
+    cleanStr += 'Z'
+  }
+  const libDate = new Date(cleanStr)
+  if (isNaN(libDate.getTime())) return false
+
+  const now = new Date()
+  return now.getTime() < libDate.getTime()
 }

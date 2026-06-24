@@ -12,14 +12,20 @@ onRecordValidate((e) => {
     const dataLiberacaoStr = colab.getString('data_liberacao')
 
     if (dataLiberacaoStr) {
-      const dataLiberacaoDate = new Date(dataLiberacaoStr)
+      let cleanStr = dataLiberacaoStr
+      if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
+      if (
+        !cleanStr.endsWith('Z') &&
+        cleanStr.split('T').length === 2 &&
+        !cleanStr.includes('+') &&
+        !cleanStr.match(/-\d{2}:\d{2}$/)
+      ) {
+        cleanStr += 'Z'
+      }
+      const dataLiberacaoDate = new Date(cleanStr)
       if (!isNaN(dataLiberacaoDate.getTime())) {
-        const agoraUtc3 = new Date(Date.now() - 3 * 3600000)
-        const pad = (n) => n.toString().padStart(2, '0')
-        const todayStr = `${agoraUtc3.getUTCFullYear()}-${pad(agoraUtc3.getUTCMonth() + 1)}-${pad(agoraUtc3.getUTCDate())}`
-        const libStr = `${dataLiberacaoDate.getUTCFullYear()}-${pad(dataLiberacaoDate.getUTCMonth() + 1)}-${pad(dataLiberacaoDate.getUTCDate())}`
-
-        if (todayStr < libStr) {
+        const now = new Date()
+        if (now.getTime() < dataLiberacaoDate.getTime()) {
           throw new BadRequestError(
             'Pagamento agendado não pode ser confirmado antes da data de liberação.',
             {
