@@ -283,6 +283,7 @@ export function ImportPlanilhaModal({
               uiPeriodoInicio || parseDateToDB(row['PERIODO_INICIO'] || row['PERIODO INICIO']),
             periodo_fim: uiPeriodoFim || parseDateToDB(row['PERIODO_FIM'] || row['PERIODO FIM']),
             referencia: refNumber,
+            liberado_pagamento: true,
           }
         })
 

@@ -59,6 +59,21 @@ routerAdd(
           .db()
           .newQuery(`
           UPDATE colaboradores
+          SET liberado_pagamento = 1
+          WHERE referencia IN (
+            SELECT DISTINCT referencia
+            FROM colaboradores
+            WHERE referencia IS NOT NULL
+            ORDER BY referencia DESC
+            LIMIT 4
+          ) AND liberado_pagamento = 0
+        `)
+          .execute()
+
+        txApp
+          .db()
+          .newQuery(`
+          UPDATE colaboradores
           SET liberado_pagamento = 0
           WHERE (
             referencia IS NULL

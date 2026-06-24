@@ -554,7 +554,16 @@ export default function Dashboard() {
   )
 
   const refData = Object.entries(refDataMap)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => {
+      const numA = Number(a)
+      const numB = Number(b)
+      const isNumA = !isNaN(numA) && a.trim() !== '' && a !== 'N/A'
+      const isNumB = !isNaN(numB) && b.trim() !== '' && b !== 'N/A'
+      if (isNumA && isNumB) return numA - numB
+      if (isNumA && !isNumB) return -1
+      if (!isNumA && isNumB) return 1
+      return a.localeCompare(b)
+    })
     .map(([ref, data]) => ({
       referenciaName: ref,
       total: data.total,
