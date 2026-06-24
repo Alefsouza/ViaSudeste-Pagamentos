@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
 
 export function ImportPlanilhaModal({
   open,
@@ -31,6 +32,7 @@ export function ImportPlanilhaModal({
   const [periodoInicio, setPeriodoInicio] = useState('')
   const [periodoFim, setPeriodoFim] = useState('')
   const [referencia, setReferencia] = useState('')
+  const [progress, setProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -287,28 +289,60 @@ export function ImportPlanilhaModal({
           }
         })
 
-        const res = await pb.send('/backend/v1/import/colaboradores', {
-          method: 'POST',
-          body: JSON.stringify({
-            data: formattedData,
-            dataLiberacao,
-            periodoInicio,
-            periodoFim,
-            referencia: refNumber,
-          }),
-        })
+        window.dispatchEvent(new Event('import-start'))
 
-        if (res.errors && res.errors.length > 0) {
-          res.errors.forEach((err: string) => toast.error(err))
+        const CHUNK_SIZE = 100
+        const totalChunks = Math.ceil(formattedData.length / CHUNK_SIZE)
+        let totalImported = 0
+        const allErrors: string[] = []
+        let failedBatch = -1
+        let lastErrorMsg = ''
+
+        for (let i = 0; i < totalChunks; i++) {
+          const chunk = formattedData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
+          try {
+            const res = await pb.send('/backend/v1/import/colaboradores', {
+              method: 'POST',
+              body: JSON.stringify({
+                data: chunk,
+                dataLiberacao,
+                periodoInicio,
+                periodoFim,
+                referencia: refNumber,
+              }),
+            })
+
+            if (res.errors && res.errors.length > 0) {
+              allErrors.push(...res.errors)
+            }
+            totalImported += res.count || chunk.length
+          } catch (chunkErr: any) {
+            failedBatch = i + 1
+            lastErrorMsg = chunkErr.response?.message || chunkErr.message || 'Falha na requisição'
+            break // Stop processing further chunks
+          }
+          setProgress(Math.round(((i + 1) / totalChunks) * 100))
         }
 
-        toast.success(`${res.count} registros importados com sucesso`)
-        onOpenChange(false)
-        setFile(null)
-        const d = new Date()
-        setDataLiberacao(
-          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-        )
+        if (failedBatch !== -1) {
+          toast.error(`Importação interrompida no lote ${failedBatch}. Erro: ${lastErrorMsg}`)
+        } else if (allErrors.length > 0) {
+          allErrors.slice(0, 5).forEach((err: string) => toast.error(err))
+          if (allErrors.length > 5) {
+            toast.error(`Mais ${allErrors.length - 5} erros ocorreram durante a importação.`)
+          }
+        }
+
+        if (totalImported > 0 || failedBatch === -1) {
+          toast.success(`${totalImported} registros importados com sucesso`)
+          onOpenChange(false)
+          setFile(null)
+          setProgress(0)
+          const d = new Date()
+          setDataLiberacao(
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+          )
+        }
       } catch (error: any) {
         const errorMsg = error.response?.message || error.message || 'Erro desconhecido'
         const isValidationError = errorMsg.includes('Arquivo invalido')
@@ -320,7 +354,9 @@ export function ImportPlanilhaModal({
           },
         })
       } finally {
+        window.dispatchEvent(new Event('import-end'))
         setLoading(false)
+        setProgress(0)
       }
     }
 
@@ -342,7 +378,8 @@ export function ImportPlanilhaModal({
     <Dialog
       open={open}
       onOpenChange={(val) => {
-        if (!loading) onOpenChange(val)
+        if (loading) return
+        onOpenChange(val)
         if (!val) {
           setFile(null)
           setConfirming(false)
@@ -350,6 +387,7 @@ export function ImportPlanilhaModal({
           setPeriodoInicio('')
           setPeriodoFim('')
           setReferencia('')
+          setProgress(0)
         }
       }}
     >
@@ -492,12 +530,24 @@ export function ImportPlanilhaModal({
                       className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
                     >
                       {loading ? (
-                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                        <span className="flex items-center gap-2 justify-center">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Importando...
+                        </span>
                       ) : (
                         'Sim, importar'
                       )}
                     </Button>
                   </div>
+                  {loading && progress > 0 && (
+                    <div className="mt-4 space-y-2 animate-fade-in-up w-full">
+                      <div className="flex justify-between text-xs text-muted-foreground px-1">
+                        <span>Progresso da importação</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

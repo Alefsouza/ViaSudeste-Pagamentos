@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { RecordModel, RecordSubscription } from 'pocketbase'
 
 import pb from '@/lib/pocketbase/client'
@@ -21,8 +21,25 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
   const callbackRef = useRef(callback)
   callbackRef.current = callback
 
+  const [isImporting, setIsImporting] = useState(false)
+
   useEffect(() => {
-    if (!enabled) return
+    const handleStart = () => setIsImporting(true)
+    const handleEnd = () => setIsImporting(false)
+
+    window.addEventListener('import-start', handleStart)
+    window.addEventListener('import-end', handleEnd)
+
+    return () => {
+      window.removeEventListener('import-start', handleStart)
+      window.removeEventListener('import-end', handleEnd)
+    }
+  }, [])
+
+  const isActuallyEnabled = enabled && !isImporting
+
+  useEffect(() => {
+    if (!isActuallyEnabled) return
 
     let unsubscribeFn: (() => Promise<void>) | undefined
     let cancelled = false
@@ -46,7 +63,7 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
         unsubscribeFn().catch(() => {})
       }
     }
-  }, [collectionName, enabled])
+  }, [collectionName, isActuallyEnabled])
 }
 
 export default useRealtime

@@ -286,6 +286,13 @@ export default function Dashboard() {
   useRealtime('colaboradores', refreshAll)
   useRealtime('pagamentos', refreshAll)
 
+  useEffect(() => {
+    window.addEventListener('import-end', refreshAll)
+    return () => {
+      window.removeEventListener('import-end', refreshAll)
+    }
+  }, [refreshAll])
+
   const availableTipos = Array.from(knownTipos).sort()
   const availableRefs = Array.from(knownRefs).sort((a, b) => b - a)
 
