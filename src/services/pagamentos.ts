@@ -15,7 +15,12 @@ export const getPagamentosTotals = async (filters: any) => {
   const filterConditions: string[] = []
 
   if (filters.search) {
-    filterConditions.push(`(nome ~ "${filters.search}" || registro ~ "${filters.search}")`)
+    const isNumeric = /^\d+$/.test(filters.search)
+    if (isNumeric) {
+      filterConditions.push(`registro = "${filters.search}"`)
+    } else {
+      filterConditions.push(`(nome ~ "${filters.search}" || registro ~ "${filters.search}")`)
+    }
   }
 
   if (filters.status && filters.status !== 'Todos') {
@@ -70,9 +75,16 @@ export const getPagamentosPaginated = async (page: number, perPage: number, filt
   const filterConditions: string[] = []
 
   if (filters.search) {
-    filterConditions.push(
-      `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
-    )
+    const isNumeric = /^\d+$/.test(filters.search)
+    if (isNumeric) {
+      filterConditions.push(
+        `(registro = "${filters.search}" || colaborador_id.registro = "${filters.search}")`,
+      )
+    } else {
+      filterConditions.push(
+        `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
+      )
+    }
   }
 
   if (filters.status && filters.status !== 'Todos') {
@@ -121,9 +133,16 @@ export const getPagamentosAnalytics = async (filters: any) => {
   const filterConditions: string[] = []
 
   if (filters.search) {
-    filterConditions.push(
-      `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
-    )
+    const isNumeric = /^\d+$/.test(filters.search)
+    if (isNumeric) {
+      filterConditions.push(
+        `(registro = "${filters.search}" || colaborador_id.registro = "${filters.search}")`,
+      )
+    } else {
+      filterConditions.push(
+        `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
+      )
+    }
   }
 
   if (filters.status && filters.status !== 'Todos') {

@@ -28,9 +28,14 @@ const buildFilterString = (filters: any, prefix = '') => {
   const conditions: string[] = []
 
   if (filters.search) {
-    conditions.push(
-      `(${prefix}nome ~ "${filters.search}" || ${prefix}registro ~ "${filters.search}")`,
-    )
+    const isNumeric = /^\d+$/.test(filters.search)
+    if (isNumeric) {
+      conditions.push(`(${prefix}registro = "${filters.search}")`)
+    } else {
+      conditions.push(
+        `(${prefix}nome ~ "${filters.search}" || ${prefix}registro ~ "${filters.search}")`,
+      )
+    }
   }
   if (filters.filial && filters.filial !== 'Todas') {
     conditions.push(`${prefix}filial = "${filters.filial}"`)
