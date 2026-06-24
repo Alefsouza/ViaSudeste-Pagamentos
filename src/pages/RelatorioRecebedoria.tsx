@@ -42,6 +42,7 @@ import {
   ChevronLeft,
   ChevronRight,
   SearchX,
+  ArrowDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatHoraString, formatHoras, getTipoPagamento, formatBRL } from '@/lib/formatters'
@@ -216,20 +217,14 @@ export default function RelatorioRecebedoria() {
 
       const fullRes = await pb.collection('pagamentos').getFullList({
         filter: filterString,
-        sort: '-created',
+        sort: '-updated',
         expand: 'colaborador_id,user_id',
       })
 
-      const sortedData = fullRes.sort((a: any, b: any) => {
-        const dateA = parseDateForSort(a.expand?.colaborador_id?.data)
-        const dateB = parseDateForSort(b.expand?.colaborador_id?.data)
-        return dateA - dateB
-      })
+      setSummaryData(fullRes)
+      setTotalItems(fullRes.length)
 
-      setSummaryData(sortedData)
-      setTotalItems(sortedData.length)
-
-      const newTotalPages = Math.ceil(sortedData.length / 20) || 1
+      const newTotalPages = Math.ceil(fullRes.length / 20) || 1
       setTotalPages(newTotalPages)
       setPage((p) => (p > newTotalPages ? newTotalPages : p))
 
@@ -342,32 +337,6 @@ export default function RelatorioRecebedoria() {
 
   const handleExport = () => {
     window.print()
-  }
-
-  const parseDateForSort = (dateStr: string | undefined | null) => {
-    if (!dateStr || dateStr === '-') return 0
-    const datePart = dateStr.split(' ')[0]
-
-    if (datePart.includes('/')) {
-      const parts = datePart.split('/')
-      if (parts.length >= 3) {
-        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime()
-      }
-    }
-
-    if (datePart.includes('-')) {
-      const parts = datePart.split('-')
-      if (parts.length >= 3) {
-        if (parts[0].length === 4) {
-          // YYYY-MM-DD
-          return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getTime()
-        } else {
-          // DD-MM-YYYY
-          return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime()
-        }
-      }
-    }
-    return 0
   }
 
   const formatDateStringSafe = (dateStr: string) => {
@@ -754,7 +723,9 @@ export default function RelatorioRecebedoria() {
                 <TableHeader className="border-b-2 border-slate-800">
                   <TableRow className="border-none">
                     <TableHead className="text-black font-bold py-3">Registro</TableHead>
-                    <TableHead className="text-black font-bold py-3">Data/Hora Pagamento</TableHead>
+                    <TableHead className="text-black font-bold py-3 whitespace-nowrap">
+                      Data/Hora Pgto <ArrowDown className="inline h-3 w-3 ml-1" />
+                    </TableHead>
                     <TableHead className="text-black font-bold py-3">Dt. Ref</TableHead>
                     <TableHead className="text-black font-bold py-3">Inicio</TableHead>
                     <TableHead className="text-black font-bold py-3">Término</TableHead>
@@ -844,7 +815,9 @@ export default function RelatorioRecebedoria() {
                     <TableHead>Registro</TableHead>
                     <TableHead>Nome</TableHead>
                     <TableHead>Dt. Ref.</TableHead>
-                    <TableHead>Data Pgto</TableHead>
+                    <TableHead className="whitespace-nowrap">
+                      Data Pgto <ArrowDown className="inline h-3 w-3 ml-1 text-slate-500" />
+                    </TableHead>
                     <TableHead>Horário</TableHead>
                     <TableHead className="text-left">Valor</TableHead>
                     <TableHead className="text-left w-[150px]">Tipo de Pagamento</TableHead>
