@@ -209,7 +209,7 @@ export default function Dashboard() {
         setIsRetrying(false)
 
         isFetchingRef.current = false
-        if (showLoading) setStatsLoading(false)
+        setStatsLoading(false)
 
         if (pendingRefreshRef.current) {
           pendingRefreshRef.current = false
@@ -265,7 +265,7 @@ export default function Dashboard() {
       toast({
         title: newStatus ? 'Pagamento liberado com sucesso.' : 'Pagamento bloqueado com sucesso.',
       })
-      scheduleRefresh()
+      scheduleRefresh(false)
     } catch (err: any) {
       toast({
         title: 'Erro ao alterar o status do pagamento. Tente novamente.',
@@ -289,7 +289,7 @@ export default function Dashboard() {
 
       toast({ title: 'Registro excluído com sucesso!' })
       setPaymentToCancel(null)
-      scheduleRefresh()
+      scheduleRefresh(false)
     } catch (err: any) {
       toast({
         title: 'Erro ao excluir o registro. Por favor, tente novamente.',
@@ -318,8 +318,8 @@ export default function Dashboard() {
     }
   }, [statsData])
 
-  useRealtime('colaboradores', scheduleRefresh)
-  useRealtime('pagamentos', scheduleRefresh)
+  useRealtime('colaboradores', () => scheduleRefresh(false))
+  useRealtime('pagamentos', () => scheduleRefresh(false))
 
   useEffect(() => {
     window.addEventListener('import-end', scheduleRefresh)
