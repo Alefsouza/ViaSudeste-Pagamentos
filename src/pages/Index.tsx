@@ -91,35 +91,51 @@ export default function Index() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-      <Card className="w-full max-w-[450px] shadow-xl rounded-2xl border-slate-200 dark:border-slate-800 animate-slide-up">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Image */}
+      <div
+        className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-1000"
+        style={{
+          backgroundImage: "url('https://img.usecurling.com/p/1920/1080?q=bus&color=black')",
+        }}
+      />
+      {/* Dark green overlay with blur */}
+      <div className="absolute inset-0 bg-forest/80 backdrop-blur-[6px]" />
+
+      <Card className="w-full max-w-[450px] relative z-10 bg-white/10 dark:bg-black/20 backdrop-blur-xl shadow-2xl rounded-2xl border-white/20 animate-slide-up text-white">
         <CardHeader className="space-y-2 text-center pb-8">
-          <Logo className="mx-auto h-16 sm:h-20 mb-6" />
-          <CardTitle className="text-2xl font-bold tracking-tight">Bem-vindo de volta</CardTitle>
-          <CardDescription className="text-base">
+          <div className="mx-auto h-20 mb-6 bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/20 shadow-inner flex items-center justify-center">
+            <Logo className="h-full w-auto drop-shadow-md text-white" />
+          </div>
+          <CardTitle className="text-2xl font-bold tracking-tight text-white drop-shadow-sm">
+            Bem-vindo de volta
+          </CardTitle>
+          <CardDescription className="text-base text-white/80">
             Insira suas credenciais para acessar o sistema.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
             {errors.form && (
-              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md border border-red-200">
+              <div className="p-3 bg-red-500/20 backdrop-blur-sm text-red-50 text-sm rounded-md border border-red-500/30 shadow-inner">
                 {errors.form}
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-white/90 font-medium">
+                Email
+              </Label>
               {isLoading ? (
-                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-11 w-full bg-white/20" />
               ) : (
                 <div>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Mail className="absolute left-3 top-3.5 h-4 w-4 text-white/60" />
                     <Input
                       id="email"
                       type="email"
                       placeholder="nome@empresa.com"
-                      className={`pl-9 focus-visible:ring-forest ${errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                      className={`h-11 pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/50 focus-visible:border-white/50 transition-all ${errors.email ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value)
@@ -128,23 +144,27 @@ export default function Index() {
                       disabled={isLoading}
                     />
                   </div>
-                  {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email}</p>}
+                  {errors.email && (
+                    <p className="text-sm text-red-300 mt-1 drop-shadow-sm">{errors.email}</p>
+                  )}
                 </div>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor="password" className="text-white/90 font-medium">
+                Senha
+              </Label>
               {isLoading ? (
-                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-11 w-full bg-white/20" />
               ) : (
                 <div>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Lock className="absolute left-3 top-3.5 h-4 w-4 text-white/60" />
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
-                      className={`pl-9 pr-10 focus-visible:ring-forest ${errors.password ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                      className={`h-11 pl-9 pr-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/50 focus-visible:border-white/50 transition-all ${errors.password ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value)
@@ -156,7 +176,7 @@ export default function Index() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute right-0 top-0 h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-transparent"
+                      className="absolute right-0 top-0.5 h-10 w-10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
                     >
@@ -164,14 +184,14 @@ export default function Index() {
                     </Button>
                   </div>
                   {errors.password && (
-                    <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+                    <p className="text-sm text-red-300 mt-1 drop-shadow-sm">{errors.password}</p>
                   )}
                 </div>
               )}
             </div>
             <Button
               type="submit"
-              className="w-full h-11 bg-forest hover:bg-forest/90 text-white transition-all active:scale-[0.98]"
+              className="w-full h-11 mt-2 bg-mint hover:bg-mint-light text-forest font-bold shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
               disabled={isLoading}
             >
               {isLoading ? (
