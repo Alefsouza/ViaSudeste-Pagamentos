@@ -18,28 +18,38 @@ export default function Index() {
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
 
-  const [bgUrl, setBgUrl] = useState('https://img.usecurling.com/p/1920/1080?q=electric%20bus')
+  const [bgUrl, setBgUrl] = useState<string | null>(null)
+  const [bgError, setBgError] = useState(false)
 
   const { login, user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
 
   useEffect(() => {
+    let mounted = true
     async function fetchBg() {
       try {
         const record = await pb
           .collection('app_settings')
           .getFirstListItem('name="login_background"')
+        if (!mounted) return
+
         if (record.file) {
           setBgUrl(pb.files.getURL(record, record.file))
         } else if (record.value) {
           setBgUrl(record.value)
+        } else {
+          setBgError(true)
         }
       } catch (err) {
-        // Fallback already set
+        if (mounted) setBgError(true)
       }
     }
     fetchBg()
+
+    return () => {
+      mounted = false
+    }
   }, [])
 
   useEffect(() => {
@@ -111,16 +121,18 @@ export default function Index() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 relative overflow-hidden bg-forest">
       {/* Background Image */}
-      <div
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-1000"
-        style={{
-          backgroundImage: `url('${bgUrl}')`,
-        }}
-      />
+      {!bgError && bgUrl && (
+        <div
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000"
+          style={{
+            backgroundImage: `url('${bgUrl}')`,
+          }}
+        />
+      )}
       {/* Dark green overlay with blur */}
-      <div className="absolute inset-0 bg-forest/85 backdrop-blur-[4px]" />
+      <div className="absolute inset-0 bg-forest/80 backdrop-blur-md" />
 
       <Card className="w-full max-w-[420px] relative z-10 bg-white/10 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-3xl border border-white/20 animate-slide-up text-white">
         <CardHeader className="space-y-3 text-center pb-8 pt-10">
