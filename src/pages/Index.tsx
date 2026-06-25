@@ -94,48 +94,48 @@ export default function Index() {
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Image */}
       <div
-        className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-1000"
+        className="absolute inset-0 bg-cover bg-center transition-transform duration-1000"
         style={{
-          backgroundImage: "url('https://img.usecurling.com/p/1920/1080?q=bus&color=black')",
+          backgroundImage: "url('https://img.usecurling.com/p/1920/1080?q=electric%20bus')",
         }}
       />
       {/* Dark green overlay with blur */}
-      <div className="absolute inset-0 bg-forest/80 backdrop-blur-[6px]" />
+      <div className="absolute inset-0 bg-forest/85 backdrop-blur-[4px]" />
 
-      <Card className="w-full max-w-[450px] relative z-10 bg-white/10 dark:bg-black/20 backdrop-blur-xl shadow-2xl rounded-2xl border-white/20 animate-slide-up text-white">
-        <CardHeader className="space-y-2 text-center pb-8">
-          <div className="mx-auto h-20 mb-6 bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/20 shadow-inner flex items-center justify-center">
+      <Card className="w-full max-w-[420px] relative z-10 bg-white/10 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-3xl border border-white/20 animate-slide-up text-white">
+        <CardHeader className="space-y-3 text-center pb-8 pt-10">
+          <div className="mx-auto h-20 mb-4 bg-white/5 p-3 rounded-2xl backdrop-blur-sm border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center justify-center transition-transform hover:scale-105">
             <Logo className="h-full w-auto drop-shadow-md text-white" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white drop-shadow-sm">
-            Bem-vindo de volta
+          <CardTitle className="text-3xl font-bold tracking-tight text-white drop-shadow-md">
+            Bem-vindo
           </CardTitle>
-          <CardDescription className="text-base text-white/80">
-            Insira suas credenciais para acessar o sistema.
+          <CardDescription className="text-base text-white/80 font-medium">
+            Acesse sua conta para continuar
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <CardContent className="pb-10">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {errors.form && (
-              <div className="p-3 bg-red-500/20 backdrop-blur-sm text-red-50 text-sm rounded-md border border-red-500/30 shadow-inner">
+              <div className="p-3 bg-red-500/20 backdrop-blur-md text-red-50 text-sm rounded-xl border border-red-500/30 shadow-inner">
                 {errors.form}
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-white/90 font-medium">
+            <div className="space-y-2.5">
+              <Label htmlFor="email" className="text-white/90 font-medium ml-1">
                 Email
               </Label>
               {isLoading ? (
-                <Skeleton className="h-11 w-full bg-white/20" />
+                <Skeleton className="h-12 w-full bg-white/20 rounded-xl" />
               ) : (
                 <div>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3.5 h-4 w-4 text-white/60" />
+                  <div className="relative group">
+                    <Mail className="absolute left-3.5 top-3.5 h-5 w-5 text-white/50 group-focus-within:text-white/90 transition-colors" />
                     <Input
                       id="email"
                       type="email"
                       placeholder="nome@empresa.com"
-                      className={`h-11 pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/50 focus-visible:border-white/50 transition-all ${errors.email ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
+                      className={`h-12 pl-11 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus-visible:ring-1 focus-visible:ring-mint focus-visible:border-mint transition-all rounded-xl shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] ${errors.email ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value)
@@ -145,26 +145,28 @@ export default function Index() {
                     />
                   </div>
                   {errors.email && (
-                    <p className="text-sm text-red-300 mt-1 drop-shadow-sm">{errors.email}</p>
+                    <p className="text-sm text-red-300 mt-1.5 ml-1 drop-shadow-sm">
+                      {errors.email}
+                    </p>
                   )}
                 </div>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-white/90 font-medium">
+            <div className="space-y-2.5">
+              <Label htmlFor="password" className="text-white/90 font-medium ml-1">
                 Senha
               </Label>
               {isLoading ? (
-                <Skeleton className="h-11 w-full bg-white/20" />
+                <Skeleton className="h-12 w-full bg-white/20 rounded-xl" />
               ) : (
                 <div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3.5 h-4 w-4 text-white/60" />
+                  <div className="relative group">
+                    <Lock className="absolute left-3.5 top-3.5 h-5 w-5 text-white/50 group-focus-within:text-white/90 transition-colors" />
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
-                      className={`h-11 pl-9 pr-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/50 focus-visible:border-white/50 transition-all ${errors.password ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
+                      className={`h-12 pl-11 pr-11 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus-visible:ring-1 focus-visible:ring-mint focus-visible:border-mint transition-all rounded-xl shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] ${errors.password ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value)
@@ -176,22 +178,24 @@ export default function Index() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute right-0 top-0.5 h-10 w-10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                      className="absolute right-1 top-1 h-10 w-10 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
                     >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </Button>
                   </div>
                   {errors.password && (
-                    <p className="text-sm text-red-300 mt-1 drop-shadow-sm">{errors.password}</p>
+                    <p className="text-sm text-red-300 mt-1.5 ml-1 drop-shadow-sm">
+                      {errors.password}
+                    </p>
                   )}
                 </div>
               )}
             </div>
             <Button
               type="submit"
-              className="w-full h-11 mt-2 bg-mint hover:bg-mint-light text-forest font-bold shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
+              className="w-full h-12 mt-4 bg-mint hover:bg-mint-light text-forest text-base font-bold shadow-[0_4px_14px_0_rgba(76,175,80,0.39)] hover:shadow-[0_6px_20px_rgba(76,175,80,0.23)] hover:-translate-y-[1px] transition-all duration-200 active:scale-[0.98] rounded-xl"
               disabled={isLoading}
             >
               {isLoading ? (
