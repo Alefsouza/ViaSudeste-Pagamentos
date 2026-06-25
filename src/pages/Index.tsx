@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast'
 import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/utils'
+import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
 
 export default function Index() {
   const [email, setEmail] = useState('')
@@ -16,7 +18,7 @@ export default function Index() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [bgLoaded, setBgLoaded] = useState(false)
-  const [bgUrl, setBgUrl] = useState('/background-bus.png')
+  const [bgUrl, setBgUrl] = useState('')
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
 
   const { login, signIn, user } = useAuth()
@@ -31,34 +33,39 @@ export default function Index() {
     }
   }, [user, navigate])
 
-  useEffect(() => {
-    let isMounted = true
-    const img = new Image()
-    img.src = '/background-bus.png'
-
-    img.onload = () => {
-      if (isMounted) setBgLoaded(true)
-    }
-
-    img.onerror = () => {
-      // Fallback to high-quality placeholder if local asset is invalid or missing
-      const fallback = 'https://img.usecurling.com/p/1920/1080?q=electric%20buses'
-      const fallbackImg = new Image()
-      fallbackImg.src = fallback
-      fallbackImg.onload = () => {
-        if (isMounted) {
-          setBgUrl(fallback)
+  const loadBackground = async () => {
+    try {
+      const record = await pb.collection('app_settings').getFirstListItem('name="login_background"')
+      if (record && record.file) {
+        const url = pb.files.getURL(record, record.file)
+        const img = new Image()
+        img.src = url
+        img.onload = () => {
+          setBgUrl(url)
           setBgLoaded(true)
         }
+        img.onerror = () => {
+          setBgUrl('/background-bus.png')
+          setBgLoaded(true)
+        }
+      } else {
+        setBgUrl('/background-bus.png')
+        setBgLoaded(true)
       }
-      fallbackImg.onerror = () => {
-        if (isMounted) setBgLoaded(true)
-      }
+    } catch (e) {
+      setBgUrl('/background-bus.png')
+      setBgLoaded(true)
     }
+  }
 
-    return () => {
-      isMounted = false
+  useRealtime('app_settings', (e) => {
+    if (e.record.name === 'login_background') {
+      loadBackground()
     }
+  })
+
+  useEffect(() => {
+    loadBackground()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,7 +108,7 @@ export default function Index() {
   }
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-slate-950">
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-slate-900">
       {/* Background Image */}
       <div
         className={cn(
@@ -109,12 +116,12 @@ export default function Index() {
           bgLoaded ? 'opacity-100' : 'opacity-0',
         )}
         style={{
-          backgroundImage: `url('${bgUrl}')`,
+          backgroundImage: bgUrl ? `url('${bgUrl}')` : undefined,
         }}
       />
 
       {/* Visual Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/40 via-slate-950/70 to-slate-950/90 z-10 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-slate-900/40 sm:bg-slate-950/60 z-10 backdrop-blur-[2px]" />
 
       {/* Login Content */}
       <div className="relative z-20 w-full max-w-md px-4 sm:px-0 flex flex-col items-center animate-in slide-in-from-bottom-8 fade-in duration-700">
