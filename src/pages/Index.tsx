@@ -16,6 +16,7 @@ export default function Index() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [bgLoaded, setBgLoaded] = useState(false)
+  const [bgUrl, setBgUrl] = useState('/background-bus.png')
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
 
   const { login, signIn, user } = useAuth()
@@ -31,9 +32,33 @@ export default function Index() {
   }, [user, navigate])
 
   useEffect(() => {
+    let isMounted = true
     const img = new Image()
     img.src = '/background-bus.png'
-    img.onload = () => setBgLoaded(true)
+
+    img.onload = () => {
+      if (isMounted) setBgLoaded(true)
+    }
+
+    img.onerror = () => {
+      // Fallback to high-quality placeholder if local asset is invalid or missing
+      const fallback = 'https://img.usecurling.com/p/1920/1080?q=electric%20buses'
+      const fallbackImg = new Image()
+      fallbackImg.src = fallback
+      fallbackImg.onload = () => {
+        if (isMounted) {
+          setBgUrl(fallback)
+          setBgLoaded(true)
+        }
+      }
+      fallbackImg.onerror = () => {
+        if (isMounted) setBgLoaded(true)
+      }
+    }
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,12 +109,12 @@ export default function Index() {
           bgLoaded ? 'opacity-100' : 'opacity-0',
         )}
         style={{
-          backgroundImage: "url('/background-bus.png')",
+          backgroundImage: `url('${bgUrl}')`,
         }}
       />
 
       {/* Visual Overlay */}
-      <div className="absolute inset-0 bg-slate-950/60 z-10 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/40 via-slate-950/70 to-slate-950/90 z-10 backdrop-blur-[2px]" />
 
       {/* Login Content */}
       <div className="relative z-20 w-full max-w-md px-4 sm:px-0 flex flex-col items-center animate-in slide-in-from-bottom-8 fade-in duration-700">
