@@ -105,24 +105,39 @@ export function Header() {
                 <FileDown size={16} />
                 <span className="hidden sm:inline">Exportar Folha</span>
               </button>
-              <button
-                onClick={() => setUploadModalOpen(true)}
-                className="flex items-center gap-1.5 transition-colors text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-              >
-                <Upload size={16} />
-                <span className="hidden sm:inline">Upload Fotos</span>
-              </button>
               <Link
-                to="/usuarios"
+                to="/camera"
                 className={`flex items-center gap-1.5 transition-colors ${
-                  location.pathname === '/usuarios'
+                  location.pathname === '/camera'
                     ? 'text-forest dark:text-mint-light'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                 }`}
               >
-                <Users size={16} />
-                <span className="hidden sm:inline">Usuários</span>
+                <Camera size={16} />
+                <span className="hidden sm:inline">Pagamentos</span>
               </Link>
+              {user.email === 'ti@viasudeste.com' && (
+                <>
+                  <button
+                    onClick={() => setUploadModalOpen(true)}
+                    className="flex items-center gap-1.5 transition-colors text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                  >
+                    <Upload size={16} />
+                    <span className="hidden sm:inline">Upload Fotos</span>
+                  </button>
+                  <Link
+                    to="/usuarios"
+                    className={`flex items-center gap-1.5 transition-colors ${
+                      location.pathname === '/usuarios'
+                        ? 'text-forest dark:text-mint-light'
+                        : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                  >
+                    <Users size={16} />
+                    <span className="hidden sm:inline">Usuários</span>
+                  </Link>
+                </>
+              )}
             </nav>
           ) : user.role === 'DP' ? (
             <nav className="flex items-center gap-3 md:gap-4 text-sm font-medium">

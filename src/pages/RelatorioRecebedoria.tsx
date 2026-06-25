@@ -92,12 +92,17 @@ export default function RelatorioRecebedoria() {
   useEffect(() => {
     async function fetchFilterOptions() {
       try {
-        const usersRes = await pb.collection('users').getFullList({
-          filter: 'tipo_usuario = "recebedoria"',
+        const allUsersRes = await pb.collection('users').getFullList({
+          sort: 'name',
         })
-        setUsuariosRecebedoria(usersRes)
 
-        const allUsersRes = await pb.collection('users').getFullList()
+        allUsersRes.sort((a: any, b: any) => {
+          const nameA = a.name || a.email || 'Usuário'
+          const nameB = b.name || b.email || 'Usuário'
+          return nameA.localeCompare(nameB)
+        })
+
+        setUsuariosRecebedoria(allUsersRes)
         setAllUsers(allUsersRes)
 
         // Get proper Filial Names

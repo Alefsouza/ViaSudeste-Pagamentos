@@ -3,6 +3,8 @@ import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider, useAuth, Role } from '@/hooks/use-auth'
+import { toast } from 'sonner'
+import { useEffect } from 'react'
 import Index from './pages/Index'
 import Dashboard from './pages/Dashboard'
 import Camera from './pages/Camera'
@@ -12,24 +14,41 @@ import GestaoRegistros from './pages/GestaoRegistros'
 import DPFotos from './pages/DPFotos'
 import Layout from './components/Layout'
 
+function RedirectWithToast({ to, message }: { to: string; message: string }) {
+  useEffect(() => {
+    toast.error(message)
+  }, [message])
+  return <Navigate to={to} replace />
+}
+
 function ProtectedRoute({
   children,
   allowedRoles,
+  allowedEmails,
 }: {
   children: React.ReactNode
   allowedRoles: Role[]
+  allowedEmails?: string[]
 }) {
   const { user, loading } = useAuth()
 
   if (loading) return null
 
   if (!user) return <Navigate to="/" replace />
+
   if (!allowedRoles.includes(user.role)) {
-    if (user.role === 'Administrador') return <Navigate to="/dashboard" replace />
-    if (user.role === 'DP') return <Navigate to="/dp/fotos" replace />
-    return <Navigate to="/camera" replace />
+    const to =
+      user.role === 'Administrador' ? '/dashboard' : user.role === 'DP' ? '/dp/fotos' : '/camera'
+    return <Navigate to={to} replace />
   }
-  return children
+
+  if (allowedEmails && !allowedEmails.includes(user.email)) {
+    const to =
+      user.role === 'Administrador' ? '/dashboard' : user.role === 'DP' ? '/dp/fotos' : '/camera'
+    return <RedirectWithToast to={to} message="Você não tem permissão para acessar esta área." />
+  }
+
+  return <>{children}</>
 }
 
 const AppRoutes = () => (
@@ -47,7 +66,7 @@ const AppRoutes = () => (
       <Route
         path="/usuarios"
         element={
-          <ProtectedRoute allowedRoles={['Administrador']}>
+          <ProtectedRoute allowedRoles={['Administrador']} allowedEmails={['ti@viasudeste.com']}>
             <Usuarios />
           </ProtectedRoute>
         }
