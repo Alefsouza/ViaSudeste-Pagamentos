@@ -14,6 +14,7 @@ import {
   FileDown,
   KeyRound,
   ChevronDown,
+  User as UserIcon,
 } from 'lucide-react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { ImportPlanilhaModal } from '@/components/ImportPlanilhaModal'
@@ -29,6 +30,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ChangePasswordModal } from '@/components/ChangePasswordModal'
+import { ProfilePhotoModal } from '@/components/ProfilePhotoModal'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Logo } from '@/components/Logo'
 
 export function Header() {
@@ -39,6 +42,7 @@ export function Header() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [exportFolhaModalOpen, setExportFolhaModalOpen] = useState(false)
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false)
+  const [profilePhotoModalOpen, setProfilePhotoModalOpen] = useState(false)
 
   if (!user) return null
 
@@ -188,11 +192,17 @@ export function Header() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors outline-none focus-visible:ring-2 focus-visible:ring-forest rounded-sm px-1 py-0.5">
+                <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
+                  <AvatarImage src={user.avatarUrl} alt={user.name} className="object-cover" />
+                  <AvatarFallback className="bg-forest/10 text-forest text-xs font-semibold">
+                    {user.name.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
                 <span className="max-w-[120px] truncate">{user.name}</span>
                 <ChevronDown size={14} className="text-slate-400" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -201,6 +211,13 @@ export function Header() {
               >
                 <KeyRound size={16} className="mr-2 text-slate-500" />
                 <span>Alterar Senha</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setProfilePhotoModalOpen(true)}
+                className="cursor-pointer"
+              >
+                <UserIcon size={16} className="mr-2 text-slate-500" />
+                <span>Adicionar Foto de Perfil</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={handleLogout}
@@ -220,6 +237,7 @@ export function Header() {
         open={changePasswordModalOpen}
         onOpenChange={setChangePasswordModalOpen}
       />
+      <ProfilePhotoModal open={profilePhotoModalOpen} onOpenChange={setProfilePhotoModalOpen} />
     </header>
   )
 }

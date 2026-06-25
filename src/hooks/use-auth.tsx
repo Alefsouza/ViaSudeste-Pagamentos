@@ -9,6 +9,7 @@ export interface User {
   role: Role
   email: string
   garagem?: string
+  avatarUrl?: string
 }
 
 interface AuthContextType {
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: record.tipo_usuario as Role,
         email: record.email || '',
         garagem: record.garagem,
+        avatarUrl: record.avatar ? pb.files.getURL(record, record.avatar) : undefined,
       }
     }
 
