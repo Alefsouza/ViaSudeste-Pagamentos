@@ -18,9 +18,29 @@ export default function Index() {
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
 
+  const [bgUrl, setBgUrl] = useState('https://img.usecurling.com/p/1920/1080?q=electric%20bus')
+
   const { login, user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+
+  useEffect(() => {
+    async function fetchBg() {
+      try {
+        const record = await pb
+          .collection('app_settings')
+          .getFirstListItem('name="login_background"')
+        if (record.file) {
+          setBgUrl(pb.files.getURL(record, record.file))
+        } else if (record.value) {
+          setBgUrl(record.value)
+        }
+      } catch (err) {
+        // Fallback already set
+      }
+    }
+    fetchBg()
+  }, [])
 
   useEffect(() => {
     if (user) {
@@ -96,7 +116,7 @@ export default function Index() {
       <div
         className="absolute inset-0 bg-cover bg-center transition-transform duration-1000"
         style={{
-          backgroundImage: "url('https://img.usecurling.com/p/1920/1080?q=electric%20bus')",
+          backgroundImage: `url('${bgUrl}')`,
         }}
       />
       {/* Dark green overlay with blur */}
