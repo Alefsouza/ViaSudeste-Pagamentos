@@ -16,6 +16,7 @@ export default function Index() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
 
   const { login, user } = useAuth()
   const navigate = useNavigate()
@@ -31,48 +32,62 @@ export default function Index() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) {
-      toast({
-        title: 'Erro de validação',
-        description: 'Preencha todos os campos.',
-        variant: 'destructive',
-      })
-      return
+    setErrors({})
+
+    const newErrors: { email?: string; password?: string } = {}
+
+    if (!email) {
+      newErrors.email = 'O email é obrigatório.'
+    } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+      newErrors.email = 'Por favor, insira um endereço de email válido.'
     }
 
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      toast({
-        title: 'Email inválido',
-        description: 'Por favor, insira um endereço de email válido.',
-        variant: 'destructive',
-      })
-      return
+    if (!password) {
+      newErrors.password = 'A senha é obrigatória.'
+    } else if (password.length < 8) {
+      newErrors.password = 'A senha deve ter no mínimo 8 caracteres.'
     }
 
-    if (password.length < 8) {
-      toast({
-        title: 'Senha muito curta',
-        description: 'A senha deve ter no mínimo 8 caracteres.',
-        variant: 'destructive',
-      })
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
       return
     }
 
     setIsLoading(true)
-    try {
-      await login(email, password)
-      const role = pb.authStore.record?.tipo_usuario
-      toast({ title: 'Sucesso', description: `Bem-vindo de volta, ${email.split('@')[0]}!` })
-      navigate(role === 'Administrador' ? '/dashboard' : role === 'DP' ? '/dp/fotos' : '/camera')
-    } catch {
-      toast({
-        title: 'Erro ao fazer login',
-        description: 'Email ou senha incorretos.',
-        variant: 'destructive',
-      })
-    } finally {
+
+    const { error } = await login(email, password)
+
+    if (error) {
+      const err = error as any
+      if (err?.status === 400) {
+        setErrors({
+          form: 'Email ou senha incorretos. Verifique suas credenciais e tente novamente.',
+        })
+      } else if (err?.status === 0 || err?.isAbort) {
+        setErrors({
+          form: 'Erro de conexão. Verifique sua internet e tente novamente.',
+        })
+      } else if (err?.message) {
+        setErrors({
+          form: `Erro ao fazer login: ${err.message}`,
+        })
+      } else {
+        setErrors({
+          form: 'Ocorreu um erro inesperado. Tente novamente.',
+        })
+      }
       setIsLoading(false)
+      return
     }
+
+    const role = pb.authStore.record?.tipo_usuario
+    const garagem = pb.authStore.record?.garagem
+    toast({
+      title: 'Sucesso',
+      description: `Bem-vindo de volta, ${email.split('@')[0]}!${garagem ? ` (${garagem})` : ''}`,
+    })
+    setIsLoading(false)
+    navigate(role === 'Administrador' ? '/dashboard' : role === 'DP' ? '/dp/fotos' : '/camera')
   }
 
   return (
@@ -87,22 +102,33 @@ export default function Index() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
+            {errors.form && (
+              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md border border-red-200">
+                {errors.form}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               {isLoading ? (
                 <Skeleton className="h-10 w-full" />
               ) : (
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="nome@empresa.com"
-                    className="pl-9 focus-visible:ring-forest"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                  />
+                <div>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="nome@empresa.com"
+                      className={`pl-9 focus-visible:ring-forest ${errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value)
+                        if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }))
+                      }}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email}</p>}
                 </div>
               )}
             </div>
@@ -111,27 +137,35 @@ export default function Index() {
               {isLoading ? (
                 <Skeleton className="h-10 w-full" />
               ) : (
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    className="pl-9 pr-10 focus-visible:ring-forest"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </Button>
+                <div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      className={`pl-9 pr-10 focus-visible:ring-forest ${errors.password ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value)
+                        if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }))
+                      }}
+                      disabled={isLoading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </Button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+                  )}
                 </div>
               )}
             </div>

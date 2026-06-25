@@ -13,7 +13,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, pass: string) => Promise<void>
+  login: (email: string, pass: string) => Promise<{ error: any }>
   logout: () => void
   loading: boolean
 }
@@ -29,9 +29,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!record) return null
       return {
         id: record.id,
-        name: record.name || record.email.split('@')[0],
+        name: record.name || (record.email ? record.email.split('@')[0] : 'Usuário'),
         role: record.tipo_usuario as Role,
-        email: record.email,
+        email: record.email || '',
         garagem: record.garagem,
       }
     }
@@ -49,7 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (email: string, pass: string) => {
-    await pb.collection('users').authWithPassword(email, pass)
+    try {
+      await pb.collection('users').authWithPassword(email, pass)
+      return { error: null }
+    } catch (error) {
+      return { error }
+    }
   }
 
   const logout = () => {
