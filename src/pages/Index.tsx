@@ -8,12 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast'
 import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react'
 import { Logo } from '@/components/Logo'
+import { cn } from '@/lib/utils'
 
 export default function Index() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [bgLoaded, setBgLoaded] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
 
   const { login, signIn, user } = useAuth()
@@ -27,6 +29,12 @@ export default function Index() {
       )
     }
   }, [user, navigate])
+
+  useEffect(() => {
+    const img = new Image()
+    img.src = '/background-bus.png'
+    img.onload = () => setBgLoaded(true)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,26 +76,31 @@ export default function Index() {
   }
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden animate-in fade-in duration-700">
-      {/* Background Image with Fallback */}
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-slate-950">
+      {/* Background Image */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
+        className={cn(
+          'absolute inset-0 bg-cover bg-center bg-no-repeat z-0 transition-opacity duration-1000',
+          bgLoaded ? 'opacity-100' : 'opacity-0',
+        )}
         style={{
-          backgroundImage:
-            "url('/login-background.png'), url('https://img.usecurling.com/p/1920/1080?q=bus%20fleet&color=blue')",
+          backgroundImage: "url('/background-bus.png')",
         }}
       />
 
       {/* Visual Overlay */}
       <div className="absolute inset-0 bg-slate-950/60 z-10 backdrop-blur-[2px]" />
 
-      {/* Login Card */}
-      <div className="relative z-20 w-full max-w-md px-4 sm:px-0">
-        <Card className="border-0 shadow-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
-          <CardHeader className="space-y-4 pb-6 text-center">
-            <div className="flex justify-center mb-2">
-              <Logo className="h-16 w-auto" />
-            </div>
+      {/* Login Content */}
+      <div className="relative z-20 w-full max-w-md px-4 sm:px-0 flex flex-col items-center animate-in slide-in-from-bottom-8 fade-in duration-700">
+        {/* Brand Container */}
+        <div className="mb-8 bg-white p-5 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.3)] border border-white/20">
+          <Logo className="h-16 sm:h-20 w-auto" />
+        </div>
+
+        {/* Login Card */}
+        <Card className="w-full border-0 shadow-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
+          <CardHeader className="space-y-2 pb-6 text-center">
             <CardTitle className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               Bem-vindo ao Sistema
             </CardTitle>
