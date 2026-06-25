@@ -171,7 +171,7 @@ export default function Index() {
         />
       )}
       {/* Green overlay to maintain brand consistency */}
-      <div className="absolute inset-0 bg-forest/70" />
+      <div className="absolute inset-0 bg-forest/30" />
 
       <Card className="w-full max-w-[420px] relative z-10 bg-white/10 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-3xl border border-white/20 animate-slide-up text-white">
         <CardHeader className="space-y-3 text-center pb-8 pt-10">
