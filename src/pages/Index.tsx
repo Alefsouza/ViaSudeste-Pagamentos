@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
+import { useRealtime } from '@/hooks/use-realtime'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -60,6 +61,35 @@ export default function Index() {
       mounted = false
     }
   }, [])
+
+  useRealtime('app_settings', (e) => {
+    if (e.record.name === 'login_background') {
+      if (e.action === 'delete') {
+        setBgError(true)
+        setBgUrl(null)
+        return
+      }
+      const record = e.record
+      if (record.file) {
+        const baseUrl = pb.files.getURL(record, record.file)
+        const separator = baseUrl.includes('?') ? '&' : '?'
+        const cacheBuster = record.updated
+          ? `${separator}t=${new Date(record.updated).getTime()}`
+          : ''
+        setBgUrl(`${baseUrl}${cacheBuster}`)
+        setBgError(false)
+      } else if (record.value) {
+        const separator = record.value.includes('?') ? '&' : '?'
+        const cacheBuster = record.updated
+          ? `${separator}t=${new Date(record.updated).getTime()}`
+          : ''
+        setBgUrl(`${record.value}${cacheBuster}`)
+        setBgError(false)
+      } else {
+        setBgError(true)
+      }
+    }
+  })
 
   useEffect(() => {
     if (user) {
