@@ -19,8 +19,7 @@ export default function Index() {
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
 
-  const [bgUrl, setBgUrl] = useState<string | null>(null)
-  const [bgError, setBgError] = useState(false)
+  const [bgUrl, setBgUrl] = useState<string>('/login-background.png')
 
   const { login, user } = useAuth()
   const navigate = useNavigate()
@@ -48,11 +47,9 @@ export default function Index() {
             ? `${separator}t=${new Date(record.updated).getTime()}`
             : ''
           setBgUrl(`${record.value}${cacheBuster}`)
-        } else {
-          setBgError(true)
         }
       } catch (err) {
-        if (mounted) setBgError(true)
+        // Fallback to local default image is handled by initial state
       }
     }
     fetchBg()
@@ -65,8 +62,7 @@ export default function Index() {
   useRealtime('app_settings', (e) => {
     if (e.record.name === 'login_background') {
       if (e.action === 'delete') {
-        setBgError(true)
-        setBgUrl(null)
+        setBgUrl('/login-background.png')
         return
       }
       const record = e.record
@@ -77,16 +73,14 @@ export default function Index() {
           ? `${separator}t=${new Date(record.updated).getTime()}`
           : ''
         setBgUrl(`${baseUrl}${cacheBuster}`)
-        setBgError(false)
       } else if (record.value) {
         const separator = record.value.includes('?') ? '&' : '?'
         const cacheBuster = record.updated
           ? `${separator}t=${new Date(record.updated).getTime()}`
           : ''
         setBgUrl(`${record.value}${cacheBuster}`)
-        setBgError(false)
       } else {
-        setBgError(true)
+        setBgUrl('/login-background.png')
       }
     }
   })
@@ -162,16 +156,14 @@ export default function Index() {
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 relative overflow-hidden bg-forest">
       {/* Background Image */}
-      {!bgError && bgUrl && (
-        <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000"
-          style={{
-            backgroundImage: `url('${bgUrl}')`,
-          }}
-        />
-      )}
-      {/* Green overlay to maintain brand consistency */}
-      <div className="absolute inset-0 bg-forest/30" />
+      <div
+        className="absolute inset-0 bg-cover bg-center transition-transform duration-1000"
+        style={{
+          backgroundImage: `url('${bgUrl}')`,
+        }}
+      />
+      {/* Green overlay to maintain brand consistency while allowing image visibility */}
+      <div className="absolute inset-0 bg-forest/20" />
 
       <Card className="w-full max-w-[420px] relative z-10 bg-white/10 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-3xl border border-white/20 animate-slide-up text-white">
         <CardHeader className="space-y-3 text-center pb-8 pt-10">
