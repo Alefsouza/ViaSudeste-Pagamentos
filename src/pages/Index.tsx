@@ -34,12 +34,19 @@ export default function Index() {
           .getFirstListItem('name="login_background"')
         if (!mounted) return
 
-        const cacheBuster = record.updated ? `?t=${new Date(record.updated).getTime()}` : ''
         if (record.file) {
-          setBgUrl(`${pb.files.getURL(record, record.file)}${cacheBuster}`)
+          const baseUrl = pb.files.getURL(record, record.file)
+          const separator = baseUrl.includes('?') ? '&' : '?'
+          const cacheBuster = record.updated
+            ? `${separator}t=${new Date(record.updated).getTime()}`
+            : ''
+          setBgUrl(`${baseUrl}${cacheBuster}`)
         } else if (record.value) {
           const separator = record.value.includes('?') ? '&' : '?'
-          setBgUrl(`${record.value}${separator}t=${new Date(record.updated).getTime()}`)
+          const cacheBuster = record.updated
+            ? `${separator}t=${new Date(record.updated).getTime()}`
+            : ''
+          setBgUrl(`${record.value}${cacheBuster}`)
         } else {
           setBgError(true)
         }
