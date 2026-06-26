@@ -67,7 +67,7 @@ export function Header() {
               className="hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest rounded-sm"
               aria-label="Ir para a página inicial"
             >
-              <Logo className="h-10 sm:h-12 shrink-0" />
+              <Logo variant="header" className="h-10 sm:h-12 shrink-0" />
             </Link>
           </div>
 

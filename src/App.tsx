@@ -53,8 +53,8 @@ function ProtectedRoute({
 
 const AppRoutes = () => (
   <Routes>
+    <Route path="/" element={<Index />} />
     <Route element={<Layout />}>
-      <Route path="/" element={<Index />} />
       <Route
         path="/dashboard"
         element={
