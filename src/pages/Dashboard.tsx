@@ -97,8 +97,9 @@ export default function Dashboard() {
   const { toast } = useToast()
   const { user } = useAuth()
   const isAdmin = user?.role === 'Administrador'
-  const isAlcimara = user?.email === 'alcimara.cabral@viasudeste.com'
-  const canManagePayments = isAdmin && isAlcimara
+  const isAuthorized =
+    user?.email === 'ti@viasudeste.com' || user?.email === 'alcimara.cabral@viasudeste.com'
+  const canManagePayments = isAuthorized
 
   const [paymentToCancel, setPaymentToCancel] = useState<any>(null)
   const [maxRef, setMaxRef] = useState<number>(0)
@@ -250,7 +251,7 @@ export default function Dashboard() {
   ])
 
   const handleToggleRelease = async (payment: any) => {
-    if (!isAlcimara) {
+    if (!isAuthorized) {
       toast({
         title: 'Ação não permitida',
         description: 'Você não tem permissão para liberar pagamentos.',
@@ -262,7 +263,13 @@ export default function Dashboard() {
       const liberadoPagamento = payment.liberado_pagamento
       const newStatus = !liberadoPagamento
       const targetId = payment.id
-      await pb.collection('colaboradores').update(targetId, { liberado_pagamento: newStatus })
+
+      const dataUpdate: any = { liberado_pagamento: newStatus }
+      if (newStatus) {
+        dataUpdate.data_liberacao = new Date().toISOString()
+      }
+
+      await pb.collection('colaboradores').update(targetId, dataUpdate)
       toast({
         title: newStatus ? 'Pagamento liberado com sucesso.' : 'Pagamento bloqueado com sucesso.',
       })
@@ -277,7 +284,7 @@ export default function Dashboard() {
 
   const handleDeletePayment = async () => {
     if (!paymentToCancel) return
-    if (!isAlcimara) {
+    if (!isAuthorized) {
       toast({
         title: 'Ação não permitida',
         description: 'Você não tem permissão para excluir registros.',
@@ -287,6 +294,18 @@ export default function Dashboard() {
     }
     try {
       await pb.collection('colaboradores').delete(paymentToCancel.id)
+
+      // Try to delete related pagamento if exists just in case to ensure strict compliance
+      try {
+        const relatedPags = await pb
+          .collection('pagamentos')
+          .getFullList({ filter: `colaborador_id="${paymentToCancel.id}"` })
+        for (const p of relatedPags) {
+          await pb.collection('pagamentos').delete(p.id)
+        }
+      } catch {
+        /* intentionally ignored */
+      }
 
       toast({ title: 'Registro excluído com sucesso!' })
       setPaymentToCancel(null)
