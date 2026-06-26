@@ -544,7 +544,12 @@ export default function RelatorioRecebedoria() {
           </div>
           <div className="text-right">
             <p>
-              <span className="font-bold">Usuário:</span> {user?.name || user?.email || 'N/A'}
+              <span className="font-bold">Usuário:</span>{' '}
+              {usuarioFilter === 'Todos'
+                ? 'Todos'
+                : usuariosRecebedoria.find((u) => u.id === usuarioFilter)?.name ||
+                  usuariosRecebedoria.find((u) => u.id === usuarioFilter)?.email ||
+                  'N/A'}
             </p>
           </div>
         </div>
@@ -557,7 +562,13 @@ export default function RelatorioRecebedoria() {
             Relatórios de Pagamentos
           </h1>
           <p className="text-muted-foreground mt-1 print:text-slate-700">
-            Meus pagamentos processados.
+            {usuarioFilter === 'Todos'
+              ? 'Todos os pagamentos processados.'
+              : `Pagamentos processados por ${
+                  usuariosRecebedoria.find((u) => u.id === usuarioFilter)?.name ||
+                  usuariosRecebedoria.find((u) => u.id === usuarioFilter)?.email ||
+                  'N/A'
+                }.`}
           </p>
         </div>
         <Button onClick={handleExport} className="w-full sm:w-auto print:hidden">
