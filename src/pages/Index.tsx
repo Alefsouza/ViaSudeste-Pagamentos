@@ -17,8 +17,8 @@ export default function Index() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [bgLoaded, setBgLoaded] = useState(false)
-  const [bgUrl, setBgUrl] = useState('')
+  const [bgLoaded, setBgLoaded] = useState(true)
+  const [bgUrl, setBgUrl] = useState('/background-bus.png')
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
 
   const { login, signIn, user } = useAuth()

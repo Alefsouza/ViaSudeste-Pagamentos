@@ -13,16 +13,93 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Camera, UploadCloud, Loader2, CameraIcon, RefreshCcw, Save } from 'lucide-react'
+import {
+  Camera,
+  UploadCloud,
+  Loader2,
+  CameraIcon,
+  RefreshCcw,
+  Save,
+  HelpCircle,
+} from 'lucide-react'
+import { PhotoPreviewModal } from '@/components/PhotoPreviewModal'
 
 export default function DPFotos() {
   const [registro, setRegistro] = useState('')
+  const [nome, setNome] = useState('')
+  const [isLoadingNome, setIsLoadingNome] = useState(false)
+  const [nomeError, setNomeError] = useState('')
+  const [hasExistingPhoto, setHasExistingPhoto] = useState(false)
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null)
+
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
+
+  const [previewModalOpen, setPreviewModalOpen] = useState(false)
 
   const [activeTab, setActiveTab] = useState('camera')
   const [isCapturing, setIsCapturing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  const fetchNome = async () => {
+    const currentRegistro = registro.trim()
+    if (!currentRegistro) {
+      setNome('')
+      setNomeError('')
+      setHasExistingPhoto(false)
+      setExistingPhotoUrl(null)
+      return
+    }
+
+    setIsLoadingNome(true)
+    setNomeError('')
+    setNome('')
+    setHasExistingPhoto(false)
+    setExistingPhotoUrl(null)
+
+    try {
+      const res = await pb.send(
+        `/backend/v1/get-colaborador-by-registro?registro=${encodeURIComponent(currentRegistro)}`,
+        { method: 'GET' },
+      )
+      setNome(res.nome)
+
+      try {
+        const photoRecord = await pb
+          .collection('fotos_colaboradores')
+          .getFirstListItem(`registro="${currentRegistro}"`)
+        setHasExistingPhoto(true)
+        if (photoRecord.foto) {
+          setExistingPhotoUrl(pb.files.getUrl(photoRecord, photoRecord.foto))
+        } else if (photoRecord.foto_url) {
+          setExistingPhotoUrl(photoRecord.foto_url)
+        }
+      } catch (err) {
+        setHasExistingPhoto(false)
+        setExistingPhotoUrl(null)
+      }
+    } catch (err: any) {
+      if (err.status === 404) {
+        setNomeError('Colaborador não encontrado')
+      } else {
+        setNomeError('Serviço temporariamente indisponível')
+        console.error(err)
+      }
+    } finally {
+      setIsLoadingNome(false)
+    }
+  }
+
+  const handleBlur = () => {
+    fetchNome()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      fetchNome()
+    }
+  }
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -141,6 +218,9 @@ export default function DPFotos() {
       }
 
       setRegistro('')
+      setNome('')
+      setHasExistingPhoto(false)
+      setExistingPhotoUrl(null)
       setFile(null)
       setPreview(null)
       if (activeTab === 'camera') startCamera()
@@ -174,10 +254,36 @@ export default function DPFotos() {
                 id="registro"
                 value={registro}
                 onChange={(e) => setRegistro(e.target.value)}
+                onBlur={handleBlur}
+                onKeyDown={handleKeyDown}
                 placeholder="Ex: 123456"
                 className="h-12 text-lg text-center font-mono tracking-widest bg-slate-50 dark:bg-slate-900"
                 required
               />
+              {nomeError && <p className="text-sm text-red-500 font-medium">{nomeError}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nome" className="text-base font-semibold">
+                Nome do Colaborador
+              </Label>
+              <div className="relative">
+                <Input
+                  id="nome"
+                  value={nome}
+                  placeholder={
+                    isLoadingNome ? 'Buscando...' : 'Nome será preenchido automaticamente'
+                  }
+                  className="h-12 text-lg bg-slate-100 dark:bg-slate-800 text-slate-500 focus-visible:ring-0"
+                  readOnly
+                  tabIndex={-1}
+                />
+                {isLoadingNome && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                  </div>
+                )}
+              </div>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -257,6 +363,23 @@ export default function DPFotos() {
                 </div>
               </TabsContent>
             </Tabs>
+
+            {hasExistingPhoto && (
+              <div className="flex items-center gap-3 text-red-500 bg-red-50 dark:bg-red-500/10 p-3 rounded-md animate-in fade-in slide-in-from-top-2">
+                <HelpCircle className="w-5 h-5 flex-shrink-0" />
+                <span className="text-sm font-medium flex-1">
+                  O colaborador já possui uma foto cadastrada no sistema.
+                </span>
+                {existingPhotoUrl && (
+                  <img
+                    src={existingPhotoUrl}
+                    alt="Foto existente"
+                    className="w-12 h-12 rounded-md object-cover border border-red-200 dark:border-red-500/30 flex-shrink-0 cursor-pointer hover:scale-105 hover:opacity-90 transition-all duration-200 shadow-sm"
+                    onClick={() => setPreviewModalOpen(true)}
+                  />
+                )}
+              </div>
+            )}
           </form>
         </CardContent>
         <CardFooter className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-b-xl border-t border-slate-200 dark:border-slate-800">
@@ -264,7 +387,7 @@ export default function DPFotos() {
             type="submit"
             form="foto-form"
             className="w-full h-12 text-lg bg-forest hover:bg-forest/90 text-white gap-2 shadow-md"
-            disabled={submitting || !file || !registro}
+            disabled={submitting || !file || !registro || isLoadingNome || !!nomeError}
           >
             {submitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -275,6 +398,14 @@ export default function DPFotos() {
           </Button>
         </CardFooter>
       </Card>
+
+      <PhotoPreviewModal
+        open={previewModalOpen}
+        onOpenChange={setPreviewModalOpen}
+        fotoUrl={existingPhotoUrl}
+        registro={registro}
+        nome={nome}
+      />
     </div>
   )
 }
