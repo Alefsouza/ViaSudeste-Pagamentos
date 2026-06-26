@@ -940,7 +940,11 @@ export default function Camera() {
           if (!open && viewState !== 'CONFIRMING_PAYMENT') handleReset()
         }}
       >
-        <DialogContent className="w-[95vw] max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden p-4 sm:p-6">
+        <DialogContent
+          className="w-[95vw] max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden p-4 sm:p-6 [&>button]:hidden"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader className="shrink-0">
             <DialogTitle>Resumo do Pagamento</DialogTitle>
             <DialogDescription>
@@ -1063,34 +1067,29 @@ export default function Camera() {
             </div>
           )}
 
-          <DialogFooter className="mt-4 shrink-0 w-full">
-            <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-4">
-              <div className="text-sm w-full sm:w-auto"></div>
-              <div className="flex gap-2 w-full sm:w-auto justify-end">
-                <Button
-                  variant="outline"
-                  onClick={handleReset}
-                  disabled={viewState === 'CONFIRMING_PAYMENT'}
-                  className="flex-1 sm:flex-none"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleConfirmPayment}
-                  disabled={viewState === 'CONFIRMING_PAYMENT' || visibleRecords.length === 0}
-                  className="flex-1 sm:flex-none"
-                >
-                  {viewState === 'CONFIRMING_PAYMENT' ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Confirmando...
-                    </>
-                  ) : (
-                    'Confirmar'
-                  )}
-                </Button>
-              </div>
-            </div>
+          <DialogFooter className="mt-4 shrink-0 w-full flex flex-row justify-between sm:justify-between space-x-0 sm:space-x-0 gap-4">
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              disabled={viewState === 'CONFIRMING_PAYMENT'}
+              className="flex-1 sm:flex-none"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmPayment}
+              disabled={viewState === 'CONFIRMING_PAYMENT' || visibleRecords.length === 0}
+              className="flex-1 sm:flex-none"
+            >
+              {viewState === 'CONFIRMING_PAYMENT' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Confirmando...
+                </>
+              ) : (
+                'Confirmar'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
