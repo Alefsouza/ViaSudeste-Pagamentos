@@ -31,6 +31,7 @@ export default function DPFotos() {
   const [nomeError, setNomeError] = useState('')
   const [hasExistingPhoto, setHasExistingPhoto] = useState(false)
   const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null)
+  const [lastSearchedRegistro, setLastSearchedRegistro] = useState('')
 
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -48,6 +49,11 @@ export default function DPFotos() {
       setNomeError('')
       setHasExistingPhoto(false)
       setExistingPhotoUrl(null)
+      setLastSearchedRegistro('')
+      return
+    }
+
+    if (currentRegistro === lastSearchedRegistro) {
       return
     }
 
@@ -80,13 +86,14 @@ export default function DPFotos() {
       }
     } catch (err: any) {
       if (err.status === 404) {
-        setNomeError('Colaborador não encontrado')
+        setNomeError('Registro não encontrado')
       } else {
         setNomeError('Serviço temporariamente indisponível')
         console.error(err)
       }
     } finally {
       setIsLoadingNome(false)
+      setLastSearchedRegistro(currentRegistro)
     }
   }
 
@@ -223,6 +230,7 @@ export default function DPFotos() {
       setExistingPhotoUrl(null)
       setFile(null)
       setPreview(null)
+      setLastSearchedRegistro('')
       if (activeTab === 'camera') startCamera()
     } catch (err) {
       console.error(err)
@@ -250,33 +258,16 @@ export default function DPFotos() {
               <Label htmlFor="registro" className="text-base font-semibold">
                 Registro do Colaborador
               </Label>
-              <Input
-                id="registro"
-                value={registro}
-                onChange={(e) => setRegistro(e.target.value)}
-                onBlur={handleBlur}
-                onKeyDown={handleKeyDown}
-                placeholder="Ex: 123456"
-                className="h-12 text-lg text-center font-mono tracking-widest bg-slate-50 dark:bg-slate-900"
-                required
-              />
-              {nomeError && <p className="text-sm text-red-500 font-medium">{nomeError}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="nome" className="text-base font-semibold">
-                Nome do Colaborador
-              </Label>
               <div className="relative">
                 <Input
-                  id="nome"
-                  value={nome}
-                  placeholder={
-                    isLoadingNome ? 'Buscando...' : 'Nome será preenchido automaticamente'
-                  }
-                  className="h-12 text-lg bg-slate-100 dark:bg-slate-800 text-slate-500 focus-visible:ring-0"
-                  readOnly
-                  tabIndex={-1}
+                  id="registro"
+                  value={registro}
+                  onChange={(e) => setRegistro(e.target.value)}
+                  onBlur={handleBlur}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ex: 123456"
+                  className="h-12 text-lg text-center font-mono tracking-widest bg-slate-50 dark:bg-slate-900"
+                  required
                 />
                 {isLoadingNome && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -284,6 +275,12 @@ export default function DPFotos() {
                   </div>
                 )}
               </div>
+              {nomeError && <p className="text-sm text-red-500 font-medium">{nomeError}</p>}
+              {!nomeError && !isLoadingNome && nome && (
+                <p className="text-sm text-green-600 dark:text-green-500 font-medium animate-in fade-in">
+                  ✓ Colaborador: {nome}
+                </p>
+              )}
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
