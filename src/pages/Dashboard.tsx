@@ -65,6 +65,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatBRL, getTipoPagamento, checkIsLocked, formatDateDBToBR } from '@/lib/formatters'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
+  if (curr.pagamento_relacionado?.status === 'Cancelado') return 'Cancelado'
   if (curr.pagamento_relacionado?.status === 'Confirmado') return 'Confirmado'
   let status = curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
 
@@ -364,6 +365,7 @@ export default function Dashboard() {
   const baseStatsData = useMemo(() => {
     return statsData.filter((curr) => {
       const evaluatedStatus = getEvaluatedStatus(curr, maxRef)
+      if (evaluatedStatus === 'Cancelado' && debouncedFilters.status !== 'Cancelado') return false
       if (debouncedFilters.status !== 'Todos' && evaluatedStatus !== debouncedFilters.status)
         return false
 

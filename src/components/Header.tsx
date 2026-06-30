@@ -120,6 +120,19 @@ export function Header() {
                 <Camera size={16} />
                 <span className="hidden sm:inline">Pagamentos</span>
               </Link>
+              {user.email === 'clayton.souza@viasudeste.com' && (
+                <Link
+                  to="/dp/fotos"
+                  className={`flex items-center gap-1.5 transition-colors ${
+                    location.pathname === '/dp/fotos'
+                      ? 'text-forest dark:text-mint-light'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  }`}
+                >
+                  <CameraIcon size={16} />
+                  <span className="hidden sm:inline">Captura de Fotos</span>
+                </Link>
+              )}
               {user.email === 'ti@viasudeste.com' && (
                 <>
                   <button
@@ -145,10 +158,17 @@ export function Header() {
             </nav>
           ) : user.role === 'DP' ? (
             <nav className="flex items-center gap-3 md:gap-4 text-sm font-medium">
-              <span className="flex items-center gap-1.5 text-forest dark:text-mint-light font-semibold">
+              <Link
+                to="/dp/fotos"
+                className={`flex items-center gap-1.5 transition-colors ${
+                  location.pathname === '/dp/fotos'
+                    ? 'text-forest dark:text-mint-light font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
                 <CameraIcon size={16} />
-                <span className="hidden sm:inline">Captura de Fotos (DP)</span>
-              </span>
+                <span className="hidden sm:inline">Captura de Fotos</span>
+              </Link>
             </nav>
           ) : (
             <nav className="flex items-center gap-3 md:gap-4 text-sm font-medium">
@@ -162,6 +182,17 @@ export function Header() {
               >
                 <Camera size={16} />
                 <span className="hidden sm:inline">Pagamentos</span>
+              </Link>
+              <Link
+                to="/dp/fotos"
+                className={`flex items-center gap-1.5 transition-colors ${
+                  location.pathname === '/dp/fotos'
+                    ? 'text-forest dark:text-mint-light'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                <CameraIcon size={16} />
+                <span className="hidden sm:inline">Captura de Fotos</span>
               </Link>
               <Link
                 to="/relatorio-recebedoria"

@@ -25,10 +25,12 @@ function ProtectedRoute({
   children,
   allowedRoles,
   allowedEmails,
+  allowedEmailsAny,
 }: {
   children: React.ReactNode
   allowedRoles: Role[]
   allowedEmails?: string[]
+  allowedEmailsAny?: string[]
 }) {
   const { user, loading } = useAuth()
 
@@ -36,7 +38,9 @@ function ProtectedRoute({
 
   if (!user) return <Navigate to="/" replace />
 
-  if (!allowedRoles.includes(user.role)) {
+  const hasAnyEmail = allowedEmailsAny?.includes(user.email)
+
+  if (!allowedRoles.includes(user.role) && !hasAnyEmail) {
     const to =
       user.role === 'Administrador' ? '/dashboard' : user.role === 'DP' ? '/dp/fotos' : '/camera'
     return <Navigate to={to} replace />
@@ -106,7 +110,10 @@ const AppRoutes = () => (
       <Route
         path="/dp/fotos"
         element={
-          <ProtectedRoute allowedRoles={['DP']}>
+          <ProtectedRoute
+            allowedRoles={['DP', 'recebedoria']}
+            allowedEmailsAny={['clayton.souza@viasudeste.com']}
+          >
             <DPFotos />
           </ProtectedRoute>
         }

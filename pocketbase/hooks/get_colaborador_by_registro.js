@@ -8,7 +8,17 @@ routerAdd(
     }
 
     const authRecord = e.auth
-    if (!authRecord || !['DP', 'Administrador'].includes(authRecord.getString('tipo_usuario'))) {
+    if (!authRecord) {
+      return e.forbiddenError('Acesso negado')
+    }
+
+    const tipoUsuario = authRecord.getString('tipo_usuario')
+    const email = authRecord.getString('email')
+    const isAuthorized =
+      ['DP', 'Administrador', 'recebedoria'].includes(tipoUsuario) ||
+      email === 'clayton.souza@viasudeste.com'
+
+    if (!isAuthorized) {
       return e.forbiddenError('Acesso negado')
     }
 
