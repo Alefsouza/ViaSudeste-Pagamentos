@@ -207,6 +207,7 @@ export default function DPFotos() {
       const formData = new FormData()
       formData.append('registro', registro.trim())
       formData.append('foto', file)
+      formData.append('origem', 'captura')
       formData.append('data_upload', new Date().toISOString())
 
       try {

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-01T11:20:17.099Z",
+  "generatedAt": "2026-07-01T11:59:07.787Z",
   "collections": [
     {
       "name": "users",
@@ -391,6 +391,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "origem",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["captura", "lote"]
         }
       ],
       "indexes": [

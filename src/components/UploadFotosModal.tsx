@@ -96,6 +96,7 @@ export function UploadFotosModal({ open, onOpenChange }: UploadFotosModalProps) 
         const formData = new FormData()
         formData.append('foto', newFile)
         formData.append('registro', registroTrimmed)
+        formData.append('origem', 'lote')
         if (filialName) {
           formData.append('filial', filialName)
         }
