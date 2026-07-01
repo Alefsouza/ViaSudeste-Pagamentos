@@ -36,6 +36,7 @@ import {
   Trash2,
   Unlock,
   Lock,
+  FileDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -63,6 +64,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
 import { formatBRL, getTipoPagamento, checkIsLocked, formatDateDBToBR } from '@/lib/formatters'
+import { ExportFolhaModal } from '@/components/ExportFolhaModal'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   if (curr.pagamento_relacionado?.status === 'Cancelado') return 'Cancelado'
@@ -125,6 +127,7 @@ export default function Dashboard() {
 
   const [statsData, setStatsData] = useState<any[]>([])
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
   // Chart Interactive Filters
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
@@ -709,23 +712,26 @@ export default function Dashboard() {
             Analise a distribuição de pagamentos e monitore as filiais.
           </p>
         </div>
-        {(selectedChartFilial || selectedChartDate || selectedChartRef || chartRefSearch) && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSelectedChartFilial(null)
-              setSelectedChartDate(null)
-              setSelectedChartRef(null)
-              setChartRefSearch('')
-              setPage(1)
-            }}
-            className="animate-fade-in text-muted-foreground"
-          >
-            <FilterX className="h-4 w-4 mr-2" />
-            Limpar Filtros de Gráfico
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {canManagePayments && null}
+          {(selectedChartFilial || selectedChartDate || selectedChartRef || chartRefSearch) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedChartFilial(null)
+                setSelectedChartDate(null)
+                setSelectedChartRef(null)
+                setChartRefSearch('')
+                setPage(1)
+              }}
+              className="animate-fade-in text-muted-foreground"
+            >
+              <FilterX className="h-4 w-4 mr-2" />
+              Limpar Filtros de Gráfico
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -1688,6 +1694,8 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ExportFolhaModal open={exportModalOpen} onOpenChange={setExportModalOpen} />
 
       <Dialog open={!!paymentToCancel} onOpenChange={(open) => !open && setPaymentToCancel(null)}>
         <DialogContent>
