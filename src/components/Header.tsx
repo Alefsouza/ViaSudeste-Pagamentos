@@ -6,6 +6,7 @@ import {
   LogOut,
   LayoutDashboard,
   Camera,
+  DollarSign,
   FileText,
   Upload,
   FileSpreadsheet,
@@ -117,7 +118,7 @@ export function Header() {
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                 }`}
               >
-                <Camera size={16} />
+                <DollarSign size={16} />
                 <span className="hidden sm:inline">Pagamentos</span>
               </Link>
               {user.email === 'clayton.souza@viasudeste.com' && (
@@ -180,7 +181,7 @@ export function Header() {
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                 }`}
               >
-                <Camera size={16} />
+                <DollarSign size={16} />
                 <span className="hidden sm:inline">Pagamentos</span>
               </Link>
               <Link
