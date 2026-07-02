@@ -45,7 +45,13 @@ import {
   ArrowDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatHoraString, formatHoras, getTipoPagamento, formatBRL } from '@/lib/formatters'
+import {
+  formatHoraString,
+  formatHoras,
+  getTipoPagamento,
+  formatBRL,
+  normalizeTimestampForSort,
+} from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 
 export default function RelatorioRecebedoria() {
@@ -284,7 +290,22 @@ export default function RelatorioRecebedoria() {
         antigasRes = antigasRes.filter((c) => !confirmadosIds.has(c.id))
       }
 
-      setAntigasData(antigasRes)
+      setAntigasData(
+        [...antigasRes].sort((a, b) => {
+          const aUpdated =
+            normalizeTimestampForSort(a.updated) || normalizeTimestampForSort(a.created) || ''
+          const bUpdated =
+            normalizeTimestampForSort(b.updated) || normalizeTimestampForSort(b.created) || ''
+          if (aUpdated !== bUpdated) return bUpdated.localeCompare(aUpdated)
+          const regCmp = String(a.registro || '').localeCompare(
+            String(b.registro || ''),
+            undefined,
+            { numeric: true },
+          )
+          if (regCmp !== 0) return regCmp
+          return (b.created || '').localeCompare(a.created || '')
+        }),
+      )
     } catch (err: any) {
       console.error(err)
       setError(true)
@@ -314,18 +335,32 @@ export default function RelatorioRecebedoria() {
     return [...summaryData].sort((a, b) => {
       const aData = a.data_pagamento || ''
       const bData = b.data_pagamento || ''
+      const aTime = a.hora_pagamento || ''
+      const bTime = b.hora_pagamento || ''
 
-      if (!aData && bData) return -1
-      if (aData && !bData) return 1
-      if (!aData && !bData) {
+      const aComposite = aData ? normalizeTimestampForSort(aTime ? `${aData} ${aTime}` : aData) : ''
+      const bComposite = bData ? normalizeTimestampForSort(bTime ? `${bData} ${bTime}` : bData) : ''
+
+      if (!aComposite && !bComposite) {
+        const aUpdated =
+          normalizeTimestampForSort(a.updated) || normalizeTimestampForSort(a.created) || ''
+        const bUpdated =
+          normalizeTimestampForSort(b.updated) || normalizeTimestampForSort(b.created) || ''
+        if (aUpdated !== bUpdated) return bUpdated.localeCompare(aUpdated)
         const regCmp = String(a.registro || '').localeCompare(String(b.registro || ''), undefined, {
           numeric: true,
         })
         if (regCmp !== 0) return regCmp
         return (b.created || '').localeCompare(a.created || '')
       }
+      if (!aComposite) return -1
+      if (!bComposite) return 1
 
-      if (aData !== bData) return bData.localeCompare(aData)
+      if (aComposite !== bComposite) return bComposite.localeCompare(aComposite)
+
+      const aUpdated = normalizeTimestampForSort(a.updated) || ''
+      const bUpdated = normalizeTimestampForSort(b.updated) || ''
+      if (aUpdated !== bUpdated) return bUpdated.localeCompare(aUpdated)
 
       const regCmp = String(a.registro || '').localeCompare(String(b.registro || ''), undefined, {
         numeric: true,

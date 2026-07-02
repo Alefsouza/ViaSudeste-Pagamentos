@@ -67,3 +67,55 @@ export const checkIsLocked = (dataLiberacaoStr?: string) => {
   const now = new Date()
   return now.getTime() < libDate.getTime()
 }
+
+export const normalizeTimestampForSort = (dateStr?: string | null): string => {
+  if (!dateStr) return ''
+  let str = dateStr.trim()
+
+  if (str.includes('T')) {
+    if (!str.endsWith('Z') && !str.includes('+') && !str.match(/-\d{2}:\d{2}$/)) {
+      str += 'Z'
+    }
+    return str
+  }
+
+  if (str.includes(' ') && str.match(/^\d{4}-\d{2}-\d{2}/)) {
+    const spaceIdx = str.indexOf(' ')
+    const datePart = str.substring(0, spaceIdx)
+    let timePart = str.substring(spaceIdx + 1).trim()
+    if (timePart.endsWith('Z')) timePart = timePart.slice(0, -1)
+    if (timePart.length === 5) timePart += ':00'
+    if (!timePart.includes('.')) timePart += '.000'
+    return `${datePart}T${timePart}Z`
+  }
+
+  if (str.includes('/')) {
+    const parts = str.split(' ')
+    const datePart = parts[0]
+    const timePart = parts[1] || '00:00:00'
+    const dp = datePart.split('/')
+    if (dp.length === 3) {
+      let y: string, m: string, d: string
+      if (dp[2].length === 4) {
+        y = dp[2]
+        m = dp[1]
+        d = dp[0]
+      } else {
+        y = dp[0]
+        m = dp[1]
+        d = dp[2]
+      }
+      let t = timePart
+      if (t.endsWith('Z')) t = t.slice(0, -1)
+      if (t.length === 5) t += ':00'
+      if (!t.includes('.')) t += '.000'
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T${t}Z`
+    }
+  }
+
+  if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return str + 'T00:00:00.000Z'
+  }
+
+  return str
+}

@@ -63,7 +63,13 @@ import pb from '@/lib/pocketbase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination'
 import { useToast } from '@/hooks/use-toast'
-import { formatBRL, getTipoPagamento, checkIsLocked, formatDateDBToBR } from '@/lib/formatters'
+import {
+  formatBRL,
+  getTipoPagamento,
+  checkIsLocked,
+  formatDateDBToBR,
+  normalizeTimestampForSort,
+} from '@/lib/formatters'
 import { ExportFolhaModal } from '@/components/ExportFolhaModal'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
@@ -97,29 +103,30 @@ export const getActualValue = (curr: any) => {
 }
 
 export const normalizeDateForSort = (dateStr: string): string => {
-  if (!dateStr) return ''
-  const datePart = dateStr.split(' ')[0].split('T')[0]
-  if (datePart.includes('/')) {
-    const parts = datePart.split('/')
-    if (parts.length === 3) {
-      if (parts[2].length === 4)
-        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-      if (parts[0].length === 4)
-        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
-    }
-  }
-  return datePart
+  return normalizeTimestampForSort(dateStr)
 }
 
 export const getPaymentSortDate = (curr: any): string | null => {
-  const pagDataPagamento = curr.pagamento_relacionado?.data_pagamento
-  if (pagDataPagamento) return pagDataPagamento
-  if (curr.data_pagamento) return curr.data_pagamento
-  const hasPhoto = curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
-  if (hasPhoto) {
-    const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
-    if (updatedDate) return updatedDate
+  const pag = curr.pagamento_relacionado
+
+  const dataPagamento =
+    pag?.data_pagamento || curr.data_pagamento || pag?.data_pagamento_v2 || curr.data_pagamento_v2
+  const horaPagamento = pag?.hora_pagamento || curr.hora_pagamento
+
+  if (dataPagamento) {
+    const alreadyHasTime = dataPagamento.includes(' ') || dataPagamento.includes('T')
+    if (!alreadyHasTime && horaPagamento) {
+      return `${dataPagamento} ${horaPagamento}`
+    }
+    return dataPagamento
   }
+
+  const updatedDate = pag?.updated || curr.updated
+  if (updatedDate) return updatedDate
+
+  const createdDate = pag?.created || curr.created
+  if (createdDate) return createdDate
+
   return null
 }
 
@@ -505,12 +512,21 @@ export default function Dashboard() {
       const normB = normalizeDateForSort(dateB)
       if (normA !== normB) return normB.localeCompare(normA)
 
-      // Secondary sort: registro ascending
+      // Secondary sort: updated timestamp descending (time-aware tiebreaker)
+      const updA = normalizeDateForSort(
+        a.pagamento_relacionado?.updated || a.updated || a.created || '',
+      )
+      const updB = normalizeDateForSort(
+        b.pagamento_relacionado?.updated || b.updated || b.created || '',
+      )
+      if (updA !== updB) return updB.localeCompare(updA)
+
+      // Tertiary sort: registro ascending
       const regA = String(a.registro || '')
       const regB = String(b.registro || '')
       if (regA !== regB) return regA.localeCompare(regB, undefined, { numeric: true })
 
-      // Tertiary sort: created descending
+      // Quaternary sort: created descending
       return (b.created || '').localeCompare(a.created || '')
     })
 
