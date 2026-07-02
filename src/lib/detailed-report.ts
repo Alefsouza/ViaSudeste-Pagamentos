@@ -5,7 +5,6 @@ export function generateDetailedPDF(
   items: DetalhadaItem[],
   total: number,
   registro: string,
-  nome: string,
   inicio: string,
   fim: string,
 ): boolean {

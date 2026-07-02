@@ -112,7 +112,6 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
         result.data.items,
         result.data.total,
         result.data.registro,
-        result.data.nome,
         dataInicio,
         dataFinal,
       )
