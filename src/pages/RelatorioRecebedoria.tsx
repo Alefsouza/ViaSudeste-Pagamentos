@@ -222,7 +222,7 @@ export default function RelatorioRecebedoria() {
 
       const fullRes = await pb.collection('pagamentos').getFullList({
         filter: filterString,
-        sort: '-updated',
+        sort: '-data_pagamento,-created',
         expand: 'colaborador_id,user_id',
       })
 
@@ -310,10 +310,36 @@ export default function RelatorioRecebedoria() {
     filiaisOptions.length,
   ])
 
+  const sortedSummaryData = React.useMemo(() => {
+    return [...summaryData].sort((a, b) => {
+      const aData = a.data_pagamento || ''
+      const bData = b.data_pagamento || ''
+
+      if (!aData && bData) return -1
+      if (aData && !bData) return 1
+      if (!aData && !bData) {
+        const regCmp = String(a.registro || '').localeCompare(String(b.registro || ''), undefined, {
+          numeric: true,
+        })
+        if (regCmp !== 0) return regCmp
+        return (b.created || '').localeCompare(a.created || '')
+      }
+
+      if (aData !== bData) return bData.localeCompare(aData)
+
+      const regCmp = String(a.registro || '').localeCompare(String(b.registro || ''), undefined, {
+        numeric: true,
+      })
+      if (regCmp !== 0) return regCmp
+
+      return (b.created || '').localeCompare(a.created || '')
+    })
+  }, [summaryData])
+
   useEffect(() => {
     const startIndex = (page - 1) * 20
-    setData(summaryData.slice(startIndex, startIndex + 20))
-  }, [page, summaryData])
+    setData(sortedSummaryData.slice(startIndex, startIndex + 20))
+  }, [page, sortedSummaryData])
 
   useRealtime('pagamentos', () => {
     loadData()
@@ -753,7 +779,7 @@ export default function RelatorioRecebedoria() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {summaryData.map((item: any, idx: number) => {
+                  {sortedSummaryData.map((item: any, idx: number) => {
                     const val =
                       item.valor_pago ||
                       item.expand?.colaborador_id?.valor_a_receber ||
@@ -805,7 +831,7 @@ export default function RelatorioRecebedoria() {
                     </td>
                     <td className="py-3 text-lg text-left font-bold text-black double-underline">
                       {formatBRL(
-                        summaryData.reduce((acc: any, item: any) => {
+                        sortedSummaryData.reduce((acc: any, item: any) => {
                           return (
                             acc +
                             (item.valor_pago ||
@@ -920,7 +946,9 @@ export default function RelatorioRecebedoria() {
                               ? formatDateStringSafe(item.updated)
                               : '-'}
                           </TableCell>
-                          <TableCell className="print:text-black">{'-'}</TableCell>
+                          <TableCell className="print:text-black">
+                            {formatHoraString(item.hora_pagamento)}
+                          </TableCell>
                           <TableCell className="font-medium print:text-black text-left">
                             {formatBRL(
                               item.expand?.colaborador_id?.valor_a_receber ||
