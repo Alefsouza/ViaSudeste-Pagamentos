@@ -80,6 +80,7 @@ export default function Usuarios() {
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false)
   const [resetSubmitting, setResetSubmitting] = useState(false)
   const [resettingUser, setResettingUser] = useState<any>(null)
+  const [senhaAtual, setSenhaAtual] = useState('')
   const [novaSenha, setNovaSenha] = useState('')
   const [confirmarSenha, setConfirmarSenha] = useState('')
 
@@ -153,6 +154,7 @@ export default function Usuarios() {
 
   const openResetPasswordDialog = (u: any) => {
     setResettingUser(u)
+    setSenhaAtual('')
     setNovaSenha('')
     setConfirmarSenha('')
     setIsResetPasswordDialogOpen(true)
@@ -169,6 +171,7 @@ export default function Usuarios() {
 
     try {
       await pb.collection('users').update(resettingUser.id, {
+        oldPassword: senhaAtual,
         password: novaSenha,
         passwordConfirm: confirmarSenha,
       })
@@ -416,6 +419,17 @@ export default function Usuarios() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleResetPasswordSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="senha-atual">Senha Atual</Label>
+              <Input
+                id="senha-atual"
+                type="password"
+                required
+                value={senhaAtual}
+                onChange={(e) => setSenhaAtual(e.target.value)}
+                placeholder="Senha atual do usuário"
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="nova-senha">Nova Senha</Label>
               <Input
