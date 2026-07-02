@@ -96,6 +96,33 @@ export const getActualValue = (curr: any) => {
   return curr.valor_a_receber || curr.valor || 0
 }
 
+export const normalizeDateForSort = (dateStr: string): string => {
+  if (!dateStr) return ''
+  const datePart = dateStr.split(' ')[0].split('T')[0]
+  if (datePart.includes('/')) {
+    const parts = datePart.split('/')
+    if (parts.length === 3) {
+      if (parts[2].length === 4)
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+      if (parts[0].length === 4)
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
+    }
+  }
+  return datePart
+}
+
+export const getPaymentSortDate = (curr: any): string | null => {
+  const pagDataPagamento = curr.pagamento_relacionado?.data_pagamento
+  if (pagDataPagamento) return pagDataPagamento
+  if (curr.data_pagamento) return curr.data_pagamento
+  const hasPhoto = curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
+  if (hasPhoto) {
+    const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
+    if (updatedDate) return updatedDate
+  }
+  return null
+}
+
 export default function Dashboard() {
   const { toast } = useToast()
   const { user } = useAuth()
@@ -460,27 +487,31 @@ export default function Dashboard() {
 
   const tableData = useMemo(() => {
     const sorted = [...filteredStatsData].sort((a, b) => {
-      const refA = a.referencia ?? -1
-      const refB = b.referencia ?? -1
+      const dateA = getPaymentSortDate(a)
+      const dateB = getPaymentSortDate(b)
 
-      if (refA !== refB) {
-        return refB - refA
+      // Empty/null dates appear at the top for immediate attention
+      if (!dateA && !dateB) {
+        const regA = String(a.registro || '')
+        const regB = String(b.registro || '')
+        if (regA !== regB) return regA.localeCompare(regB, undefined, { numeric: true })
+        return (b.created || '').localeCompare(a.created || '')
       }
+      if (!dateA) return -1
+      if (!dateB) return 1
 
-      const statusA = getEvaluatedStatus(a, maxRef)
-      const statusB = getEvaluatedStatus(b, maxRef)
+      // Primary sort: data_pagamento descending (most recent first)
+      const normA = normalizeDateForSort(dateA)
+      const normB = normalizeDateForSort(dateB)
+      if (normA !== normB) return normB.localeCompare(normA)
 
-      const weightA = statusA === 'Pendente' ? 0 : 1
-      const weightB = statusB === 'Pendente' ? 0 : 1
-
-      if (weightA !== weightB) {
-        return weightA - weightB
-      }
-
+      // Secondary sort: registro ascending
       const regA = String(a.registro || '')
       const regB = String(b.registro || '')
+      if (regA !== regB) return regA.localeCompare(regB, undefined, { numeric: true })
 
-      return regA.localeCompare(regB, undefined, { numeric: true })
+      // Tertiary sort: created descending
+      return (b.created || '').localeCompare(a.created || '')
     })
 
     const startIndex = (page - 1) * 20
@@ -1244,7 +1275,9 @@ export default function Dashboard() {
                           </TableHead>
                           <TableHead className="text-left">Valor</TableHead>
                           <TableHead>Tipo de Pagamento</TableHead>
-                          <TableHead>Data de Pagamento</TableHead>
+                          <TableHead className="whitespace-nowrap">
+                            Data de Pagamento <ArrowDown className="inline-block w-3 h-3 ml-1" />
+                          </TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-center">Foto</TableHead>
                           {canManagePayments && (
