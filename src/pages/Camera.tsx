@@ -35,6 +35,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import { useRealtime } from '@/hooks/use-realtime'
+import { PhotoPreviewModal } from '@/components/PhotoPreviewModal'
 import { cn } from '@/lib/utils'
 
 type ViewState =
@@ -55,6 +56,7 @@ export default function Camera() {
   const [fotoCapturada, setFotoCapturada] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [blockedDate, setBlockedDate] = useState<string | null>(null)
+  const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -804,13 +806,18 @@ export default function Camera() {
                 <CardContent>
                   <div className="flex items-center gap-4">
                     {fotoPredeterminada ? (
-                      <div className="w-14 h-14 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setPhotoPreviewOpen(true)}
+                        className="w-14 h-14 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800 shrink-0 cursor-pointer transition-transform duration-200 hover:scale-105 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                        title="Clique para ampliar a foto"
+                      >
                         <img
                           src={fotoPredeterminada}
                           alt="Foto"
                           className="w-full h-full object-cover"
                         />
-                      </div>
+                      </button>
                     ) : (
                       <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
                         <CameraIcon className="h-5 w-5 text-slate-400" />
@@ -1093,6 +1100,14 @@ export default function Camera() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PhotoPreviewModal
+        open={photoPreviewOpen}
+        onOpenChange={setPhotoPreviewOpen}
+        fotoUrl={fotoPredeterminada}
+        registro={colaborador?.registro || ''}
+        nome={colaborador?.nome || ''}
+      />
     </div>
   )
 }
