@@ -50,6 +50,8 @@ import {
   formatHoras,
   getTipoPagamento,
   formatBRL,
+  formatDateTimeBR,
+  getPaymentDisplayDate,
   normalizeTimestampForSort,
 } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
@@ -482,8 +484,8 @@ export default function RelatorioRecebedoria() {
       const tipoName = matchedCategory
         ? matchedCategory.name
         : item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || 'Outros'
-      const dataPagamento =
-        item.foto_confirmacao_url && item.updated ? item.updated.split(' ')[0] : '-'
+      const rawDisplayDate = getPaymentDisplayDate(item)
+      const dataPagamento = rawDisplayDate ? rawDisplayDate.split(/[ T]/)[0] : '-'
 
       const val =
         item.expand?.colaborador_id?.valor_a_receber ||
@@ -830,9 +832,10 @@ export default function RelatorioRecebedoria() {
                           {item.expand?.colaborador_id?.registro || item.registro || 'N/A'}
                         </TableCell>
                         <TableCell className="text-black py-2">
-                          {item.foto_confirmacao_url && item.updated
-                            ? formatDateStringSafe(item.updated)
-                            : '-'}
+                          {(() => {
+                            const displayDate = getPaymentDisplayDate(item)
+                            return displayDate ? formatDateTimeBR(displayDate) : '-'
+                          })()}
                         </TableCell>
                         <TableCell className="text-black py-2">
                           {formatDateStringSafe(item.expand?.colaborador_id?.data) || '-'}
@@ -977,9 +980,10 @@ export default function RelatorioRecebedoria() {
                             {formatDateStringSafe(item.expand?.colaborador_id?.data) || '-'}
                           </TableCell>
                           <TableCell className="print:text-black">
-                            {item.foto_confirmacao_url && item.updated
-                              ? formatDateStringSafe(item.updated)
-                              : '-'}
+                            {(() => {
+                              const displayDate = getPaymentDisplayDate(item)
+                              return displayDate ? formatDateTimeBR(displayDate) : '-'
+                            })()}
                           </TableCell>
                           <TableCell className="print:text-black">
                             {formatHoraString(item.hora_pagamento)}
@@ -1085,9 +1089,10 @@ export default function RelatorioRecebedoria() {
                         </div>
                         <div className="flex justify-between items-center pt-3 border-t">
                           <div className="text-sm text-slate-500">
-                            {item.foto_confirmacao_url && item.updated
-                              ? formatDateStringSafe(item.updated)
-                              : '-'}
+                            {(() => {
+                              const displayDate = getPaymentDisplayDate(item)
+                              return displayDate ? formatDateTimeBR(displayDate) : '-'
+                            })()}
                           </div>
                           <div className="flex gap-2">
                             <Button
@@ -1433,9 +1438,10 @@ export default function RelatorioRecebedoria() {
                     Data de Pagamento
                   </span>
                   <p className="font-medium">
-                    {detailsModal.foto_confirmacao_url && detailsModal.updated
-                      ? formatDateStringSafe(detailsModal.updated)
-                      : '-'}
+                    {(() => {
+                      const displayDate = getPaymentDisplayDate(detailsModal)
+                      return displayDate ? formatDateTimeBR(displayDate) : '-'
+                    })()}
                   </p>
                 </div>
                 <div>

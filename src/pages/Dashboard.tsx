@@ -68,6 +68,8 @@ import {
   getTipoPagamento,
   checkIsLocked,
   formatDateDBToBR,
+  formatDateTimeBR,
+  getPaymentDisplayDate,
   normalizeTimestampForSort,
 } from '@/lib/formatters'
 import { ExportFolhaModal } from '@/components/ExportFolhaModal'
@@ -1355,15 +1357,8 @@ export default function Dashboard() {
                                     <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
                                     <TableCell>
                                       {(() => {
-                                        const hasPhoto =
-                                          p.pagamento_relacionado?.foto_confirmacao_url ||
-                                          p.foto_confirmacao_url
-                                        if (hasPhoto) {
-                                          const updatedDate =
-                                            p.pagamento_relacionado?.updated || p.updated
-                                          return updatedDate ? formatDateDBToBR(updatedDate) : '-'
-                                        }
-                                        return '-'
+                                        const displayDate = getPaymentDisplayDate(p)
+                                        return displayDate ? formatDateTimeBR(displayDate) : '-'
                                       })()}
                                     </TableCell>
                                     <TableCell>
@@ -1545,18 +1540,11 @@ export default function Dashboard() {
                                     <span>Data de Pagamento:</span>
                                     <span>
                                       {(() => {
-                                        const hasPhoto =
-                                          p.pagamento_relacionado?.foto_confirmacao_url ||
-                                          p.foto_confirmacao_url
-                                        if (hasPhoto) {
-                                          const updatedDate =
-                                            p.pagamento_relacionado?.updated || p.updated
-                                          return updatedDate ? formatDateDBToBR(updatedDate) : '-'
-                                        }
-                                        return '-'
+                                        const displayDate = getPaymentDisplayDate(p)
+                                        return displayDate ? formatDateTimeBR(displayDate) : '-'
                                       })()}
                                     </span>
-                                  </div>
+                                  </div>{' '}
                                   <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
                                     <div>
                                       {(() => {
@@ -1768,15 +1756,8 @@ export default function Dashboard() {
                 <span className="font-semibold text-muted-foreground">Data de Pagamento:</span>
                 <span>
                   {(() => {
-                    const hasPhoto =
-                      paymentToCancel?.pagamento_relacionado?.foto_confirmacao_url ||
-                      paymentToCancel?.foto_confirmacao_url
-                    if (hasPhoto) {
-                      const updatedDate =
-                        paymentToCancel?.pagamento_relacionado?.updated || paymentToCancel?.updated
-                      return updatedDate ? formatDateDBToBR(updatedDate) : '-'
-                    }
-                    return '-'
+                    const displayDate = getPaymentDisplayDate(paymentToCancel)
+                    return displayDate ? formatDateTimeBR(displayDate) : '-'
                   })()}
                 </span>
               </div>

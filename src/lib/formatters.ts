@@ -37,6 +37,69 @@ export const getTipoPagamento = (id?: number) => {
 export const formatBRL = (val: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 
+export const formatDateTimeBR = (dateStr?: string | null): string => {
+  if (!dateStr) return '-'
+
+  let str = dateStr.trim()
+  if (!str) return '-'
+
+  if (str.includes('/') && !str.includes(':')) return str
+
+  if (str.includes(' ') && !str.includes('T')) {
+    str = str.replace(' ', 'T')
+  }
+
+  if (
+    str.includes('T') &&
+    !str.endsWith('Z') &&
+    !str.includes('+') &&
+    !str.match(/-\d{2}:\d{2}$/)
+  ) {
+    str += 'Z'
+  }
+
+  if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const parts = str.split('-')
+    return `${parts[2]}/${parts[1]}/${parts[0]} às 00:00`
+  }
+
+  const date = new Date(str)
+  if (isNaN(date.getTime())) return '-'
+
+  const localDate = new Date(date.getTime() - 3 * 3600000)
+
+  const day = String(localDate.getUTCDate()).padStart(2, '0')
+  const month = String(localDate.getUTCMonth() + 1).padStart(2, '0')
+  const year = localDate.getUTCFullYear()
+  const hours = String(localDate.getUTCHours()).padStart(2, '0')
+  const minutes = String(localDate.getUTCMinutes()).padStart(2, '0')
+
+  return `${day}/${month}/${year} às ${hours}:${minutes}`
+}
+
+export const getPaymentDisplayDate = (item: any): string | null => {
+  const pag = item?.pagamento_relacionado
+
+  const dataPagamento = pag?.data_pagamento || item?.data_pagamento
+  const horaPagamento = pag?.hora_pagamento || item?.hora_pagamento
+
+  if (dataPagamento) {
+    const hasTime = dataPagamento.includes(' ') || dataPagamento.includes('T')
+    if (!hasTime && horaPagamento) {
+      return `${dataPagamento} ${horaPagamento}`
+    }
+    return dataPagamento
+  }
+
+  const hasPhoto = pag?.foto_confirmacao_url || item?.foto_confirmacao_url
+  if (hasPhoto) {
+    const updatedDate = pag?.updated || item?.updated
+    if (updatedDate) return updatedDate
+  }
+
+  return null
+}
+
 export const formatDateDBToBR = (dStr?: string | null) => {
   if (!dStr) return 'N/A'
   // Isolate the YYYY-MM-DD part from ISO strings to avoid timezone shifts
