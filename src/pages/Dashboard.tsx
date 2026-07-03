@@ -168,7 +168,7 @@ export default function Dashboard() {
   // Chart Interactive Filters
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
   const [selectedChartDate, setSelectedChartDate] = useState<string | null>(null)
-  const [selectedChartRef, setSelectedChartRef] = useState<string | null>(null)
+  const [selectedChartRef, setSelectedChartRef] = useState<Set<string>>(new Set())
   const [chartRefSearch, setChartRefSearch] = useState('')
 
   // Concurrency & Debounce Refs
@@ -443,10 +443,10 @@ export default function Dashboard() {
         curr.filial === 2 ? 'Cursino' : curr.filial === 4 ? 'Sapopemba' : curr.filial || 'Outra'
       if (selectedChartFilial && filialStr !== selectedChartFilial) return false
 
-      if (selectedChartRef) {
+      if (selectedChartRef.size > 0) {
         const actualRef = curr.referencia
         const cRef = actualRef != null ? String(actualRef) : 'N/A'
-        if (cRef !== selectedChartRef) return false
+        if (!selectedChartRef.has(cRef)) return false
       }
 
       if (chartRefSearch) {
@@ -763,14 +763,17 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2">
           {canManagePayments && null}
-          {(selectedChartFilial || selectedChartDate || selectedChartRef || chartRefSearch) && (
+          {(selectedChartFilial ||
+            selectedChartDate ||
+            selectedChartRef.size > 0 ||
+            chartRefSearch) && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 setSelectedChartFilial(null)
                 setSelectedChartDate(null)
-                setSelectedChartRef(null)
+                setSelectedChartRef(new Set())
                 setChartRefSearch('')
                 setPage(1)
               }}
@@ -1148,12 +1151,32 @@ export default function Dashboard() {
                         dataKey="total"
                         radius={[4, 4, 0, 0]}
                         fill="var(--color-total)"
-                        onClick={(data) => {
-                          const refVal = data?.referenciaName || data?.payload?.referenciaName
-                          if (refVal) {
-                            setSelectedChartRef((prev) => (prev === refVal ? null : refVal))
-                            setPage(1)
-                          }
+                        onClick={(data: any, index: number, event: any) => {
+                          const refVal =
+                            data?.referenciaName ||
+                            data?.payload?.referenciaName ||
+                            (refData[index] && refData[index].referenciaName)
+                          if (!refVal) return
+                          const isCtrl = event && (event.ctrlKey || event.metaKey)
+                          setSelectedChartRef((prev) => {
+                            const next = new Set(prev)
+                            if (isCtrl) {
+                              if (next.has(refVal)) {
+                                next.delete(refVal)
+                              } else {
+                                next.add(refVal)
+                              }
+                            } else {
+                              if (next.size === 1 && next.has(refVal)) {
+                                next.clear()
+                              } else {
+                                next.clear()
+                                next.add(refVal)
+                              }
+                            }
+                            return next
+                          })
+                          setPage(1)
                         }}
                         style={{ cursor: 'pointer' }}
                       >
@@ -1162,11 +1185,11 @@ export default function Dashboard() {
                             key={`cell-${index}`}
                             fill="var(--color-total)"
                             style={{
-                              opacity: selectedChartRef
-                                ? selectedChartRef === entry.referenciaName
+                              opacity:
+                                selectedChartRef.size === 0 ||
+                                selectedChartRef.has(entry.referenciaName)
                                   ? 1
-                                  : 0.3
-                                : 1,
+                                  : 0.3,
                               transition: 'opacity 0.2s',
                               outline: 'none',
                             }}
@@ -1259,7 +1282,7 @@ export default function Dashboard() {
                 Transações de Pagamentos
                 {(selectedChartFilial ||
                   selectedChartDate ||
-                  selectedChartRef ||
+                  selectedChartRef.size > 0 ||
                   chartRefSearch) && (
                   <span className="text-sm font-normal text-muted-foreground">
                     (Filtro de gráfico ativo
