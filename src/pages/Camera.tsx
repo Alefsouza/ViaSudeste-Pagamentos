@@ -725,7 +725,7 @@ export default function Camera() {
     <div className="container max-w-5xl mx-auto p-4 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Pagamento de Boca de Caixa
+          Pagamento
         </h1>
         <p className="text-sm text-slate-500 mt-1">
           Identifique o colaborador e realize a verificação facial.
