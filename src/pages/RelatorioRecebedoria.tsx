@@ -82,7 +82,6 @@ export default function RelatorioRecebedoria() {
 
   const [statusFilter, setStatusFilter] = useState('Todos')
   const [usuarioFilter, setUsuarioFilter] = useState('Todos')
-  const [garagemFilter, setGaragemFilter] = useState('Todos')
   const [tipoPagamentoFilter, setTipoPagamentoFilter] = useState('Todos')
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -94,7 +93,6 @@ export default function RelatorioRecebedoria() {
   // Filter Options State
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
-  const [filiaisOptions, setFiliaisOptions] = useState<{ label: string; value: string }[]>([])
   const [tiposPagamento, setTiposPagamento] = useState<string[]>([])
 
   useEffect(() => {
@@ -113,38 +111,14 @@ export default function RelatorioRecebedoria() {
         setUsuariosRecebedoria(allUsersRes)
         setAllUsers(allUsersRes)
 
-        // Get proper Filial Names
-        const colabRes = await pb.collection('colaboradores').getFullList({
-          fields: 'filial,filial_id',
-        })
-        const mapNomes = new Map<number, string>()
-        colabRes.forEach((c: any) => {
-          if (c.filial && c.filial_id != null) {
-            mapNomes.set(c.filial_id, c.filial)
-          }
-        })
-
         const pagamentosRes = await pb
           .collection('pagamentos')
-          .getFullList({ fields: 'tipo_pagamento,filial' })
+          .getFullList({ fields: 'tipo_pagamento' })
 
         const uniqueTipos = Array.from(
           new Set(pagamentosRes.map((p: any) => p.tipo_pagamento).filter(Boolean)),
         )
         setTiposPagamento(uniqueTipos as string[])
-
-        const uniqueFiliais = Array.from(
-          new Set(
-            pagamentosRes
-              .map((p: any) => p.filial)
-              .filter((f) => f !== null && f !== undefined && f !== ''),
-          ),
-        )
-        const options = uniqueFiliais.map((f) => ({
-          label: mapNomes.get(Number(f)) || String(f),
-          value: String(f),
-        }))
-        setFiliaisOptions(options.sort((a, b) => a.label.localeCompare(b.label)))
       } catch (err) {
         console.error('Error fetching filter options:', err)
       }
@@ -218,10 +192,6 @@ export default function RelatorioRecebedoria() {
         conditions.push(`user_id = "${usuarioFilter}"`)
       }
 
-      if (garagemFilter && garagemFilter !== 'Todos') {
-        conditions.push(`filial = ${garagemFilter}`)
-      }
-
       if (tipoPagamentoFilter && tipoPagamentoFilter !== 'Todos') {
         conditions.push(`tipo_pagamento = "${tipoPagamentoFilter}"`)
       }
@@ -264,10 +234,6 @@ export default function RelatorioRecebedoria() {
       if (debouncedReferenciaFilter && !isNaN(Number(debouncedReferenciaFilter))) {
         antigasConditions.push(`referencia = ${Number(debouncedReferenciaFilter)}`)
       }
-      if (garagemFilter && garagemFilter !== 'Todos') {
-        antigasConditions.push(`filial_id = ${garagemFilter}`)
-      }
-
       let antigasRes = await pb.collection('colaboradores').getFullList({
         filter: antigasConditions.join(' && '),
         sort: '-referencia,-created',
@@ -327,10 +293,8 @@ export default function RelatorioRecebedoria() {
     debouncedReferenciaFilter,
     statusFilter,
     usuarioFilter,
-    garagemFilter,
     tipoPagamentoFilter,
     allUsers.length,
-    filiaisOptions.length,
   ])
 
   const sortedSummaryData = React.useMemo(() => {
@@ -389,7 +353,6 @@ export default function RelatorioRecebedoria() {
   const clearFilters = () => {
     setStatusFilter('Todos')
     setUsuarioFilter('Todos')
-    setGaragemFilter('Todos')
     setTipoPagamentoFilter('Todos')
     setSearchTerm('')
     setReferenciaFilter('')
@@ -598,12 +561,6 @@ export default function RelatorioRecebedoria() {
               <span className="font-bold">Período:</span> {formatDateStringSafe(startDate)} a{' '}
               {formatDateStringSafe(endDate)}
             </p>
-            <p>
-              <span className="font-bold">Filial:</span>{' '}
-              {garagemFilter === 'Todos'
-                ? 'Todas'
-                : filiaisOptions.find((f) => f.value === garagemFilter)?.label || garagemFilter}
-            </p>
           </div>
           <div className="text-right">
             <p>
@@ -705,23 +662,6 @@ export default function RelatorioRecebedoria() {
               onChange={(e) => setReferenciaFilter(e.target.value)}
               className="bg-white dark:bg-slate-950"
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Garagem</Label>
-            <Select value={garagemFilter} onValueChange={setGaragemFilter}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todas</SelectItem>
-                {filiaisOptions.map((f) => (
-                  <SelectItem key={f.value} value={f.value}>
-                    {f.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">
