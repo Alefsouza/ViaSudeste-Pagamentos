@@ -37,6 +37,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { useRealtime } from '@/hooks/use-realtime'
 import { PhotoPreviewModal } from '@/components/PhotoPreviewModal'
 import { cn } from '@/lib/utils'
+import { fetchPhotoAsBase64 } from '@/lib/photo-cache'
 
 type ViewState =
   | 'EMPTY'
@@ -57,6 +58,7 @@ export default function Camera() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [blockedDate, setBlockedDate] = useState<string | null>(null)
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false)
+  const [fotoBase64, setFotoBase64] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -314,6 +316,8 @@ export default function Camera() {
           .getFirstListItem(`registro = "${registro}"`)
         if (fotoRecord && fotoRecord.foto) {
           fotoUrl = pb.files.getURL(fotoRecord, fotoRecord.foto)
+        } else if (fotoRecord && fotoRecord.foto_url) {
+          fotoUrl = fotoRecord.foto_url
         }
       } catch (err) {
         // No photo found
@@ -326,7 +330,16 @@ export default function Camera() {
         records: records,
       })
       setFotoPredeterminada(fotoUrl)
+      setFotoBase64(null)
       setViewState('CAPTURING')
+
+      if (fotoUrl) {
+        fetchPhotoAsBase64(fotoUrl, registro)
+          .then((b64) => {
+            if (b64) setFotoBase64(b64)
+          })
+          .catch(() => {})
+      }
     } catch (err: any) {
       setViewState('SEARCH_FAILED')
       const msg = err.message || 'Erro ao buscar dados do colaborador'
@@ -474,6 +487,7 @@ export default function Camera() {
           fotoPredeterminada,
           fotoCaptured,
           colaborador?.registro,
+          fotoBase64 || undefined,
         )
 
         if (success) {
@@ -692,6 +706,7 @@ export default function Camera() {
     setRegistro('')
     setColaborador(null)
     setFotoPredeterminada(null)
+    setFotoBase64(null)
     setFotoCapturada(null)
     setErrorMsg(null)
     setViewState('EMPTY')
@@ -700,6 +715,7 @@ export default function Camera() {
   const handleRetry = () => {
     setColaborador(null)
     setFotoPredeterminada(null)
+    setFotoBase64(null)
     setFotoCapturada(null)
     setErrorMsg(null)
     setViewState('EMPTY')

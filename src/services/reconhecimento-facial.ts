@@ -15,15 +15,19 @@ export const reconhecimentoFacialService = async (
   fotoPredeterminada: string,
   fotoCaptured: string,
   registro?: string,
+  fotoPredeterminadaBase64?: string,
 ): Promise<boolean> => {
   try {
+    const payload: Record<string, string> = {
+      fotoPredeterminada,
+      fotoCaptured,
+    }
+    if (registro) payload.registro = registro
+    if (fotoPredeterminadaBase64) payload.fotoPredeterminadaBase64 = fotoPredeterminadaBase64
+
     const response = await pb.send<{ match: boolean }>('/backend/v1/facial-recognition', {
       method: 'POST',
-      body: JSON.stringify({
-        fotoPredeterminada,
-        fotoCaptured,
-        registro,
-      }),
+      body: JSON.stringify(payload),
     })
     return response.match
   } catch (error) {

@@ -154,6 +154,7 @@ routerAdd(
     let fotoPredeterminada = body.fotoPredeterminada || body.fotoDoBanco
     let fotoCaptured = body.fotoCaptured || body.fotoCapturada
     const registro = body.registro
+    const fotoPredeterminadaBase64 = body.fotoPredeterminadaBase64
 
     if (!fotoPredeterminada || !fotoCaptured) {
       return e.badRequestError('Missing images')
@@ -233,53 +234,60 @@ routerAdd(
       return result
     }
 
-    let sourceB64 = fotoPredeterminada
     let targetB64 = fotoCaptured.includes(',') ? fotoCaptured.split(',')[1] : fotoCaptured
+    let sourceB64
 
-    const cacheKey = registro || fotoPredeterminada
-    globalThis.__photoCache = globalThis.__photoCache || {}
-    const now = Date.now()
-
-    for (const key in globalThis.__photoCache) {
-      if (now - globalThis.__photoCache[key].time > 300000) {
-        delete globalThis.__photoCache[key]
-      }
-    }
-
-    if (globalThis.__photoCache[cacheKey]) {
-      sourceB64 = globalThis.__photoCache[cacheKey].data
+    if (fotoPredeterminadaBase64) {
+      sourceB64 = fotoPredeterminadaBase64.includes(',')
+        ? fotoPredeterminadaBase64.split(',')[1]
+        : fotoPredeterminadaBase64
     } else {
-      if (sourceB64.startsWith('http://') || sourceB64.startsWith('https://')) {
-        try {
-          const headers = {}
-          const authHeader = e.requestInfo().headers['authorization']
-          if (authHeader) headers['Authorization'] = authHeader
+      sourceB64 = fotoPredeterminada
+      const cacheKey = registro || fotoPredeterminada
+      globalThis.__photoCache = globalThis.__photoCache || {}
+      const now = Date.now()
 
-          const fetchRes = $http.send({
-            url: sourceB64,
-            method: 'GET',
-            headers: headers,
-            timeout: 5,
-          })
-          if (fetchRes.statusCode === 200 && fetchRes.body) {
-            sourceB64 = bytesToBase64(fetchRes.body)
-            if (!sourceB64) throw new Error('Falha na conversão de bytes')
-            globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
-          } else {
+      for (const key in globalThis.__photoCache) {
+        if (now - globalThis.__photoCache[key].time > 300000) {
+          delete globalThis.__photoCache[key]
+        }
+      }
+
+      if (globalThis.__photoCache[cacheKey]) {
+        sourceB64 = globalThis.__photoCache[cacheKey].data
+      } else {
+        if (sourceB64.startsWith('http://') || sourceB64.startsWith('https://')) {
+          try {
+            const headers = {}
+            const authHeader = e.requestInfo().headers['authorization']
+            if (authHeader) headers['Authorization'] = authHeader
+
+            const fetchRes = $http.send({
+              url: sourceB64,
+              method: 'GET',
+              headers: headers,
+              timeout: 5,
+            })
+            if (fetchRes.statusCode === 200 && fetchRes.body) {
+              sourceB64 = bytesToBase64(fetchRes.body)
+              if (!sourceB64) throw new Error('Falha na conversão de bytes')
+              globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
+            } else {
+              logRecord.set('status', 400)
+              $app.save(logRecord)
+              console.log('Erro ao baixar foto do banco. Status: ' + fetchRes.statusCode)
+              return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
+            }
+          } catch (err) {
             logRecord.set('status', 400)
             $app.save(logRecord)
-            console.log('Erro ao baixar foto do banco. Status: ' + fetchRes.statusCode)
+            console.log('Erro ao baixar foto do banco: ' + String(err))
             return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
           }
-        } catch (err) {
-          logRecord.set('status', 400)
-          $app.save(logRecord)
-          console.log('Erro ao baixar foto do banco: ' + String(err))
-          return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
+        } else {
+          sourceB64 = sourceB64.includes(',') ? sourceB64.split(',')[1] : sourceB64
+          globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
         }
-      } else {
-        sourceB64 = sourceB64.includes(',') ? sourceB64.split(',')[1] : sourceB64
-        globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
       }
     }
 
@@ -332,13 +340,13 @@ routerAdd(
       const canonicalHeaders = `content-type:application/x-amz-json-1.1\nhost:${host}\nx-amz-date:${amzDate}\nx-amz-target:${amzTarget}\n`
       const signedHeaders = 'content-type;host;x-amz-date;x-amz-target'
 
-      const payloadHash = sha256_hex(requestBody)
+      const payloadHash = $security.sha256(requestBody)
 
       const canonicalRequest = `${method}\n${canonicalUri}\n${canonicalQuerystring}\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`
 
       const algorithm = 'AWS4-HMAC-SHA256'
       const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`
-      const stringToSign = `${algorithm}\n${amzDate}\n${credentialScope}\n${sha256_hex(canonicalRequest)}`
+      const stringToSign = `${algorithm}\n${amzDate}\n${credentialScope}\n${$security.sha256(canonicalRequest)}`
 
       const signingKey = getSignatureKey(secretKey, dateStamp, region, service)
       const signature = hmac_sha256_hex(signingKey, stringToSign)
