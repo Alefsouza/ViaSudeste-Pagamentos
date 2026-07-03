@@ -307,7 +307,7 @@ routerAdd(
       requestBody = JSON.stringify({
         SourceImage: { Bytes: sourceB64 },
         TargetImage: { Bytes: targetB64 },
-        SimilarityThreshold: 80,
+        SimilarityThreshold: 70,
       })
     } catch (err) {
       logRecord.set('status', 400)
@@ -412,7 +412,7 @@ routerAdd(
         let similarity = 'N/A'
         if (faceMatches.length > 0) {
           similarity = faceMatches[0].Similarity
-          if (similarity >= 80) {
+          if (similarity >= 70) {
             match = true
           }
         }
