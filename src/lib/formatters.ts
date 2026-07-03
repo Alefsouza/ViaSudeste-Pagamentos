@@ -1,13 +1,20 @@
 export const formatDataString = (dStr?: string) => {
   if (!dStr) return '-'
-  if (dStr.includes('/')) return dStr
-  if (dStr.includes('-')) {
-    const parts = dStr.split(' ')[0].split('-')
-    if (parts.length === 3) {
-      if (parts[0].length === 4) return `${parts[2]}/${parts[1]}/${parts[0]}`
-      return `${parts[0]}/${parts[1]}/${parts[2]}`
-    }
+  const trimmed = dStr.trim()
+
+  // Brazilian date format: dd/mm/yyyy — normalize and return
+  const matchBr = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (matchBr) {
+    return `${matchBr[1].padStart(2, '0')}/${matchBr[2].padStart(2, '0')}/${matchBr[3]}`
   }
+
+  // ISO date or datetime: extract YYYY-MM-DD portion and convert to dd/mm/yyyy directly
+  // (avoids Date object timezone shifting the day)
+  const matchIso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (matchIso) {
+    return `${matchIso[3]}/${matchIso[2]}/${matchIso[1]}`
+  }
+
   return dStr
 }
 
@@ -43,7 +50,14 @@ export const formatDateTimeBR = (dateStr?: string | null): string => {
   let str = dateStr.trim()
   if (!str) return '-'
 
+  // Brazilian date-only: dd/mm/yyyy — return as-is
   if (str.includes('/') && !str.includes(':')) return str
+
+  // ISO date-only: YYYY-MM-DD — format directly without timezone shift
+  if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const parts = str.split('-')
+    return `${parts[2]}/${parts[1]}/${parts[0]} às 00:00`
+  }
 
   if (str.includes(' ') && !str.includes('T')) {
     str = str.replace(' ', 'T')
@@ -58,14 +72,10 @@ export const formatDateTimeBR = (dateStr?: string | null): string => {
     str += 'Z'
   }
 
-  if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    const parts = str.split('-')
-    return `${parts[2]}/${parts[1]}/${parts[0]} às 00:00`
-  }
-
   const date = new Date(str)
   if (isNaN(date.getTime())) return '-'
 
+  // Convert UTC to Brazilian timezone (UTC-3) for display
   const localDate = new Date(date.getTime() - 3 * 3600000)
 
   const day = String(localDate.getUTCDate()).padStart(2, '0')
@@ -102,10 +112,18 @@ export const getPaymentDisplayDate = (item: any): string | null => {
 
 export const formatDateDBToBR = (dStr?: string | null) => {
   if (!dStr) return 'N/A'
+  const trimmed = String(dStr).trim()
+
+  // Already in Brazilian format: dd/mm/yyyy
+  const matchBr = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (matchBr) {
+    return `${matchBr[1].padStart(2, '0')}/${matchBr[2].padStart(2, '0')}/${matchBr[3]}`
+  }
+
   // Isolate the YYYY-MM-DD part from ISO strings to avoid timezone shifts
-  const datePart = dStr.split(' ')[0].split('T')[0]
+  const datePart = trimmed.split(' ')[0].split('T')[0]
   const parts = datePart.split('-')
-  if (parts.length === 3) {
+  if (parts.length === 3 && parts[0].length === 4) {
     const [y, m, day] = parts
     return `${day}/${m}/${y}`
   }

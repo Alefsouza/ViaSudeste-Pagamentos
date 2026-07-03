@@ -354,28 +354,49 @@ export default function Camera() {
 
   const formatDateSafe = (dStr?: string) => {
     if (!dStr) return 'Data não informada'
-    let cleanStr = dStr
+
+    const trimmed = dStr.trim()
+
+    // Brazilian date format: dd/mm/yyyy — return as-is (already correct)
+    const matchBr = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+    if (matchBr) {
+      const dd = matchBr[1].padStart(2, '0')
+      const mm = matchBr[2].padStart(2, '0')
+      const yyyy = matchBr[3]
+      return `${dd}/${mm}/${yyyy}`
+    }
+
+    // ISO date-only: YYYY-MM-DD — convert directly without Date object (avoids timezone shift)
+    const matchIsoDate = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (matchIsoDate) {
+      return `${matchIsoDate[3]}/${matchIsoDate[2]}/${matchIsoDate[1]}`
+    }
+
+    // ISO datetime: extract date portion directly to avoid timezone issues
+    const matchIsoDateTime = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T\s]/)
+    if (matchIsoDateTime) {
+      return `${matchIsoDateTime[3]}/${matchIsoDateTime[2]}/${matchIsoDateTime[1]}`
+    }
+
+    // Fallback: try Date object with UTC methods (no timezone subtraction)
+    let cleanStr = trimmed
     if (cleanStr.includes(' ') && !cleanStr.includes('T')) cleanStr = cleanStr.replace(' ', 'T')
     if (
       !cleanStr.endsWith('Z') &&
       cleanStr.split('T').length === 2 &&
       !cleanStr.includes('+') &&
       !cleanStr.match(/-\d{2}:\d{2}$/)
-    )
+    ) {
       cleanStr += 'Z'
+    }
     const d = new Date(cleanStr)
     if (!isNaN(d.getTime())) {
-      const utcMinus3 = new Date(d.getTime() - 3 * 3600000)
-      const dd = String(utcMinus3.getUTCDate()).padStart(2, '0')
-      const mm = String(utcMinus3.getUTCMonth() + 1).padStart(2, '0')
-      const yyyy = utcMinus3.getUTCFullYear()
+      const dd = String(d.getUTCDate()).padStart(2, '0')
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+      const yyyy = d.getUTCFullYear()
       return `${dd}/${mm}/${yyyy}`
     }
 
-    const matchIso = dStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
-    if (matchIso) return `${matchIso[3]}/${matchIso[2]}/${matchIso[1]}`
-    const matchBr = dStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
-    if (matchBr) return `${matchBr[1]}/${matchBr[2]}/${matchBr[3]}`
     return dStr
   }
 
