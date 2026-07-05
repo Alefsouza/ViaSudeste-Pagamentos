@@ -71,6 +71,7 @@ import {
   formatDateTimeBR,
   getPaymentDisplayDate,
   normalizeTimestampForSort,
+  toBrasiliaDateString,
 } from '@/lib/formatters'
 import { ExportFolhaModal } from '@/components/ExportFolhaModal'
 
@@ -258,6 +259,13 @@ export default function Dashboard() {
           performFetch(false)
         }
       } catch (e: any) {
+        if (e?.status === 401 || e?.response?.status === 401) {
+          isFetchingRef.current = false
+          setStatsLoading(false)
+          pb.authStore.clear()
+          window.location.href = '/'
+          return
+        }
         setIsRetrying(true)
         isFetchingRef.current = false
 
@@ -417,14 +425,15 @@ export default function Dashboard() {
             updatedStr = curr.pagamento_relacionado?.updated || curr.updated
           }
           if (updatedStr) {
-            const rawDate = updatedStr.split(' ')[0].split('T')[0]
-            if (debouncedFilters.startDate && rawDate < debouncedFilters.startDate) return false
-            if (debouncedFilters.endDate && rawDate > debouncedFilters.endDate) return false
+            const rawDate = toBrasiliaDateString(updatedStr)
+            if (debouncedFilters.startDate && (!rawDate || rawDate < debouncedFilters.startDate))
+              return false
+            if (debouncedFilters.endDate && (!rawDate || rawDate > debouncedFilters.endDate))
+              return false
           } else {
             return false
           }
-        }
-        // If not Confirmado (e.g. Pendente), we maintain visibility by letting it pass the date filter.
+        } // If not Confirmado (e.g. Pendente), we maintain visibility by letting it pass the date filter.
       }
       return true
     })
@@ -456,35 +465,12 @@ export default function Dashboard() {
       }
 
       if (selectedChartDate) {
-        let dateKey: string | null = null
         const hasPhoto =
           curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
-        let rawDate = ''
+        let dateKey: string | null = null
         if (hasPhoto) {
           const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
-          if (updatedDate) {
-            rawDate = updatedDate.split(' ')[0].split('T')[0]
-          }
-        }
-
-        if (rawDate) {
-          let str = rawDate
-          if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            dateKey = str
-          } else if (str.includes('/')) {
-            const parts = str.split('/')
-            if (parts.length === 3) {
-              if (parts[2].length === 4)
-                dateKey = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-              else if (parts[0].length === 4)
-                dateKey = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`
-              else dateKey = str
-            } else {
-              dateKey = str
-            }
-          } else {
-            dateKey = str
-          }
+          dateKey = toBrasiliaDateString(updatedDate)
         }
 
         if (!dateKey || dateKey !== selectedChartDate) return false
@@ -637,9 +623,7 @@ export default function Dashboard() {
       const hasPhoto = curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
       if (hasPhoto) {
         const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
-        if (updatedDate) {
-          dateKey = updatedDate.split(' ')[0].split('T')[0]
-        }
+        dateKey = toBrasiliaDateString(updatedDate)
       }
 
       if (!dateKey) return acc

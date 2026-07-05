@@ -32,11 +32,11 @@ function ProtectedRoute({
   allowedEmails?: string[]
   allowedEmailsAny?: string[]
 }) {
-  const { user, loading } = useAuth()
+  const { user, isAuthenticated, loading } = useAuth()
 
   if (loading) return null
 
-  if (!user) return <Navigate to="/" replace />
+  if (!isAuthenticated || !user) return <Navigate to="/" replace />
 
   const hasAnyEmail = allowedEmailsAny?.includes(user.email)
 

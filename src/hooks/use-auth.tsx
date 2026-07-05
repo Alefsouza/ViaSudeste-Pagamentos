@@ -14,6 +14,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null
+  isAuthenticated: boolean
   login: (email: string, pass: string) => Promise<{ error: any }>
   logout: () => void
   loading: boolean
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -38,15 +40,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    setUser(mapUser(pb.authStore.record))
-    setLoading(false)
+    const syncUser = () => {
+      if (pb.authStore.isValid && pb.authStore.record) {
+        setUser(mapUser(pb.authStore.record))
+        setIsAuthenticated(true)
+      } else {
+        setUser(null)
+        setIsAuthenticated(false)
+      }
+      setLoading(false)
+    }
+
+    syncUser()
+
+    if (!pb.authStore.isValid && pb.authStore.record) {
+      pb.authStore.clear()
+    }
 
     const unsubscribe = pb.authStore.onChange((_token, record) => {
-      setUser(mapUser(record))
+      if (pb.authStore.isValid) {
+        setUser(mapUser(record))
+        setIsAuthenticated(true)
+      } else {
+        setUser(null)
+        setIsAuthenticated(false)
+      }
     })
+
+    const interval = setInterval(() => {
+      if (!pb.authStore.isValid && pb.authStore.record) {
+        pb.authStore.clear()
+        if (window.location.pathname !== '/') {
+          window.location.href = '/'
+        }
+      }
+    }, 30000)
 
     return () => {
       unsubscribe()
+      clearInterval(interval)
     }
   }, [])
 
@@ -62,10 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     pb.authStore.clear()
     setUser(null)
+    setIsAuthenticated(false)
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, isAuthenticated, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
   )
 }
 

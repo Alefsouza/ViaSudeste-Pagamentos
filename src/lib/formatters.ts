@@ -200,3 +200,33 @@ export const normalizeTimestampForSort = (dateStr?: string | null): string => {
 
   return str
 }
+
+export const toBrasiliaDateString = (dateStr?: string | null): string | null => {
+  if (!dateStr) return null
+  let str = dateStr.trim()
+  if (!str) return null
+
+  if (str.includes(' ') && !str.includes('T')) {
+    str = str.replace(' ', 'T')
+  }
+
+  if (
+    str.includes('T') &&
+    !str.endsWith('Z') &&
+    !str.includes('+') &&
+    !str.match(/-\d{2}:\d{2}$/)
+  ) {
+    str += 'Z'
+  }
+
+  const date = new Date(str)
+  if (isNaN(date.getTime())) return null
+
+  const localDate = new Date(date.getTime() - 3 * 3600000)
+
+  const year = localDate.getUTCFullYear()
+  const month = String(localDate.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(localDate.getUTCDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
