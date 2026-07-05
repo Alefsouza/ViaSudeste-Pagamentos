@@ -53,6 +53,8 @@ import {
   formatDateTimeBR,
   getPaymentDisplayDate,
   normalizeTimestampForSort,
+  getBrasiliaStartUTC,
+  getBrasiliaEndUTC,
 } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 
@@ -156,8 +158,10 @@ export default function RelatorioRecebedoria() {
       const conditions: string[] = []
 
       if (startDate && endDate) {
+        const startUTC = getBrasiliaStartUTC(startDate)
+        const endUTC = getBrasiliaEndUTC(endDate)
         conditions.push(
-          `updated >= "${startDate} 00:00:00" && updated <= "${endDate} 23:59:59" && foto_confirmacao_url != ""`,
+          `updated >= "${startUTC}" && updated <= "${endUTC}" && foto_confirmacao_url != ""`,
         )
       }
       if (startTime) {
