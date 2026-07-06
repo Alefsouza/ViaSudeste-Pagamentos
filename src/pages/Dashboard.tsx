@@ -74,6 +74,8 @@ import {
   toBrasiliaDateString,
 } from '@/lib/formatters'
 import { ExportFolhaModal } from '@/components/ExportFolhaModal'
+import { DashboardPaymentModal } from '@/components/DashboardPaymentModal'
+import { PaymentTableRow } from '@/components/PaymentTableRow'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   if (curr.pagamento_relacionado?.status === 'Cancelado') return 'Cancelado'
@@ -298,37 +300,40 @@ export default function Dashboard() {
     performFetch,
   ])
 
-  const handleToggleRelease = async (payment: any) => {
-    if (!isAuthorized) {
-      toast({
-        title: 'Ação não permitida',
-        description: 'Você não tem permissão para liberar pagamentos.',
-        variant: 'destructive',
-      })
-      return
-    }
-    try {
-      const liberadoPagamento = payment.liberado_pagamento
-      const newStatus = !liberadoPagamento
-      const targetId = payment.id
-
-      const dataUpdate: any = { liberado_pagamento: newStatus }
-      if (newStatus) {
-        dataUpdate.data_liberacao = new Date().toISOString()
+  const handleToggleRelease = useCallback(
+    async (payment: any) => {
+      if (!isAuthorized) {
+        toast({
+          title: 'Ação não permitida',
+          description: 'Você não tem permissão para liberar pagamentos.',
+          variant: 'destructive',
+        })
+        return
       }
+      try {
+        const liberadoPagamento = payment.liberado_pagamento
+        const newStatus = !liberadoPagamento
+        const targetId = payment.id
 
-      await pb.collection('colaboradores').update(targetId, dataUpdate)
-      toast({
-        title: newStatus ? 'Pagamento liberado com sucesso.' : 'Pagamento bloqueado com sucesso.',
-      })
-      scheduleRefresh(false)
-    } catch (err: any) {
-      toast({
-        title: 'Erro ao alterar o status do pagamento. Tente novamente.',
-        variant: 'destructive',
-      })
-    }
-  }
+        const dataUpdate: any = { liberado_pagamento: newStatus }
+        if (newStatus) {
+          dataUpdate.data_liberacao = new Date().toISOString()
+        }
+
+        await pb.collection('colaboradores').update(targetId, dataUpdate)
+        toast({
+          title: newStatus ? 'Pagamento liberado com sucesso.' : 'Pagamento bloqueado com sucesso.',
+        })
+        scheduleRefresh(false)
+      } catch (err: any) {
+        toast({
+          title: 'Erro ao alterar o status do pagamento. Tente novamente.',
+          variant: 'destructive',
+        })
+      }
+    },
+    [isAuthorized, toast, scheduleRefresh],
+  )
 
   const handleDeletePayment = async () => {
     if (!paymentToCancel) return
@@ -365,6 +370,24 @@ export default function Dashboard() {
       })
     }
   }
+
+  const handlePaymentConfirmed = useCallback((colaboradorId: string) => {
+    setStatsData((prev) =>
+      prev.map((c) => {
+        if (c.id === colaboradorId) {
+          return {
+            ...c,
+            pagamento_relacionado: {
+              ...(c.pagamento_relacionado || {}),
+              status: 'Confirmado',
+              valor_pago: c.valor_a_receber || c.valor || 0,
+            },
+          }
+        }
+        return c
+      }),
+    )
+  }, [])
 
   useEffect(() => {
     if (statsData.length > 0) {
@@ -746,7 +769,9 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {canManagePayments && null}
+          {canManagePayments && (
+            <DashboardPaymentModal maxRef={maxRef} onPaymentConfirmed={handlePaymentConfirmed} />
+          )}
           {(selectedChartFilial ||
             selectedChartDate ||
             selectedChartRef.size > 0 ||
@@ -1345,151 +1370,15 @@ export default function Dashboard() {
                                   </TableCell>
                                 </TableRow>,
                                 ...records.map((p: any) => (
-                                  <TableRow key={p.id}>
-                                    <TableCell className="font-medium pl-8">
-                                      {p.nome || 'Desconhecido'}
-                                    </TableCell>
-                                    <TableCell>{p.registro || '-'}</TableCell>
-                                    <TableCell>
-                                      {p.filial === 2
-                                        ? 'Cursino'
-                                        : p.filial === 4
-                                          ? 'Sapopemba'
-                                          : p.filial || '-'}
-                                    </TableCell>
-                                    <TableCell>{p.referencia ?? '-'}</TableCell>
-                                    <TableCell className="text-emerald-600 dark:text-emerald-500 font-medium text-left">
-                                      {formatBRL(getActualValue(p))}
-                                    </TableCell>
-                                    <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-                                    <TableCell>
-                                      {(() => {
-                                        const displayDate = getPaymentDisplayDate(p)
-                                        return displayDate ? formatDateTimeBR(displayDate) : '-'
-                                      })()}
-                                    </TableCell>
-                                    <TableCell>
-                                      {(() => {
-                                        const status = getEvaluatedStatus(p, maxRef)
-                                        if (!status) return null
-
-                                        if (status === 'Confirmado')
-                                          return (
-                                            <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                                              Confirmado
-                                            </Badge>
-                                          )
-                                        if (status === 'Agendado') {
-                                          return (
-                                            <TooltipProvider>
-                                              <Tooltip>
-                                                <TooltipTrigger className="cursor-help">
-                                                  <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1 w-max">
-                                                    <Lock className="w-3 h-3" />
-                                                    Agendado
-                                                  </Badge>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                  <p>
-                                                    Liberado em:{' '}
-                                                    {formatDateDBToBR(p.data_liberacao)}
-                                                  </p>
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            </TooltipProvider>
-                                          )
-                                        }
-                                        if (status === 'Bloqueado') {
-                                          return (
-                                            <Badge className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 w-max">
-                                              <Lock className="w-3 h-3" />
-                                              Bloqueado
-                                            </Badge>
-                                          )
-                                        }
-                                        if (status === 'Pendente') {
-                                          return (
-                                            <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
-                                              Pendente
-                                            </Badge>
-                                          )
-                                        }
-                                        if (status === 'Cancelado')
-                                          return <Badge variant="destructive">Cancelado</Badge>
-                                        return <Badge variant="outline">{status}</Badge>
-                                      })()}
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                      {p.foto_confirmacao_url && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() =>
-                                            setSelectedPhotoUrl(p.foto_confirmacao_url)
-                                          }
-                                        >
-                                          <ImageIcon className="w-4 h-4 mr-2" />
-                                          Visualizar
-                                        </Button>
-                                      )}
-                                    </TableCell>
-                                    {canManagePayments && (
-                                      <TableCell className="text-center">
-                                        {(() => {
-                                          const status = getEvaluatedStatus(p, maxRef)
-
-                                          const actualRef = p.referencia
-                                          const isOutsideValidity =
-                                            actualRef && maxRef > 0 && actualRef < maxRef - 3
-
-                                          const liberadoPagamento = p.liberado_pagamento
-
-                                          return (
-                                            <div className="flex justify-center gap-1">
-                                              {(status === 'Pendente' || status === 'Bloqueado') &&
-                                                isOutsideValidity && (
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className={cn(
-                                                      'hover:bg-amber-100 dark:hover:bg-amber-900/50',
-                                                      liberadoPagamento
-                                                        ? 'text-emerald-500 hover:text-emerald-700'
-                                                        : 'text-amber-500 hover:text-amber-700',
-                                                    )}
-                                                    onClick={() => handleToggleRelease(p)}
-                                                    title={
-                                                      liberadoPagamento
-                                                        ? 'Bloquear Pagamento'
-                                                        : 'Liberar Pagamento'
-                                                    }
-                                                  >
-                                                    {liberadoPagamento ? (
-                                                      <Lock className="h-4 w-4" />
-                                                    ) : (
-                                                      <Unlock className="h-4 w-4" />
-                                                    )}
-                                                  </Button>
-                                                )}
-                                              {(status === 'Pendente' ||
-                                                status === 'Bloqueado' ||
-                                                status === 'Agendado') && (
-                                                <Button
-                                                  variant="ghost"
-                                                  size="icon"
-                                                  className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
-                                                  onClick={() => setPaymentToCancel(p)}
-                                                  title="Excluir Pagamento"
-                                                >
-                                                  <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                              )}
-                                            </div>
-                                          )
-                                        })()}
-                                      </TableCell>
-                                    )}
-                                  </TableRow>
+                                  <PaymentTableRow
+                                    key={p.id}
+                                    record={p}
+                                    maxRef={maxRef}
+                                    canManagePayments={canManagePayments}
+                                    onPhotoClick={setSelectedPhotoUrl}
+                                    onToggleRelease={handleToggleRelease}
+                                    onDeleteClick={setPaymentToCancel}
+                                  />
                                 )),
                               ]
                             },

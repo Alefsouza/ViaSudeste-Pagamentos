@@ -16,9 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Search, CheckCircle } from 'lucide-react'
+import { Search, CheckCircle, Loader2 } from 'lucide-react'
 import { formatBRL, checkIsLocked } from '@/lib/formatters'
-import { format } from 'date-fns'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
@@ -27,10 +26,10 @@ import { toast as sonnerToast } from 'sonner'
 
 export function DashboardPaymentModal({
   maxRef,
-  onRefresh,
+  onPaymentConfirmed,
 }: {
   maxRef: number
-  onRefresh: () => void
+  onPaymentConfirmed: (colaboradorId: string) => void
 }) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -135,7 +134,6 @@ export function DashboardPaymentModal({
 
       let existingPaymentId = null
       try {
-        // Detect if a "Pendente" or existing record already exists for this specific collaborator and reference period
         let filterStr = `colaborador_id="${record.id}"`
         if (record.inicio) {
           filterStr += ` && inicio="${record.inicio}"`
@@ -154,10 +152,16 @@ export function DashboardPaymentModal({
         await pb.collection('pagamentos').create(formData)
       }
 
+      setRecords((prev) => prev.filter((r) => r.id !== record.id))
+      setPhotos((prev) => {
+        const next = { ...prev }
+        delete next[record.id]
+        return next
+      })
+
+      onPaymentConfirmed(record.id)
+
       toast({ title: 'Pagamento aprovado com sucesso!' })
-      setOpen(false)
-      setRecords([])
-      onRefresh()
     } catch (err: any) {
       console.error('Erro completo do servidor:', err.response, err.response?.data, err)
       const errors = extractFieldErrors(err)
@@ -201,7 +205,11 @@ export function DashboardPaymentModal({
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
           <Button onClick={handleSearch} disabled={loading}>
-            <Search className="w-4 h-4 mr-2" />
+            {loading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Search className="w-4 h-4 mr-2" />
+            )}
             Buscar
           </Button>
         </div>
@@ -220,7 +228,7 @@ export function DashboardPaymentModal({
               </TableHeader>
               <TableBody>
                 {records.map((r) => (
-                  <TableRow key={r.id}>
+                  <TableRow key={r.id} className={submitting[r.id] ? 'opacity-50' : ''}>
                     <TableCell>
                       <div className="font-medium">{r.nome || 'Desconhecido'}</div>
                       <div className="text-xs text-muted-foreground">{r.registro}</div>
@@ -243,6 +251,7 @@ export function DashboardPaymentModal({
                           setPhotos((prev) => ({ ...prev, [r.id]: file }))
                         }}
                         className="w-56"
+                        disabled={submitting[r.id]}
                       />
                     </TableCell>
                     <TableCell>
@@ -253,7 +262,14 @@ export function DashboardPaymentModal({
                           disabled={submitting[r.id]}
                           className="bg-emerald-600 hover:bg-emerald-700"
                         >
-                          Confirmar
+                          {submitting[r.id] ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                              Confirmando...
+                            </>
+                          ) : (
+                            'Confirmar'
+                          )}
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground">Sem permissão</span>
