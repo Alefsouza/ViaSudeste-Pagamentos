@@ -274,7 +274,7 @@ export default function Camera() {
       })
 
       if (!records || records.length === 0) {
-        const msg = 'Colaborador não encontrado para este registro.'
+        const msg = 'Não há pagamento para esse colaborador.'
         setViewState('SEARCH_FAILED')
         setErrorMsg(msg)
         toast({ title: 'Aviso', description: msg, variant: 'destructive' })
@@ -294,14 +294,7 @@ export default function Camera() {
       })
 
       if (availableRecords.length === 0) {
-        let msg = 'Não há valor para o colaborador receber no momento.'
-        if (!hasLiberado) {
-          msg = 'O pagamento ainda não foi liberado para este colaborador.'
-        } else if (!hasValidTime) {
-          msg = 'A data de liberação do pagamento ainda não foi atingida.'
-        } else if (!hasPendente) {
-          msg = 'Todos os pagamentos deste colaborador já foram confirmados.'
-        }
+        const msg = 'Não há pagamento para esse colaborador.'
 
         setViewState('SEARCH_FAILED')
         setErrorMsg(msg)
