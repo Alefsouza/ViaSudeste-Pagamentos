@@ -63,6 +63,7 @@ export default function Camera() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [streamActive, setStreamActive] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
 
   const { toast } = useToast()
   const { user } = useAuth()
@@ -178,6 +179,7 @@ export default function Camera() {
       stream.getTracks().forEach((track) => track.stop())
       videoRef.current.srcObject = null
       setStreamActive(false)
+      setCameraReady(false)
     }
   }, [])
 

@@ -2,61 +2,38 @@ routerAdd(
   'POST',
   '/backend/v1/facial-recognition',
   (e) => {
-    // Pure JS SHA256 and HMAC-SHA256 implementation to remove external dependencies
+    // SHA-256 core for binary HMAC only — text hashing uses native $security.sha256
+    const K256 = [
+      0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+      0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+      0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+      0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+      0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+      0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+      0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+      0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+      0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+      0xc67178f2,
+    ]
+    const H256 = [
+      0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+      0x5be0cd19,
+    ]
     function safe_add(x, y) {
-      const lsw = (x & 0xffff) + (y & 0xffff)
-      const msw = (x >>> 16) + (y >>> 16) + (lsw >>> 16)
-      return (msw << 16) | (lsw & 0xffff)
+      const l = (x & 0xffff) + (y & 0xffff)
+      const m = (x >>> 16) + (y >>> 16) + (l >>> 16)
+      return (m << 16) | (l & 0xffff)
     }
     function S(X, n) {
       return (X >>> n) | (X << (32 - n))
     }
-    function R(X, n) {
-      return X >>> n
-    }
-    function Ch(x, y, z) {
-      return (x & y) ^ (~x & z)
-    }
-    function Maj(x, y, z) {
-      return (x & y) ^ (x & z) ^ (y & z)
-    }
-    function Sigma0256(x) {
-      return S(x, 2) ^ S(x, 13) ^ S(x, 22)
-    }
-    function Sigma1256(x) {
-      return S(x, 6) ^ S(x, 11) ^ S(x, 25)
-    }
-    function Gamma0256(x) {
-      return S(x, 7) ^ S(x, 18) ^ R(x, 3)
-    }
-    function Gamma1256(x) {
-      return S(x, 17) ^ S(x, 19) ^ R(x, 10)
-    }
 
     function core_sha256(m, l) {
-      const K = [
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
-        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
-        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
-        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
-        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
-        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
-        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
-        0xc67178f2,
-      ]
-      const H = [
-        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
-        0x5be0cd19,
-      ]
       const W = new Array(64)
-      let a, b, c, d, e, f, g, h, i, j
-      let T1, T2
-
+      let a, b, c, d, e, f, g, h, i, j, T1, T2
+      const H = H256.slice()
       m[l >> 5] |= 0x80 << (24 - (l % 32))
       m[(((l + 64) >> 9) << 4) + 15] = l
-
       for (i = 0; i < m.length; i += 16) {
         a = H[0]
         b = H[1]
@@ -66,18 +43,24 @@ routerAdd(
         f = H[5]
         g = H[6]
         h = H[7]
-
         for (j = 0; j < 64; j++) {
           if (j < 16) W[j] = m[i + j] || 0
           else
             W[j] = safe_add(
-              safe_add(safe_add(Gamma1256(W[j - 2]), W[j - 7]), Gamma0256(W[j - 15])),
+              safe_add(
+                safe_add(S(W[j - 2], 17) ^ S(W[j - 2], 19) ^ (W[j - 2] >>> 10), W[j - 7]),
+                S(W[j - 15], 7) ^ S(W[j - 15], 18) ^ (W[j - 15] >>> 3),
+              ),
               W[j - 16],
             )
-
-          T1 = safe_add(safe_add(safe_add(safe_add(h, Sigma1256(e)), Ch(e, f, g)), K[j]), W[j])
-          T2 = safe_add(Sigma0256(a), Maj(a, b, c))
-
+          T1 = safe_add(
+            safe_add(
+              safe_add(safe_add(h, S(e, 6) ^ S(e, 11) ^ S(e, 25)), (e & f) ^ (~e & g)),
+              K256[j],
+            ),
+            W[j],
+          )
+          T2 = safe_add(S(a, 2) ^ S(a, 13) ^ S(a, 22), (a & b) ^ (a & c) ^ (b & c))
           h = g
           g = f
           f = e
@@ -87,7 +70,6 @@ routerAdd(
           b = a
           a = safe_add(T1, T2)
         }
-
         H[0] = safe_add(a, H[0])
         H[1] = safe_add(b, H[1])
         H[2] = safe_add(c, H[2])
@@ -100,284 +82,206 @@ routerAdd(
       return H
     }
 
-    function str2binb(str) {
-      const len = str.length
+    function str2binb(s) {
+      const len = s.length
       const bin = new Array((len >> 2) + 1)
       for (let i = 0; i < bin.length; i++) bin[i] = 0
-      for (let i = 0; i < len; i++) {
-        bin[i >> 2] |= (str.charCodeAt(i) & 0xff) << (24 - (i % 4) * 8)
-      }
+      for (let i = 0; i < len; i++) bin[i >> 2] |= (s.charCodeAt(i) & 0xff) << (24 - (i % 4) * 8)
       return { bin: bin, length: len * 8 }
     }
 
-    function binb2hex(binarray) {
-      const hex_tab = '0123456789abcdef'
-      let str = ''
-      for (let i = 0; i < binarray.length * 4; i++) {
-        str +=
-          hex_tab.charAt((binarray[i >> 2] >>> ((3 - (i % 4)) * 8 + 4)) & 0xf) +
-          hex_tab.charAt((binarray[i >> 2] >>> ((3 - (i % 4)) * 8)) & 0xf)
-      }
-      return str
+    function binb2hex(ba) {
+      const t = '0123456789abcdef'
+      let s = ''
+      for (let i = 0; i < ba.length * 4; i++)
+        s +=
+          t.charAt((ba[i >> 2] >>> ((3 - (i % 4)) * 8 + 4)) & 0xf) +
+          t.charAt((ba[i >> 2] >>> ((3 - (i % 4)) * 8)) & 0xf)
+      return s
     }
 
-    function core_hmac_sha256(key_bin, data) {
-      let bkey = key_bin
-      if (bkey.length > 16) bkey = core_sha256(bkey, bkey.length * 32)
-
-      const ipad = new Array(16),
-        opad = new Array(16)
+    function core_hmac_sha256(key, data) {
+      let bk = key
+      if (bk.length > 16) bk = core_sha256(bk, bk.length * 32)
+      const ip = new Array(16),
+        op = new Array(16)
       for (let i = 0; i < 16; i++) {
-        const k = bkey[i] || 0
-        ipad[i] = k ^ 0x36363636
-        opad[i] = k ^ 0x5c5c5c5c
+        const k = bk[i] || 0
+        ip[i] = k ^ 0x36363636
+        op[i] = k ^ 0x5c5c5c5c
       }
-
-      const hash = core_sha256(ipad.concat(data.bin), 512 + data.length)
-      return core_sha256(opad.concat(hash), 512 + 256)
+      return core_sha256(op.concat(core_sha256(ip.concat(data.bin), 512 + data.length)), 512 + 256)
     }
 
-    function hmac_sha256_hex(key_bin, data_str) {
-      return binb2hex(core_hmac_sha256(key_bin, str2binb(data_str)))
-    }
-
-    function hmac_sha256_bin(key_bin, data_str) {
-      return core_hmac_sha256(key_bin, str2binb(data_str))
-    }
-
-    function sha256_hex(data_str) {
-      const data = str2binb(data_str)
-      return binb2hex(core_sha256(data.bin, data.length))
-    }
-
-    const body = e.requestInfo().body || {}
-    let fotoPredeterminada = body.fotoPredeterminada || body.fotoDoBanco
-    let fotoCaptured = body.fotoCaptured || body.fotoCapturada
-    const registro = body.registro
-    const fotoPredeterminadaBase64 = body.fotoPredeterminadaBase64
-
-    if (!fotoPredeterminada || !fotoCaptured) {
-      return e.badRequestError('Missing images')
-    }
-
-    fotoCaptured = fotoCaptured.includes(',') ? fotoCaptured.split(',')[1] : fotoCaptured
-    if (fotoPredeterminada.startsWith('data:')) {
-      fotoPredeterminada = fotoPredeterminada.split(',')[1]
-    }
-
-    const userId = e.auth.id
-    const d = new Date(Date.now() - 60000)
-    const pad = (n) => (n < 10 ? '0' + n : n)
-    const oneMinAgoStr = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.000Z`
-
-    const recentLogs = $app.findRecordsByFilter(
-      'api_audit_logs',
-      `user = '${userId}' && created >= '${oneMinAgoStr}'`,
-      '-created',
-      11,
-      0,
-    )
-
-    if (recentLogs.length >= 10) {
-      return e.json(429, {
-        message: 'Limite de requisicoes atingido. Tente novamente em alguns segundos',
-      })
-    }
-
-    const logRecord = new Record($app.findCollectionByNameOrId('api_audit_logs'))
-    logRecord.set('user', userId)
-    logRecord.set('endpoint', '/backend/v1/facial-recognition')
-    logRecord.set('status', 0)
-    $app.save(logRecord)
-
-    const accessKey = $secrets.get('AWS_API_KEY')
-    const secretKey = $secrets.get('AWS_API_SECRET')
-    const region = 'sa-east-1'
-
-    if (!accessKey || !secretKey) {
-      logRecord.set('status', 401)
-      $app.save(logRecord)
-      return e.json(401, { message: 'Credenciais da AWS invalidas. Verifique Secrets' })
+    function hexToBinb(h) {
+      const b = []
+      for (let i = 0; i < h.length; i += 8) b.push(parseInt(h.substr(i, 8), 16))
+      return b
     }
 
     function bytesToBase64(bytes) {
       let u8
-      if (bytes instanceof Uint8Array) {
-        u8 = bytes
-      } else if (bytes instanceof ArrayBuffer) {
-        u8 = new Uint8Array(bytes)
-      } else if (bytes && bytes.buffer instanceof ArrayBuffer) {
+      if (bytes instanceof Uint8Array) u8 = bytes
+      else if (bytes instanceof ArrayBuffer) u8 = new Uint8Array(bytes)
+      else if (bytes && bytes.buffer instanceof ArrayBuffer)
         u8 = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-      } else {
-        u8 = new Uint8Array(bytes)
-      }
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-      let result = ''
-      let i
-      const len = u8.length
-      for (i = 0; i < len - 2; i += 3) {
-        result += chars[u8[i] >> 2]
-        result += chars[((u8[i] & 3) << 4) | (u8[i + 1] >> 4)]
-        result += chars[((u8[i + 1] & 15) << 2) | (u8[i + 2] >> 6)]
-        result += chars[u8[i + 2] & 63]
-      }
-      if (len % 3 === 2) {
-        result += chars[u8[i] >> 2]
-        result += chars[((u8[i] & 3) << 4) | (u8[i + 1] >> 4)]
-        result += chars[(u8[i + 1] & 15) << 2]
-        result += '='
-      } else if (len % 3 === 1) {
-        result += chars[u8[i] >> 2]
-        result += chars[(u8[i] & 3) << 4]
-        result += '=='
-      }
-      return result
+      else u8 = new Uint8Array(bytes)
+      const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+      const l = u8.length
+      const p = []
+      for (let i = 0; i < l - 2; i += 3)
+        p.push(
+          c[u8[i] >> 2],
+          c[((u8[i] & 3) << 4) | (u8[i + 1] >> 4)],
+          c[((u8[i + 1] & 15) << 2) | (u8[i + 2] >> 6)],
+          c[u8[i + 2] & 63],
+        )
+      if (l % 3 === 2)
+        p.push(
+          c[u8[l - 2] >> 2],
+          c[((u8[l - 2] & 3) << 4) | (u8[l - 1] >> 4)],
+          c[(u8[l - 1] & 15) << 2],
+          '=',
+        )
+      else if (l % 3 === 1) p.push(c[u8[l - 1] >> 2], c[(u8[l - 1] & 3) << 4], '==')
+      return p.join('')
     }
 
-    let targetB64 = fotoCaptured.includes(',') ? fotoCaptured.split(',')[1] : fotoCaptured
-    let sourceB64
+    const body = e.requestInfo().body || {}
+    let fotoPred = body.fotoPredeterminada || body.fotoDoBanco
+    let fotoCap = body.fotoCaptured || body.fotoCapturada
+    const registro = body.registro
+    const fotoPredBase64 = body.fotoPredeterminadaBase64
 
-    if (fotoPredeterminadaBase64) {
-      sourceB64 = fotoPredeterminadaBase64.includes(',')
-        ? fotoPredeterminadaBase64.split(',')[1]
-        : fotoPredeterminadaBase64
+    if (!fotoPred || !fotoCap) return e.badRequestError('Missing images')
+    fotoCap = fotoCap.includes(',') ? fotoCap.split(',')[1] : fotoCap
+    if (fotoPred.startsWith('data:')) fotoPred = fotoPred.split(',')[1]
+
+    const userId = e.auth.id
+    const d = new Date(Date.now() - 60000)
+    const pad = (n) => (n < 10 ? '0' + n : '' + n)
+    const oneMinAgo = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.000Z`
+
+    const recentLogs = $app.findRecordsByFilter(
+      'api_audit_logs',
+      `user='${userId}' && created>='${oneMinAgo}'`,
+      '-created',
+      11,
+      0,
+    )
+    if (recentLogs.length >= 10)
+      return e.json(429, {
+        message: 'Limite de requisicoes atingido. Tente novamente em alguns segundos',
+      })
+
+    const logRecord = new Record($app.findCollectionByNameOrId('api_audit_logs'))
+    logRecord.set('user', userId)
+    logRecord.set('endpoint', '/backend/v1/facial-recognition')
+
+    function respond(status, responseBody) {
+      logRecord.set('status', status)
+      $app.saveNoValidate(logRecord)
+      return e.json(status, responseBody)
+    }
+
+    const accessKey = $secrets.get('AWS_API_KEY')
+    const secretKey = $secrets.get('AWS_API_SECRET')
+    const region = 'sa-east-1'
+    if (!accessKey || !secretKey)
+      return respond(401, { message: 'Credenciais da AWS invalidas. Verifique Secrets' })
+
+    let sourceB64
+    if (fotoPredBase64) {
+      sourceB64 = fotoPredBase64.includes(',') ? fotoPredBase64.split(',')[1] : fotoPredBase64
     } else {
-      sourceB64 = fotoPredeterminada
-      const cacheKey = registro || fotoPredeterminada
+      const cacheKey = registro || fotoPred
       globalThis.__photoCache = globalThis.__photoCache || {}
       const now = Date.now()
-
-      for (const key in globalThis.__photoCache) {
-        if (now - globalThis.__photoCache[key].time > 300000) {
-          delete globalThis.__photoCache[key]
-        }
+      for (const k in globalThis.__photoCache) {
+        if (now - globalThis.__photoCache[k].time > 300000) delete globalThis.__photoCache[k]
       }
-
       if (globalThis.__photoCache[cacheKey]) {
         sourceB64 = globalThis.__photoCache[cacheKey].data
-      } else {
-        if (sourceB64.startsWith('http://') || sourceB64.startsWith('https://')) {
-          try {
-            const headers = {}
-            const authHeader = e.requestInfo().headers['authorization']
-            if (authHeader) headers['Authorization'] = authHeader
-
-            const fetchRes = $http.send({
-              url: sourceB64,
-              method: 'GET',
-              headers: headers,
-              timeout: 5,
-            })
-            if (fetchRes.statusCode === 200 && fetchRes.body) {
-              sourceB64 = bytesToBase64(fetchRes.body)
-              if (!sourceB64) throw new Error('Falha na conversão de bytes')
-              globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
-            } else {
-              logRecord.set('status', 400)
-              $app.save(logRecord)
-              console.log('Erro ao baixar foto do banco. Status: ' + fetchRes.statusCode)
-              return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
-            }
-          } catch (err) {
-            logRecord.set('status', 400)
-            $app.save(logRecord)
-            console.log('Erro ao baixar foto do banco: ' + String(err))
-            return e.json(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
+      } else if (fotoPred.startsWith('http')) {
+        try {
+          const hdrs = {}
+          const ah = e.requestInfo().headers['authorization']
+          if (ah) hdrs['Authorization'] = ah
+          const fr = $http.send({ url: fotoPred, method: 'GET', headers: hdrs, timeout: 5 })
+          if (fr.statusCode === 200 && fr.body) {
+            sourceB64 = bytesToBase64(fr.body)
+            if (!sourceB64) throw new Error('conversion failed')
+            globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
+          } else {
+            return respond(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
           }
-        } else {
-          sourceB64 = sourceB64.includes(',') ? sourceB64.split(',')[1] : sourceB64
-          globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
+        } catch (err) {
+          return respond(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
         }
+      } else {
+        sourceB64 = fotoPred
+        globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
       }
     }
 
     sourceB64 = sourceB64.replace(/\s+/g, '')
-    targetB64 = targetB64.replace(/\s+/g, '')
+    fotoCap = fotoCap.replace(/\s+/g, '')
 
-    const sizeInBytes = Math.round((targetB64.length * 3) / 4)
-    console.log(`Tamanho da imagem: ${Math.round(sizeInBytes / 1024)}kb`)
-    if (sizeInBytes > 5 * 1024 * 1024) {
-      logRecord.set('status', 400)
-      $app.save(logRecord)
-      return e.json(400, { message: 'Imagem invalida. Tente capturar novamente' })
-    }
+    const sizeBytes = Math.round((fotoCap.length * 3) / 4)
+    if (sizeBytes > 5 * 1024 * 1024)
+      return respond(400, { message: 'Imagem invalida. Tente capturar novamente' })
 
     let requestBody
     try {
       requestBody = JSON.stringify({
         SourceImage: { Bytes: sourceB64 },
-        TargetImage: { Bytes: targetB64 },
+        TargetImage: { Bytes: fotoCap },
         SimilarityThreshold: 70,
       })
     } catch (err) {
-      logRecord.set('status', 400)
-      $app.save(logRecord)
-      return e.json(400, { message: 'Erro ao processar foto. Tente capturar novamente' })
+      return respond(400, { message: 'Erro ao processar foto. Tente capturar novamente' })
     }
 
-    const amzTarget = 'RekognitionService.CompareFaces'
-
-    function getSignatureKey(key, dateStamp, regionName, serviceName) {
-      const k = str2binb('AWS4' + key).bin
-      const kDate = hmac_sha256_bin(k, dateStamp)
-      const kRegion = hmac_sha256_bin(kDate, regionName)
-      const kService = hmac_sha256_bin(kRegion, serviceName)
-      const kSigning = hmac_sha256_bin(kService, 'aws4_request')
-      return kSigning
+    // AWS SigV4 — first HMAC uses native $security.hs256, chain uses compact binary HMAC
+    function getSignatureKey(secret, dateStamp, regionName, serviceName) {
+      const kDateHex = $security.hs256(dateStamp, 'AWS4' + secret)
+      const kDateBin = hexToBinb(kDateHex)
+      const kRegion = core_hmac_sha256(kDateBin, str2binb(regionName))
+      const kService = core_hmac_sha256(kRegion, str2binb(serviceName))
+      return core_hmac_sha256(kService, str2binb('aws4_request'))
     }
 
-    function signAWSRequest(region, accessKey, secretKey, requestBody, amzTarget) {
-      const method = 'POST'
+    function signAWSRequest() {
       const service = 'rekognition'
       const host = `${service}.${region}.amazonaws.com`
-      const endpoint = `https://${host}/`
-
       const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '')
       const dateStamp = amzDate.substring(0, 8)
-
-      const canonicalUri = '/'
-      const canonicalQuerystring = ''
+      const amzTarget = 'RekognitionService.CompareFaces'
       const canonicalHeaders = `content-type:application/x-amz-json-1.1\nhost:${host}\nx-amz-date:${amzDate}\nx-amz-target:${amzTarget}\n`
       const signedHeaders = 'content-type;host;x-amz-date;x-amz-target'
-
       const payloadHash = $security.sha256(requestBody)
-
-      const canonicalRequest = `${method}\n${canonicalUri}\n${canonicalQuerystring}\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`
-
-      const algorithm = 'AWS4-HMAC-SHA256'
+      const canonicalRequest = `POST\n/\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`
       const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`
-      const stringToSign = `${algorithm}\n${amzDate}\n${credentialScope}\n${$security.sha256(canonicalRequest)}`
-
+      const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${credentialScope}\n${$security.sha256(canonicalRequest)}`
       const signingKey = getSignatureKey(secretKey, dateStamp, region, service)
-      const signature = hmac_sha256_hex(signingKey, stringToSign)
-
-      const authorizationHeader = `${algorithm} Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`
-
+      const signature = binb2hex(core_hmac_sha256(signingKey, str2binb(stringToSign)))
       return {
-        url: endpoint,
+        url: `https://${host}/`,
         headers: {
           'Content-Type': 'application/x-amz-json-1.1',
           'X-Amz-Date': amzDate,
           'X-Amz-Target': amzTarget,
-          Authorization: authorizationHeader,
+          Authorization: `AWS4-HMAC-SHA256 Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
         },
       }
     }
 
-    let success = false
-    let match = false
-    let statusCode = 500
-    let timeout = false
-    let authFailed = false
-    let badRequest = false
-    let awsMessage = ''
-
+    let success = false,
+      match = false,
+      statusCode = 500,
+      awsMessage = ''
     try {
-      const reqData = signAWSRequest(region, accessKey, secretKey, requestBody, amzTarget)
-
-      console.log('Iniciando chamada AWS Rekognition...')
-      const startTime = Date.now()
-
+      const reqData = signAWSRequest()
       const res = $http.send({
         url: reqData.url,
         method: 'POST',
@@ -385,70 +289,36 @@ routerAdd(
         body: requestBody,
         timeout: 5,
       })
-
       statusCode = res.statusCode
-      const duration = Date.now() - startTime
-
-      if (statusCode === 400) {
-        badRequest = true
-        const awsError = res.json || {}
-        awsMessage = awsError.message || awsError.Message || awsError.__type || ''
-        console.log(
-          `Erro AWS: [{ "status": ${statusCode}, "response": ${JSON.stringify(awsError)} }]`,
-        )
-      } else if (statusCode === 403 || statusCode === 401) {
-        authFailed = true
-        console.log(
-          `Erro AWS: [{ "status": ${statusCode}, "response": ${JSON.stringify(res.json || {})} }]`,
-        )
-      } else if (statusCode !== 200) {
-        console.log(
-          `Erro AWS: [{ "status": ${statusCode}, "response": ${JSON.stringify(res.json || {})} }]`,
-        )
-      } else if (statusCode === 200) {
+      if (statusCode === 200) {
         const data = res.json || {}
-        const faceMatches = data.FaceMatches || []
         success = true
-        let similarity = 'N/A'
-        if (faceMatches.length > 0) {
-          similarity = faceMatches[0].Similarity
-          if (similarity >= 70) {
-            match = true
-          }
-        }
-        console.log(`Resposta AWS: [${statusCode}, ${duration}ms, ${similarity}]`)
+        const fm = data.FaceMatches || []
+        if (fm.length > 0 && fm[0].Similarity >= 70) match = true
+      } else if (statusCode === 400) {
+        const err = res.json || {}
+        awsMessage = err.message || err.Message || err.__type || ''
       }
     } catch (err) {
       statusCode = 504
-      timeout = true
-      console.log(`Erro AWS: [${String(err)}]`)
-      $app.logger().error('AWS API Error', 'error', String(err))
+      $app.logger().error('AWS Rekognition Error', 'error', String(err))
     }
 
-    logRecord.set('status', statusCode)
-    $app.save(logRecord)
-
-    if (authFailed) {
-      return e.json(401, { message: 'Credenciais da AWS invalidas. Verifique Secrets' })
-    }
-    if (badRequest) {
-      const msgLower = awsMessage.toLowerCase()
-      if (msgLower.includes('face') || msgLower.includes('rosto')) {
-        return e.json(400, {
+    if (statusCode === 401 || statusCode === 403)
+      return respond(401, { message: 'Credenciais da AWS invalidas. Verifique Secrets' })
+    if (statusCode === 400) {
+      const m = awsMessage.toLowerCase()
+      if (m.includes('face') || m.includes('rosto'))
+        return respond(400, {
           message:
             'Nenhum rosto detectado na imagem. Certifique-se de que o rosto está bem iluminado e visível.',
         })
-      }
-      return e.json(400, { message: 'Imagem invalida. Tente capturar novamente' })
+      return respond(400, { message: 'Imagem invalida. Tente capturar novamente' })
     }
-    if (statusCode === 504 || timeout) {
-      return e.json(504, { message: 'Timeout ao processar reconhecimento. Tente novamente' })
-    }
-    if (!success) {
-      return e.json(500, { message: 'Servico da AWS indisponivel. Tente novamente' })
-    }
-
-    return e.json(200, { match: match })
+    if (statusCode === 504)
+      return respond(504, { message: 'Timeout ao processar reconhecimento. Tente novamente' })
+    if (!success) return respond(500, { message: 'Servico da AWS indisponivel. Tente novamente' })
+    return respond(200, { match: match })
   },
   $apis.requireAuth(),
 )
