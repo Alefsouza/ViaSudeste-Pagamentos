@@ -1091,6 +1091,24 @@ export default function Camera() {
                     ))}
                   </div>
                   <div className="flex justify-between items-center pt-1">
+                    <span className="font-semibold text-sm text-slate-700 dark:text-slate-300">
+                      Total de Horas
+                    </span>
+                    <span className="font-bold text-sm text-slate-900 dark:text-white tabular-nums">
+                      {formatHoras(
+                        visibleRecords.reduce((acc: number, record: any) => {
+                          const horasStr = calcularIntervaloHoras(
+                            record.inicio,
+                            record.termino,
+                            record.horas,
+                          )
+                          const num = parseFloat(horasStr)
+                          return acc + (isNaN(num) ? 0 : num)
+                        }, 0),
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1">
                     <span className="font-bold text-sm">Total Geral</span>
                     <span className="font-bold text-lg text-green-600 dark:text-green-500">
                       {formatCurrency(
