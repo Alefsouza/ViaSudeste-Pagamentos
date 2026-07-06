@@ -1,6 +1,10 @@
 import pb from '@/lib/pocketbase/client'
+import { getAllPaginated } from '@/lib/pocketbase/helpers'
 
-export const getPagamentos = () => pb.collection('pagamentos').getFullList()
+const PAGAMENTO_FIELDS =
+  'id,colaborador_id,valor_pago,data_pagamento,foto_confirmacao,foto_confirmacao_url,status,tipo_pagamento,user_id,idtipopgto,horas,inicio,termino,registro,nome,filial,hora_pagamento,created,updated'
+
+export const getPagamentos = () => getAllPaginated('pagamentos', { fields: PAGAMENTO_FIELDS })
 
 export const getPagamento = (id: string) => pb.collection('pagamentos').getOne(id)
 
@@ -10,6 +14,27 @@ export const updatePagamento = (id: string, data: any) =>
   pb.collection('pagamentos').update(id, data)
 
 export const deletePagamento = (id: string) => pb.collection('pagamentos').delete(id)
+
+export const batchConfirmPagamentos = async (payments: any[], photos: Record<number, File>) => {
+  const formData = new FormData()
+  formData.append('payments', JSON.stringify(payments))
+  Object.entries(photos).forEach(([index, file]) => {
+    if (file) formData.append(`photo_${index}`, file)
+  })
+
+  const response = await fetch(`${pb.baseURL}/backend/v1/pagamentos/batch-confirm`, {
+    method: 'POST',
+    headers: { Authorization: pb.authStore.token },
+    body: formData,
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Batch confirmation failed' }))
+    throw new Error(error.message || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
 
 export const getPagamentosTotals = async (filters: any) => {
   const filterConditions: string[] = []
@@ -38,21 +63,16 @@ export const getPagamentosTotals = async (filters: any) => {
     }
   }
 
-  const dateFilters: string[] = []
   if (filters.startDate) {
-    dateFilters.push(`updated >= "${filters.startDate} 00:00:00"`)
+    filterConditions.push(`updated >= "${filters.startDate} 00:00:00"`)
   }
   if (filters.endDate) {
-    dateFilters.push(`updated <= "${filters.endDate} 23:59:59"`)
-  }
-  if (dateFilters.length > 0) {
-    const dStr = dateFilters.join(' && ')
-    filterConditions.push(`((${dStr} && foto_confirmacao_url != "") || foto_confirmacao_url = "")`)
+    filterConditions.push(`updated <= "${filters.endDate} 23:59:59"`)
   }
 
   const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : undefined
 
-  const records = await pb.collection('pagamentos').getFullList({
+  const records = await getAllPaginated('pagamentos', {
     filter: filterString,
     fields: 'valor_pago,status',
   })
@@ -108,16 +128,11 @@ export const getPagamentosPaginated = async (page: number, perPage: number, filt
     filterConditions.push(`colaborador_id.referencia = ${filters.referencia}`)
   }
 
-  const dateFilters2: string[] = []
   if (filters.startDate) {
-    dateFilters2.push(`updated >= "${filters.startDate} 00:00:00"`)
+    filterConditions.push(`updated >= "${filters.startDate} 00:00:00"`)
   }
   if (filters.endDate) {
-    dateFilters2.push(`updated <= "${filters.endDate} 23:59:59"`)
-  }
-  if (dateFilters2.length > 0) {
-    const dStr = dateFilters2.join(' && ')
-    filterConditions.push(`((${dStr} && foto_confirmacao_url != "") || foto_confirmacao_url = "")`)
+    filterConditions.push(`updated <= "${filters.endDate} 23:59:59"`)
   }
 
   const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : ''
@@ -126,6 +141,7 @@ export const getPagamentosPaginated = async (page: number, perPage: number, filt
     filter: filterString,
     sort: '-updated',
     expand: 'colaborador_id',
+    fields: PAGAMENTO_FIELDS,
   })
 }
 
@@ -166,22 +182,18 @@ export const getPagamentosAnalytics = async (filters: any) => {
     filterConditions.push(`colaborador_id.referencia = ${filters.referencia}`)
   }
 
-  const dateFilters3: string[] = []
   if (filters.startDate) {
-    dateFilters3.push(`updated >= "${filters.startDate} 00:00:00"`)
+    filterConditions.push(`updated >= "${filters.startDate} 00:00:00"`)
   }
   if (filters.endDate) {
-    dateFilters3.push(`updated <= "${filters.endDate} 23:59:59"`)
-  }
-  if (dateFilters3.length > 0) {
-    const dStr = dateFilters3.join(' && ')
-    filterConditions.push(`((${dStr} && foto_confirmacao_url != "") || foto_confirmacao_url = "")`)
+    filterConditions.push(`updated <= "${filters.endDate} 23:59:59"`)
   }
 
   const filterString = filterConditions.length > 0 ? filterConditions.join(' && ') : ''
 
-  return pb.collection('pagamentos').getFullList({
+  return getAllPaginated('pagamentos', {
     filter: filterString,
     expand: 'colaborador_id',
+    fields: PAGAMENTO_FIELDS,
   })
 }

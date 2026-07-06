@@ -1,27 +1,18 @@
 import pb from '@/lib/pocketbase/client'
+import { getAllPaginated } from '@/lib/pocketbase/helpers'
+
+const COLAB_FIELDS =
+  'id,registro,nome,valor_a_receber,valor,filial,filial_id,referencia,idtipopgto,foto_confirmacao_url,liberado_pagamento,data_liberacao,data_pagamento,data_pagamento_v2,data,hora_pagamento,updated,created,periodo_inicio,periodo_fim,inicio,termino,horas'
+
+const PAGAMENTO_FIELDS =
+  'id,colaborador_id,status,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,updated,created'
 
 export const getColaboradores = async () => {
-  return pb.collection('colaboradores').getFullList({ expand: 'colaborador_id' })
+  return getAllPaginated('colaboradores', { fields: COLAB_FIELDS, sort: '-created' })
 }
 
 export const updateColaborador = async (id: string, data: any) => {
   return pb.collection('colaboradores').update(id, data)
-}
-
-function getDatesInRange(startDate: string, endDate: string): string[] {
-  const dates: string[] = []
-  let currentDate = new Date(startDate + 'T00:00:00')
-  const end = new Date(endDate + 'T00:00:00')
-  let count = 0
-  while (currentDate <= end && count < 366) {
-    const d = String(currentDate.getDate()).padStart(2, '0')
-    const m = String(currentDate.getMonth() + 1).padStart(2, '0')
-    const y = currentDate.getFullYear()
-    dates.push(`${d}/${m}/${y}`)
-    currentDate.setDate(currentDate.getDate() + 1)
-    count++
-  }
-  return dates
 }
 
 const buildFilterString = (filters: any, prefix = '') => {
@@ -58,22 +49,14 @@ const buildFilterString = (filters: any, prefix = '') => {
     conditions.push(
       `(${prefix}data_pagamento ~ "${filters.data_pagamento_text}" || ${prefix}data ~ "${filters.data_pagamento_text}")`,
     )
-  } else if (filters.startDate && filters.startDate === filters.endDate) {
-    const d = filters.startDate.split('-')
-    if (d.length === 3) {
-      conditions.push(
-        `(${prefix}data_pagamento = "${d[2]}/${d[1]}/${d[0]}" || ${prefix}data = "${d[2]}/${d[1]}/${d[0]}")`,
-      )
-    }
   } else if (filters.startDate && filters.endDate) {
-    const dates = getDatesInRange(filters.startDate, filters.endDate)
-    if (dates.length > 0) {
-      const dateFiltersPag = dates.map((d) => `${prefix}data_pagamento = "${d}"`).join(' || ')
-      const dateFiltersData = dates.map((d) => `${prefix}data = "${d}"`).join(' || ')
-      conditions.push(`((${dateFiltersPag}) || (${dateFiltersData}))`)
-    } else {
-      conditions.push(`${prefix}data_pagamento = "NON_EXISTENT"`)
-    }
+    conditions.push(
+      `(${prefix}data_pagamento_v2 >= "${filters.startDate} 00:00:00" && ${prefix}data_pagamento_v2 <= "${filters.endDate} 23:59:59")`,
+    )
+  } else if (filters.startDate) {
+    conditions.push(`${prefix}data_pagamento_v2 >= "${filters.startDate} 00:00:00"`)
+  } else if (filters.endDate) {
+    conditions.push(`${prefix}data_pagamento_v2 <= "${filters.endDate} 23:59:59"`)
   }
 
   return conditions.length > 0 ? conditions.join(' && ') : undefined
@@ -86,7 +69,7 @@ export const fetchPagamentosForColabs = async (colabIds: string[]) => {
   for (let i = 0; i < colabIds.length; i += chunkSize) {
     const chunk = colabIds.slice(i, i + chunkSize)
     const filter = chunk.map((id) => `colaborador_id="${id}"`).join(' || ')
-    const pags = await pb.collection('pagamentos').getFullList({ filter })
+    const pags = await getAllPaginated('pagamentos', { filter, fields: PAGAMENTO_FIELDS })
     allPags.push(...pags)
   }
   return allPags
@@ -97,7 +80,7 @@ export const getPagamentosForColaboradoresFilter = async (filters: any = {}) => 
   const finalFilter = filterString
     ? `(${filterString}) && status = "Confirmado"`
     : `status = "Confirmado"`
-  return pb.collection('pagamentos').getFullList({ filter: finalFilter })
+  return getAllPaginated('pagamentos', { filter: finalFilter, fields: PAGAMENTO_FIELDS })
 }
 
 export const getColaboradoresPaginated = async (
@@ -110,22 +93,26 @@ export const getColaboradoresPaginated = async (
   return pb.collection('colaboradores').getList(page, perPage, {
     filter: filterString,
     sort: '-referencia,-created',
-    expand: 'colaborador_id',
+    fields: COLAB_FIELDS,
   })
 }
 
 export const getColaboradoresAnalytics = async (filters: any = {}) => {
   const filterString = buildFilterString(filters)
 
-  return pb.collection('colaboradores').getFullList({
+  return getAllPaginated('colaboradores', {
     filter: filterString,
     sort: '-referencia,-created',
-    expand: 'colaborador_id',
+    fields: COLAB_FIELDS,
   })
 }
 
 export const getColaboradoresStats = async (filters: any = {}) => {
-  return pb.collection('colaboradores').getFullList({ filter: buildFilterString(filters) })
+  return getAllPaginated('colaboradores', {
+    filter: buildFilterString(filters),
+    fields:
+      'id,valor_a_receber,valor,referencia,foto_confirmacao_url,liberado_pagamento,idtipopgto',
+  })
 }
 
 export const getColaboradorByRegistro = async (registro: string) => {

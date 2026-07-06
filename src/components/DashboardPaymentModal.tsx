@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Table,
   TableBody,
@@ -21,15 +22,15 @@ import { formatBRL, checkIsLocked } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
-import { extractFieldErrors } from '@/lib/pocketbase/errors'
-import { toast as sonnerToast } from 'sonner'
+import { batchConfirmPagamentos } from '@/services/pagamentos'
+import { cn } from '@/lib/utils'
 
 export function DashboardPaymentModal({
   maxRef,
   onPaymentConfirmed,
 }: {
   maxRef: number
-  onPaymentConfirmed: (colaboradorId: string) => void
+  onPaymentConfirmed: (colaboradorIds: string[]) => void
 }) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -38,9 +39,9 @@ export function DashboardPaymentModal({
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState<any[]>([])
-
   const [photos, setPhotos] = useState<Record<string, File | null>>({})
-  const [submitting, setSubmitting] = useState<Record<string, boolean>>({})
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [batchLoading, setBatchLoading] = useState(false)
 
   const handleSearch = async () => {
     if (!search.trim()) return
@@ -49,9 +50,11 @@ export function DashboardPaymentModal({
       const res = await pb.collection('colaboradores').getList(1, 50, {
         filter: `(nome ~ "${search}" || registro = "${search}") && foto_confirmacao_url = ""`,
         sort: '-created',
+        fields:
+          'id,registro,nome,valor_a_receber,valor,referencia,liberado_pagamento,data_liberacao,idtipopgto,tipo_pagamento,inicio,termino,horas,filial,filial_id',
       })
 
-      const filtered = res.items.filter((r) => {
+      const filtered = res.items.filter((r: any) => {
         if (r.foto_confirmacao_url) return false
         if (checkIsLocked(r.data_liberacao)) return false
         const ref = r.referencia || 0
@@ -62,125 +65,101 @@ export function DashboardPaymentModal({
       })
 
       setRecords(filtered)
-    } catch (e) {
+      setSelected(new Set(filtered.map((r: any) => r.id)))
+      setPhotos({})
+    } catch {
       toast({ title: 'Erro na busca', variant: 'destructive' })
     } finally {
       setLoading(false)
     }
   }
 
-  const handleConfirm = async (record: any) => {
-    const confirmPhoto = photos[record.id]
+  const toggleSelection = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
-    if (!confirmPhoto) {
+  const handleBatchConfirm = async () => {
+    const selectedRecords = records.filter((r) => selected.has(r.id))
+    if (selectedRecords.length === 0) {
+      toast({ title: 'Selecione ao menos um pagamento.', variant: 'destructive' })
+      return
+    }
+
+    const missingPhotos = selectedRecords.filter((r) => !photos[r.id])
+    if (missingPhotos.length > 0) {
       toast({
-        title: 'É necessário anexar um comprovante para confirmar o pagamento.',
+        title: 'Fotos obrigatórias',
+        description: `${missingPhotos.length} pagamento(s) sem comprovante anexado.`,
         variant: 'destructive',
       })
       return
     }
 
-    if (!record.registro || !record.nome) {
-      toast({
-        title: 'Erro de Validação',
-        description: 'Os campos Registro e Nome são obrigatórios.',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    setSubmitting((prev) => ({ ...prev, [record.id]: true }))
+    setBatchLoading(true)
     try {
-      const formData = new FormData()
-      formData.append('colaborador_id', record.id)
-      formData.append('registro', record.registro || '')
-      formData.append('nome', record.nome || '')
-      formData.append('valor_pago', String(record.valor_a_receber || record.valor || 0))
-
       const now = new Date()
-      formData.append('data_pagamento', now.toISOString())
-
       const utcMinus3 = new Date(now.getTime() - 3 * 3600000)
       const pad = (n: number) => n.toString().padStart(2, '0')
-      formData.append(
-        'hora_pagamento',
-        `${pad(utcMinus3.getUTCHours())}:${pad(utcMinus3.getUTCMinutes())}`,
-      )
-      formData.append('status', 'Confirmado')
-      formData.append('foto_confirmacao', confirmPhoto)
 
-      if (user?.id) {
-        formData.append('user_id', user.id)
-      }
+      const payments = selectedRecords.map((r) => ({
+        colaborador_id: r.id,
+        registro: r.registro || '',
+        nome: r.nome || '',
+        valor_pago: String(r.valor_a_receber || r.valor || 0),
+        data_pagamento: now.toISOString(),
+        hora_pagamento: `${pad(utcMinus3.getUTCHours())}:${pad(utcMinus3.getUTCMinutes())}`,
+        idtipopgto: r.idtipopgto ?? null,
+        tipo_pagamento: r.tipo_pagamento || '',
+        inicio: r.inicio || '',
+        termino: r.termino || '',
+        horas: r.horas || '',
+        filial: r.filial_id || (r.filial === 'Cursino' ? 1 : r.filial === 'Sapopemba' ? 2 : ''),
+      }))
 
-      if (record.idtipopgto != null) {
-        formData.append('idtipopgto', String(record.idtipopgto))
-      }
-
-      if (record.tipo_pagamento) {
-        formData.append('tipo_pagamento', record.tipo_pagamento)
-      }
-
-      if (record.inicio) formData.append('inicio', record.inicio)
-      if (record.termino) formData.append('termino', record.termino)
-      if (record.horas) formData.append('horas', String(record.horas))
-
-      const filialNumber =
-        record.filial_id ||
-        (record.filial === 'Cursino' ? 1 : record.filial === 'Sapopemba' ? 2 : '')
-      if (filialNumber !== '') {
-        formData.append('filial', String(filialNumber))
-      }
-
-      let existingPaymentId = null
-      try {
-        let filterStr = `colaborador_id="${record.id}"`
-        if (record.inicio) {
-          filterStr += ` && inicio="${record.inicio}"`
-        }
-        const existing = await pb
-          .collection('pagamentos')
-          .getFirstListItem(filterStr, { sort: '-created' })
-        existingPaymentId = existing.id
-      } catch (e) {
-        // Not found, will create
-      }
-
-      if (existingPaymentId) {
-        await pb.collection('pagamentos').update(existingPaymentId, formData)
-      } else {
-        await pb.collection('pagamentos').create(formData)
-      }
-
-      setRecords((prev) => prev.filter((r) => r.id !== record.id))
-      setPhotos((prev) => {
-        const next = { ...prev }
-        delete next[record.id]
-        return next
+      const photoMap: Record<number, File> = {}
+      selectedRecords.forEach((r, i) => {
+        if (photos[r.id]) photoMap[i] = photos[r.id]!
       })
 
-      onPaymentConfirmed(record.id)
+      const result = await batchConfirmPagamentos(payments, photoMap)
 
-      toast({ title: 'Pagamento aprovado com sucesso!' })
-    } catch (err: any) {
-      console.error('Erro completo do servidor:', err.response, err.response?.data, err)
-      const errors = extractFieldErrors(err)
-      const msgs = Object.entries(errors).map(([field, msg]) => `Campo '${field}': ${msg}`)
-      let msg = msgs.length > 0 ? msgs.join(', ') : err.message || 'Erro ao confirmar pagamento'
-      if (err.status === 400 && msgs.length === 0) {
-        msg =
-          'Erro de validação ou conflito de dados (ex: registro duplicado ou campo obrigatório ausente).'
+      const successes = result.results?.filter((r: any) => r.success) || []
+      const failures = result.results?.filter((r: any) => !r.success) || []
+
+      if (successes.length > 0) {
+        const confirmedIds = successes.map((s: any) => s.colaborador_id).filter(Boolean)
+        onPaymentConfirmed(confirmedIds)
       }
 
-      if (err.status === 400 || err.status === 403) {
-        sonnerToast.error('Ação não permitida ou dados inválidos', {
-          description: err.status === 403 ? 'Você não tem permissão para realizar esta ação.' : msg,
+      if (failures.length > 0) {
+        toast({
+          title: `${failures.length} pagamento(s) falhou(ram)`,
+          description: failures.map((f: any) => f.error).join('; '),
+          variant: 'destructive',
         })
+        const failedIds = new Set(failures.map((f: any) => f.colaborador_id).filter(Boolean))
+        setRecords((prev) => prev.filter((r) => failedIds.has(r.id)))
+        setSelected(new Set(failedIds))
       } else {
-        toast({ title: 'Erro ao confirmar', description: msg, variant: 'destructive' })
+        toast({ title: `${successes.length} pagamento(s) confirmado(s) com sucesso!` })
+        setRecords([])
+        setPhotos({})
+        setSelected(new Set())
+        setOpen(false)
       }
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao confirmar pagamentos',
+        description: err.message || 'Erro inesperado',
+        variant: 'destructive',
+      })
     } finally {
-      setSubmitting((prev) => ({ ...prev, [record.id]: false }))
+      setBatchLoading(false)
     }
   }
 
@@ -203,8 +182,9 @@ export function DashboardPaymentModal({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            disabled={batchLoading}
           />
-          <Button onClick={handleSearch} disabled={loading}>
+          <Button onClick={handleSearch} disabled={loading || batchLoading}>
             {loading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
@@ -215,71 +195,98 @@ export function DashboardPaymentModal({
         </div>
 
         {records.length > 0 ? (
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Colaborador</TableHead>
-                  <TableHead>Referência</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Comprovante</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {records.map((r) => (
-                  <TableRow key={r.id} className={submitting[r.id] ? 'opacity-50' : ''}>
-                    <TableCell>
-                      <div className="font-medium">{r.nome || 'Desconhecido'}</div>
-                      <div className="text-xs text-muted-foreground">{r.registro}</div>
-                    </TableCell>
-                    <TableCell>
-                      {r.referencia || '-'}
-                      {r.liberado_pagamento && (
-                        <span className="ml-2 text-xs text-emerald-600">(Liberado)</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-bold text-emerald-600">
-                      {formatBRL(r.valor_a_receber || r.valor)}
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] || null
-                          setPhotos((prev) => ({ ...prev, [r.id]: file }))
+          <>
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selected.size === records.length && records.length > 0}
+                        onCheckedChange={(checked) => {
+                          if (checked) setSelected(new Set(records.map((r) => r.id)))
+                          else setSelected(new Set())
                         }}
-                        className="w-56"
-                        disabled={submitting[r.id]}
+                        disabled={batchLoading}
                       />
-                    </TableCell>
-                    <TableCell>
-                      {canConfirm ? (
-                        <Button
-                          size="sm"
-                          onClick={() => handleConfirm(r)}
-                          disabled={submitting[r.id]}
-                          className="bg-emerald-600 hover:bg-emerald-700"
-                        >
-                          {submitting[r.id] ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                              Confirmando...
-                            </>
-                          ) : (
-                            'Confirmar'
-                          )}
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Sem permissão</span>
-                      )}
-                    </TableCell>
+                    </TableHead>
+                    <TableHead>Colaborador</TableHead>
+                    <TableHead>Referência</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Comprovante</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {records.map((r) => (
+                    <TableRow
+                      key={r.id}
+                      className={cn(
+                        batchLoading && 'opacity-50',
+                        !selected.has(r.id) && 'opacity-60',
+                      )}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={selected.has(r.id)}
+                          onCheckedChange={() => toggleSelection(r.id)}
+                          disabled={batchLoading}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{r.nome || 'Desconhecido'}</div>
+                        <div className="text-xs text-muted-foreground">{r.registro}</div>
+                      </TableCell>
+                      <TableCell>
+                        {r.referencia || '-'}
+                        {r.liberado_pagamento && (
+                          <span className="ml-2 text-xs text-emerald-600">(Liberado)</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-bold text-emerald-600">
+                        {formatBRL(r.valor_a_receber || r.valor)}
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null
+                            setPhotos((prev) => ({ ...prev, [r.id]: file }))
+                          }}
+                          className="w-56"
+                          disabled={batchLoading}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-end mt-4">
+              {canConfirm ? (
+                <Button
+                  onClick={handleBatchConfirm}
+                  disabled={batchLoading || selected.size === 0}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {batchLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Confirmando {selected.size} pagamento(s)...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Confirmar Selecionados ({selected.size})
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <span className="text-sm text-muted-foreground py-2">Sem permissão</span>
+              )}
+            </div>
+          </>
         ) : (
           search &&
           !loading && (

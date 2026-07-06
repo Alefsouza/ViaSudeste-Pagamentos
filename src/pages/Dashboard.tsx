@@ -371,10 +371,11 @@ export default function Dashboard() {
     }
   }
 
-  const handlePaymentConfirmed = useCallback((colaboradorId: string) => {
+  const handlePaymentConfirmed = useCallback((colaboradorIds: string[]) => {
+    const idSet = new Set(colaboradorIds)
     setStatsData((prev) =>
       prev.map((c) => {
-        if (c.id === colaboradorId) {
+        if (idSet.has(c.id)) {
           return {
             ...c,
             pagamento_relacionado: {

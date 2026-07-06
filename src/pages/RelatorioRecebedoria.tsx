@@ -57,6 +57,7 @@ import {
   getBrasiliaEndUTC,
 } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
+import { getAllPaginated } from '@/lib/pocketbase/helpers'
 
 export default function RelatorioRecebedoria() {
   const { user } = useAuth()
@@ -100,10 +101,11 @@ export default function RelatorioRecebedoria() {
   useEffect(() => {
     async function fetchFilterOptions() {
       try {
-        const [allUsersRes, pagamentosRes] = await Promise.all([
-          pb.collection('users').getFullList({ sort: 'name' }),
-          pb.collection('pagamentos').getFullList({ fields: 'tipo_pagamento' }),
+        const [usersPage, pagamentosRes] = await Promise.all([
+          pb.collection('users').getList(1, 500, { sort: 'name', fields: 'id,name,email' }),
+          getAllPaginated('pagamentos', { fields: 'tipo_pagamento' }),
         ])
+        const allUsersRes = usersPage.items
 
         allUsersRes.sort((a: any, b: any) => {
           const nameA = a.name || a.email || 'Usuário'
@@ -210,11 +212,15 @@ export default function RelatorioRecebedoria() {
           filter: filterString,
           sort: '-data_pagamento,-created',
           expand: 'colaborador_id,user_id',
+          fields:
+            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created',
         }),
-        pb.collection('pagamentos').getFullList({
+        getAllPaginated('pagamentos', {
           filter: filterString,
           sort: '-data_pagamento,-created',
           expand: 'colaborador_id',
+          fields:
+            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,updated,created',
         }),
       ])
 
@@ -233,7 +239,7 @@ export default function RelatorioRecebedoria() {
   const loadAntigasData = useCallback(async () => {
     try {
       if (!cachedRefsRef.current) {
-        const allRefs = await pb.collection('colaboradores').getFullList({ fields: 'referencia' })
+        const allRefs = await getAllPaginated('colaboradores', { fields: 'id,referencia' })
         cachedRefsRef.current = Array.from(
           new Set(allRefs.map((c) => c.referencia).filter((r) => typeof r === 'number' && r > 0)),
         )
@@ -257,13 +263,14 @@ export default function RelatorioRecebedoria() {
       }
 
       const [antigasRes, confirmadosRes] = await Promise.all([
-        pb.collection('colaboradores').getFullList({
+        getAllPaginated('colaboradores', {
           filter: antigasConditions.join(' && '),
           sort: '-referencia,-created',
+          fields: 'id,registro,nome,valor,valor_a_receber,referencia,data,filial,updated,created',
         }),
-        pb.collection('pagamentos').getFullList({
+        getAllPaginated('pagamentos', {
           filter: 'status = "Confirmado"',
-          fields: 'colaborador_id',
+          fields: 'id,colaborador_id',
         }),
       ])
 
