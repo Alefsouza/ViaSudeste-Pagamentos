@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
-import { useRealtime } from '@/hooks/use-realtime'
+import { useDebouncedRealtime } from '@/hooks/use-debounced-realtime'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -71,7 +71,6 @@ export default function RelatorioRecebedoria() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
 
-  // Filters State
   const [startDate, setStartDate] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() - 30)
@@ -92,17 +91,23 @@ export default function RelatorioRecebedoria() {
   const [referenciaFilter, setReferenciaFilter] = useState('')
   const [debouncedReferenciaFilter, setDebouncedReferenciaFilter] = useState('')
 
-  // Filter Options State
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
   const [tiposPagamento, setTiposPagamento] = useState<string[]>([])
 
+  const [antigasData, setAntigasData] = useState<any[]>([])
+  const cachedRefsRef = useRef<number[] | null>(null)
+
+  const [photoModal, setPhotoModal] = useState<string | null>(null)
+  const [detailsModal, setDetailsModal] = useState<any | null>(null)
+
   useEffect(() => {
     async function fetchFilterOptions() {
       try {
-        const allUsersRes = await pb.collection('users').getFullList({
-          sort: 'name',
-        })
+        const [allUsersRes, pagamentosRes] = await Promise.all([
+          pb.collection('users').getFullList({ sort: 'name' }),
+          pb.collection('pagamentos').getFullList({ fields: 'tipo_pagamento' }),
+        ])
 
         allUsersRes.sort((a: any, b: any) => {
           const nameA = a.name || a.email || 'Usuário'
@@ -112,10 +117,6 @@ export default function RelatorioRecebedoria() {
 
         setUsuariosRecebedoria(allUsersRes)
         setAllUsers(allUsersRes)
-
-        const pagamentosRes = await pb
-          .collection('pagamentos')
-          .getFullList({ fields: 'tipo_pagamento' })
 
         const uniqueTipos = Array.from(
           new Set(pagamentosRes.map((p: any) => p.tipo_pagamento).filter(Boolean)),
@@ -128,10 +129,6 @@ export default function RelatorioRecebedoria() {
     fetchFilterOptions()
   }, [])
 
-  // Modals
-  const [photoModal, setPhotoModal] = useState<string | null>(null)
-  const [detailsModal, setDetailsModal] = useState<any | null>(null)
-
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm)
@@ -141,7 +138,62 @@ export default function RelatorioRecebedoria() {
     return () => clearTimeout(handler)
   }, [searchTerm, referenciaFilter])
 
-  const loadData = async () => {
+  const buildFilter = useCallback(() => {
+    const conditions: string[] = []
+
+    if (startDate && endDate) {
+      const startUTC = getBrasiliaStartUTC(startDate)
+      const endUTC = getBrasiliaEndUTC(endDate)
+      conditions.push(
+        `updated >= "${startUTC}" && updated <= "${endUTC}" && foto_confirmacao_url != ""`,
+      )
+    }
+    if (startTime) {
+      conditions.push(`hora_pagamento >= "${startTime}"`)
+    }
+    if (endTime) {
+      conditions.push(`hora_pagamento <= "${endTime}"`)
+    }
+    if (debouncedSearchTerm) {
+      conditions.push(
+        `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}" || colaborador_id.nome ~ "${debouncedSearchTerm}" || colaborador_id.registro ~ "${debouncedSearchTerm}")`,
+      )
+    }
+    if (debouncedReferenciaFilter && !isNaN(Number(debouncedReferenciaFilter))) {
+      conditions.push(`colaborador_id.referencia = ${Number(debouncedReferenciaFilter)}`)
+    }
+    if (statusFilter && statusFilter !== 'Todos') {
+      if (statusFilter === 'Confirmado') {
+        conditions.push(`(status = "Confirmado" || foto_confirmacao_url != "")`)
+      } else if (statusFilter === 'Pendente') {
+        conditions.push(`(status = "Pendente" || status = "")`)
+      } else if (statusFilter === 'Cancelado') {
+        conditions.push(`status = "Cancelado"`)
+      } else {
+        conditions.push(`status = "${statusFilter}"`)
+      }
+    }
+    if (usuarioFilter && usuarioFilter !== 'Todos') {
+      conditions.push(`user_id = "${usuarioFilter}"`)
+    }
+    if (tipoPagamentoFilter && tipoPagamentoFilter !== 'Todos') {
+      conditions.push(`tipo_pagamento = "${tipoPagamentoFilter}"`)
+    }
+
+    return conditions.length > 0 ? conditions.join(' && ') : ''
+  }, [
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+    debouncedSearchTerm,
+    debouncedReferenciaFilter,
+    statusFilter,
+    usuarioFilter,
+    tipoPagamentoFilter,
+  ])
+
+  const loadData = useCallback(async () => {
     if (!user) return
 
     if (startTime && endTime && endTime < startTime) {
@@ -155,81 +207,50 @@ export default function RelatorioRecebedoria() {
     setLoading(true)
     setError(false)
     try {
-      const conditions: string[] = []
+      const filterString = buildFilter()
 
-      if (startDate && endDate) {
-        const startUTC = getBrasiliaStartUTC(startDate)
-        const endUTC = getBrasiliaEndUTC(endDate)
-        conditions.push(
-          `updated >= "${startUTC}" && updated <= "${endUTC}" && foto_confirmacao_url != ""`,
+      const [paginatedRes, summaryRes] = await Promise.all([
+        pb.collection('pagamentos').getList(page, 20, {
+          filter: filterString,
+          sort: '-data_pagamento,-created',
+          expand: 'colaborador_id,user_id',
+        }),
+        pb.collection('pagamentos').getFullList({
+          filter: filterString,
+          sort: '-data_pagamento,-created',
+          expand: 'colaborador_id',
+        }),
+      ])
+
+      setData(paginatedRes.items)
+      setTotalItems(paginatedRes.totalItems)
+      setTotalPages(paginatedRes.totalPages)
+      setSummaryData(summaryRes)
+    } catch (err: any) {
+      console.error(err)
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [user, startTime, endTime, page, buildFilter])
+
+  const loadAntigasData = useCallback(async () => {
+    try {
+      if (!cachedRefsRef.current) {
+        const allRefs = await pb.collection('colaboradores').getFullList({ fields: 'referencia' })
+        cachedRefsRef.current = Array.from(
+          new Set(allRefs.map((c) => c.referencia).filter((r) => typeof r === 'number' && r > 0)),
         )
+          .sort((a, b) => b - a)
+          .slice(0, 4)
       }
-      if (startTime) {
-        conditions.push(`hora_pagamento >= "${startTime}"`)
-      }
-      if (endTime) {
-        conditions.push(`hora_pagamento <= "${endTime}"`)
-      }
-      if (debouncedSearchTerm) {
-        conditions.push(
-          `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}" || colaborador_id.nome ~ "${debouncedSearchTerm}" || colaborador_id.registro ~ "${debouncedSearchTerm}")`,
-        )
-      }
+      const uniqueRefs = cachedRefsRef.current
 
-      if (debouncedReferenciaFilter && !isNaN(Number(debouncedReferenciaFilter))) {
-        conditions.push(`colaborador_id.referencia = ${Number(debouncedReferenciaFilter)}`)
-      }
-
-      if (statusFilter && statusFilter !== 'Todos') {
-        if (statusFilter === 'Confirmado') {
-          conditions.push(`(status = "Confirmado" || foto_confirmacao_url != "")`)
-        } else if (statusFilter === 'Pendente') {
-          conditions.push(`(status = "Pendente" || status = "")`)
-        } else if (statusFilter === 'Cancelado') {
-          conditions.push(`status = "Cancelado"`)
-        } else {
-          conditions.push(`status = "${statusFilter}"`)
-        }
-      }
-
-      if (usuarioFilter && usuarioFilter !== 'Todos') {
-        conditions.push(`user_id = "${usuarioFilter}"`)
-      }
-
-      if (tipoPagamentoFilter && tipoPagamentoFilter !== 'Todos') {
-        conditions.push(`tipo_pagamento = "${tipoPagamentoFilter}"`)
-      }
-
-      const filterString = conditions.length > 0 ? conditions.join(' && ') : ''
-
-      const fullRes = await pb.collection('pagamentos').getFullList({
-        filter: filterString,
-        sort: '-data_pagamento,-created',
-        expand: 'colaborador_id,user_id',
-      })
-
-      setSummaryData(fullRes)
-      setTotalItems(fullRes.length)
-
-      const newTotalPages = Math.ceil(fullRes.length / 20) || 1
-      setTotalPages(newTotalPages)
-      setPage((p) => (p > newTotalPages ? newTotalPages : p))
-
-      // 1. Obter referências únicas para excluir as top 4
-      const allRefs = await pb.collection('colaboradores').getFullList({ fields: 'referencia' })
-      const uniqueRefs = Array.from(
-        new Set(allRefs.map((c) => c.referencia).filter((r) => typeof r === 'number' && r > 0)),
-      )
-        .sort((a, b) => b - a)
-        .slice(0, 4)
-
-      // 2. Buscar colaboradores da aba "Ref. Antigas" (exclui as top 4 refs, busca da coleção colaboradores)
       const antigasConditions: string[] = ['referencia > 0']
       if (uniqueRefs.length > 0) {
         const notIn = uniqueRefs.map((r) => `referencia != ${r}`).join(' && ')
         antigasConditions.push(`(${notIn})`)
       }
-
       if (debouncedSearchTerm) {
         antigasConditions.push(
           `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}")`,
@@ -238,32 +259,23 @@ export default function RelatorioRecebedoria() {
       if (debouncedReferenciaFilter && !isNaN(Number(debouncedReferenciaFilter))) {
         antigasConditions.push(`referencia = ${Number(debouncedReferenciaFilter)}`)
       }
-      let antigasRes = await pb.collection('colaboradores').getFullList({
-        filter: antigasConditions.join(' && '),
-        sort: '-referencia,-created',
-      })
 
-      if (antigasRes.length > 0) {
-        const colabIds = antigasRes.map((c) => c.id)
-        const confirmadosIds = new Set<string>()
+      const [antigasRes, confirmadosRes] = await Promise.all([
+        pb.collection('colaboradores').getFullList({
+          filter: antigasConditions.join(' && '),
+          sort: '-referencia,-created',
+        }),
+        pb.collection('pagamentos').getFullList({
+          filter: 'status = "Confirmado"',
+          fields: 'colaborador_id',
+        }),
+      ])
 
-        // Check pagamentos with "Confirmado" status to exclude these colaboradores
-        const chunkSize = 50
-        for (let i = 0; i < colabIds.length; i += chunkSize) {
-          const chunk = colabIds.slice(i, i + chunkSize)
-          const chunkFilter = chunk.map((id) => `colaborador_id = "${id}"`).join(' || ')
-          const pags = await pb.collection('pagamentos').getFullList({
-            filter: `(${chunkFilter}) && status = "Confirmado"`,
-            fields: 'colaborador_id',
-          })
-          pags.forEach((p) => confirmadosIds.add(p.colaborador_id))
-        }
-
-        antigasRes = antigasRes.filter((c) => !confirmadosIds.has(c.id))
-      }
+      const confirmadosIds = new Set(confirmadosRes.map((p: any) => p.colaborador_id))
+      const filteredAntigas = antigasRes.filter((c) => !confirmadosIds.has(c.id))
 
       setAntigasData(
-        [...antigasRes].sort((a, b) => {
+        [...filteredAntigas].sort((a, b) => {
           const aUpdated =
             normalizeTimestampForSort(a.updated) || normalizeTimestampForSort(a.created) || ''
           const bUpdated =
@@ -278,81 +290,42 @@ export default function RelatorioRecebedoria() {
           return (b.created || '').localeCompare(a.created || '')
         }),
       )
-    } catch (err: any) {
-      console.error(err)
-      setError(true)
-    } finally {
-      setLoading(false)
+    } catch (err) {
+      console.error('Error loading antigas data:', err)
     }
-  }
+  }, [debouncedSearchTerm, debouncedReferenciaFilter])
+
+  useEffect(() => {
+    setPage(1)
+  }, [startDate, endDate, startTime, endTime, statusFilter, usuarioFilter, tipoPagamentoFilter])
 
   useEffect(() => {
     loadData()
-  }, [
-    startDate,
-    endDate,
-    startTime,
-    endTime,
-    debouncedSearchTerm,
-    debouncedReferenciaFilter,
-    statusFilter,
-    usuarioFilter,
-    tipoPagamentoFilter,
-    allUsers.length,
-  ])
-
-  const sortedSummaryData = React.useMemo(() => {
-    return [...summaryData].sort((a, b) => {
-      const aData = a.data_pagamento || ''
-      const bData = b.data_pagamento || ''
-      const aTime = a.hora_pagamento || ''
-      const bTime = b.hora_pagamento || ''
-
-      const aComposite = aData ? normalizeTimestampForSort(aTime ? `${aData} ${aTime}` : aData) : ''
-      const bComposite = bData ? normalizeTimestampForSort(bTime ? `${bData} ${bTime}` : bData) : ''
-
-      if (!aComposite && !bComposite) {
-        const aUpdated =
-          normalizeTimestampForSort(a.updated) || normalizeTimestampForSort(a.created) || ''
-        const bUpdated =
-          normalizeTimestampForSort(b.updated) || normalizeTimestampForSort(b.created) || ''
-        if (aUpdated !== bUpdated) return bUpdated.localeCompare(aUpdated)
-        const regCmp = String(a.registro || '').localeCompare(String(b.registro || ''), undefined, {
-          numeric: true,
-        })
-        if (regCmp !== 0) return regCmp
-        return (b.created || '').localeCompare(a.created || '')
-      }
-      if (!aComposite) return -1
-      if (!bComposite) return 1
-
-      if (aComposite !== bComposite) return bComposite.localeCompare(aComposite)
-
-      const aUpdated = normalizeTimestampForSort(a.updated) || ''
-      const bUpdated = normalizeTimestampForSort(b.updated) || ''
-      if (aUpdated !== bUpdated) return bUpdated.localeCompare(aUpdated)
-
-      const regCmp = String(a.registro || '').localeCompare(String(b.registro || ''), undefined, {
-        numeric: true,
-      })
-      if (regCmp !== 0) return regCmp
-
-      return (b.created || '').localeCompare(a.created || '')
-    })
-  }, [summaryData])
+  }, [loadData])
 
   useEffect(() => {
-    const startIndex = (page - 1) * 20
-    setData(sortedSummaryData.slice(startIndex, startIndex + 20))
-  }, [page, sortedSummaryData])
+    if (activeTab === 'antigas') {
+      loadAntigasData()
+    }
+  }, [activeTab, loadAntigasData])
 
-  useRealtime('pagamentos', () => {
-    loadData()
-  })
+  useDebouncedRealtime(
+    'pagamentos',
+    () => {
+      loadData()
+    },
+    600,
+  )
 
-  useRealtime('colaboradores', () => {
-    loadData()
-  })
+  useDebouncedRealtime(
+    'colaboradores',
+    () => {
+      cachedRefsRef.current = null
+      loadData()
+      if (activeTab === 'antigas') loadAntigasData()
+    },
+    600,
+  )
 
   const clearFilters = () => {
     setStatusFilter('Todos')
@@ -396,9 +369,6 @@ export default function RelatorioRecebedoria() {
     return dateStr
   }
 
-  const [antigasData, setAntigasData] = useState<any[]>([])
-
-  // Summary Data grouping for simple table
   const summaryArray = React.useMemo(() => {
     const summary = summaryData.reduce((acc: any, item: any) => {
       const isConfirmado = item.status === 'Confirmado' && !!item.foto_confirmacao_url
@@ -425,7 +395,6 @@ export default function RelatorioRecebedoria() {
     }[]
   }, [summaryData])
 
-  // Consolidated Summary grouped by Payment Type and Date
   const consolidatedSummary = React.useMemo(() => {
     const targetCategories = [
       { name: 'Hora Extra', keywords: ['hora extra', 'hora extras', 'horas extras'] },
@@ -544,7 +513,6 @@ export default function RelatorioRecebedoria() {
         `}
       </style>
 
-      {/* Print Header */}
       <div className="hidden print:block mb-8">
         <div className="flex justify-between items-end border-b-2 border-slate-800 pb-4 mb-4">
           <div>
@@ -579,7 +547,6 @@ export default function RelatorioRecebedoria() {
         </div>
       </div>
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white print:text-black">
@@ -601,7 +568,6 @@ export default function RelatorioRecebedoria() {
         </Button>
       </div>
 
-      {/* Filters */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border space-y-4 print:hidden">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           <div className="space-y-2">
@@ -716,7 +682,6 @@ export default function RelatorioRecebedoria() {
         </div>
       </div>
 
-      {/* Main Content */}
       {error ? (
         <div className="text-center py-12 bg-rose-50 dark:bg-rose-950/20 rounded-xl border border-rose-100 dark:border-rose-900/50 print:hidden">
           <AlertCircle className="mx-auto h-12 w-12 mb-4 text-rose-500 opacity-80" />
@@ -740,7 +705,6 @@ export default function RelatorioRecebedoria() {
           </TabsList>
 
           <TabsContent value="detalhado" className="mt-0 space-y-6">
-            {/* Print Detailed Table */}
             <div className="hidden print:block w-full">
               <Table className="w-full text-[14pt]">
                 <TableHeader className="border-b-2 border-slate-800">
@@ -760,7 +724,7 @@ export default function RelatorioRecebedoria() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedSummaryData.map((item: any, idx: number) => {
+                  {summaryData.map((item: any, idx: number) => {
                     const val =
                       item.valor_pago ||
                       item.expand?.colaborador_id?.valor_a_receber ||
@@ -813,7 +777,7 @@ export default function RelatorioRecebedoria() {
                     </td>
                     <td className="py-3 text-lg text-left font-bold text-black double-underline">
                       {formatBRL(
-                        sortedSummaryData.reduce((acc: any, item: any) => {
+                        summaryData.reduce((acc: any, item: any) => {
                           return (
                             acc +
                             (item.valor_pago ||
@@ -831,7 +795,6 @@ export default function RelatorioRecebedoria() {
               </Table>
             </div>
 
-            {/* Desktop Table */}
             <div className="hidden md:block print:hidden rounded-xl border bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
               <Table>
                 <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
@@ -973,7 +936,6 @@ export default function RelatorioRecebedoria() {
               </Table>
             </div>
 
-            {/* Mobile Cards */}
             <div className="md:hidden print:hidden space-y-4">
               {loading ? (
                 [...Array(4)].map((_, i) => <Skeleton key={i} className="h-36 w-full rounded-xl" />)
@@ -1065,7 +1027,6 @@ export default function RelatorioRecebedoria() {
               )}
             </div>
 
-            {/* Pagination Info */}
             {!loading && totalItems > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 print:hidden">
                 <p className="text-sm text-muted-foreground">
@@ -1340,7 +1301,6 @@ export default function RelatorioRecebedoria() {
         </Tabs>
       )}
 
-      {/* Details Modal */}
       <Dialog open={!!detailsModal} onOpenChange={(open) => !open && setDetailsModal(null)}>
         <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950">
           <DialogHeader>
@@ -1477,7 +1437,6 @@ export default function RelatorioRecebedoria() {
         </DialogContent>
       </Dialog>
 
-      {/* Photo Modal */}
       <Dialog open={!!photoModal} onOpenChange={(open) => !open && setPhotoModal(null)}>
         <DialogContent className="sm:max-w-2xl bg-white dark:bg-slate-950">
           <DialogHeader>
