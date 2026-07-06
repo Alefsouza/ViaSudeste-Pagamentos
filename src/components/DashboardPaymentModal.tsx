@@ -165,12 +165,7 @@ export function DashboardPaymentModal({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
-          <CheckCircle className="w-4 h-4 mr-2" />
-          Realizar Pagamento
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger asChild></DialogTrigger>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Confirmar Pagamentos</DialogTitle>
