@@ -71,11 +71,7 @@ export default function RelatorioRecebedoria() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
 
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - 30)
-    return d.toISOString().split('T')[0]
-  })
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0])
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
@@ -336,10 +332,9 @@ export default function RelatorioRecebedoria() {
     setStartTime('')
     setEndTime('')
     setTimeError('')
-    const start = new Date()
-    start.setDate(start.getDate() - 30)
-    setStartDate(start.toISOString().split('T')[0])
-    setEndDate(new Date().toISOString().split('T')[0])
+    const today = new Date().toISOString().split('T')[0]
+    setStartDate(today)
+    setEndDate(today)
     setPage(1)
   }
 
