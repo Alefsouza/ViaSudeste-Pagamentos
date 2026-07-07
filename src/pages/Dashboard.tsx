@@ -717,15 +717,6 @@ export default function Dashboard() {
 
   const isEmpty = baseStatsData.length === 0 && !statsLoading
 
-  // Group table items by Reference without aggregating their values
-  const groupedByRef = (tableData.items || []).reduce((acc: any, item: any) => {
-    const ref = item.referencia
-    const refStr = ref != null ? `Referência: ${ref}` : 'Sem Referência'
-    if (!acc[refStr]) acc[refStr] = []
-    acc[refStr].push(item)
-    return acc
-  }, {})
-
   return (
     <div className="container mx-auto py-8 px-4 space-y-8 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1324,7 +1315,7 @@ export default function Dashboard() {
                           <TableHead className="whitespace-nowrap">
                             Ref <ArrowDown className="inline-block w-3 h-3 ml-1" />
                           </TableHead>
-                          <TableHead className="text-left">Valor</TableHead>
+                          <TableHead className="text-left">Valor Pago</TableHead>
                           <TableHead>Tipo de Pagamento</TableHead>
                           <TableHead className="whitespace-nowrap">
                             Data de Pagamento <ArrowDown className="inline-block w-3 h-3 ml-1" />
@@ -1337,7 +1328,7 @@ export default function Dashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {Object.keys(groupedByRef).length === 0 ? (
+                        {(tableData.items || []).length === 0 ? (
                           <TableRow>
                             <TableCell
                               colSpan={canManagePayments ? 10 : 9}
@@ -1349,41 +1340,17 @@ export default function Dashboard() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          Object.entries(groupedByRef).flatMap(
-                            ([refName, records]: [string, any]) => {
-                              const totalLines = filteredStatsData.filter((c) => {
-                                const cRef = c.referencia
-                                const cRefStr =
-                                  cRef != null ? `Referência: ${cRef}` : 'Sem Referência'
-                                return cRefStr === refName
-                              }).length
-                              return [
-                                <TableRow
-                                  key={`header-${refName}`}
-                                  className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                                >
-                                  <TableCell
-                                    colSpan={canManagePayments ? 10 : 9}
-                                    className="font-semibold text-slate-700 dark:text-slate-300"
-                                  >
-                                    {refName} - {totalLines}{' '}
-                                    {totalLines === 1 ? 'pagamento' : 'pagamentos'}
-                                  </TableCell>
-                                </TableRow>,
-                                ...records.map((p: any) => (
-                                  <PaymentTableRow
-                                    key={p.id}
-                                    record={p}
-                                    maxRef={maxRef}
-                                    canManagePayments={canManagePayments}
-                                    onPhotoClick={setSelectedPhotoUrl}
-                                    onToggleRelease={handleToggleRelease}
-                                    onDeleteClick={setPaymentToCancel}
-                                  />
-                                )),
-                              ]
-                            },
-                          )
+                          (tableData.items || []).map((p: any) => (
+                            <PaymentTableRow
+                              key={p.id}
+                              record={p}
+                              maxRef={maxRef}
+                              canManagePayments={canManagePayments}
+                              onPhotoClick={setSelectedPhotoUrl}
+                              onToggleRelease={handleToggleRelease}
+                              onDeleteClick={setPaymentToCancel}
+                            />
+                          ))
                         )}
                       </TableBody>
                     </Table>
@@ -1391,185 +1358,165 @@ export default function Dashboard() {
 
                   {/* Mobile View */}
                   <div className="md:hidden space-y-6">
-                    {Object.keys(groupedByRef).length === 0 ? (
+                    {(tableData.items || []).length === 0 ? (
                       <div className="text-center text-muted-foreground p-8">
                         {selectedChartDate
                           ? 'Nenhuma transação encontrada para esta data.'
                           : 'Nenhum pagamento encontrado com os filtros atuais.'}
                       </div>
                     ) : (
-                      Object.entries(groupedByRef).map(([refName, records]: [string, any]) => {
-                        const totalLines = filteredStatsData.filter((c) => {
-                          const cRef = c.referencia
-                          const cRefStr = cRef != null ? `Referência: ${cRef}` : 'Sem Referência'
-                          return cRefStr === refName
-                        }).length
-                        return (
-                          <div key={refName} className="space-y-4">
-                            <div className="font-semibold text-slate-700 dark:text-slate-300 px-2 pt-2 border-b pb-2">
-                              {refName} - {totalLines}{' '}
-                              {totalLines === 1 ? 'pagamento' : 'pagamentos'}
+                      (tableData.items || []).map((p: any) => (
+                        <Card key={p.id} className="shadow-sm">
+                          <CardContent className="p-4 flex flex-col gap-2">
+                            <div className="flex justify-between font-bold">
+                              <span className="truncate">{p.nome || 'Desconhecido'}</span>
+                              <span className="text-emerald-600 dark:text-emerald-500">
+                                {formatBRL(getActualValue(p))}
+                              </span>
                             </div>
-                            {records.map((p: any) => (
-                              <Card key={p.id} className="shadow-sm">
-                                <CardContent className="p-4 flex flex-col gap-2">
-                                  <div className="flex justify-between font-bold">
-                                    <span className="truncate">{p.nome || 'Desconhecido'}</span>
-                                    <span className="text-emerald-600 dark:text-emerald-500">
-                                      {formatBRL(getActualValue(p))}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-muted-foreground flex justify-between">
-                                    <span>Reg: {p.registro || '-'}</span>
-                                    <span>
-                                      {p.filial === 2
-                                        ? 'Cursino'
-                                        : p.filial === 4
-                                          ? 'Sapopemba'
-                                          : p.filial || '-'}
-                                      {p.referencia ? ` (Ref: ${p.referencia})` : ''}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-muted-foreground flex justify-between">
-                                    <span>{getTipoPagamento(p.idtipopgto)}</span>
-                                  </div>
-                                  <div className="text-sm text-muted-foreground flex justify-between">
-                                    <span>Data de Pagamento:</span>
-                                    <span>
-                                      {(() => {
-                                        const displayDate = getPaymentDisplayDate(p)
-                                        return displayDate ? formatDateTimeBR(displayDate) : '-'
-                                      })()}
-                                    </span>
-                                  </div>{' '}
-                                  <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
-                                    <div>
-                                      {(() => {
-                                        const status = getEvaluatedStatus(p, maxRef)
-                                        if (!status) return null
+                            <div className="text-sm text-muted-foreground flex justify-between">
+                              <span>Reg: {p.registro || '-'}</span>
+                              <span>
+                                {p.filial === 2
+                                  ? 'Cursino'
+                                  : p.filial === 4
+                                    ? 'Sapopemba'
+                                    : p.filial || '-'}
+                                {p.referencia ? ` (Ref: ${p.referencia})` : ''}
+                              </span>
+                            </div>
+                            <div className="text-sm text-muted-foreground flex justify-between">
+                              <span>{getTipoPagamento(p.idtipopgto)}</span>
+                            </div>
+                            <div className="text-sm text-muted-foreground flex justify-between">
+                              <span>Data de Pagamento:</span>
+                              <span>
+                                {(() => {
+                                  const displayDate = getPaymentDisplayDate(p)
+                                  return displayDate ? formatDateTimeBR(displayDate) : '-'
+                                })()}
+                              </span>
+                            </div>{' '}
+                            <div className="text-sm text-muted-foreground flex justify-between items-center mt-2 border-t pt-2">
+                              <div>
+                                {(() => {
+                                  const status = getEvaluatedStatus(p, maxRef)
+                                  if (!status) return null
 
-                                        if (status === 'Confirmado')
-                                          return (
-                                            <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                                              Confirmado
-                                            </Badge>
-                                          )
-                                        if (status === 'Agendado') {
-                                          return (
-                                            <TooltipProvider>
-                                              <Tooltip>
-                                                <TooltipTrigger className="cursor-help">
-                                                  <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1">
-                                                    <Lock className="w-3 h-3" />
-                                                    Agendado
-                                                  </Badge>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                  <p>
-                                                    Liberado em:{' '}
-                                                    {formatDateDBToBR(p.data_liberacao)}
-                                                  </p>
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            </TooltipProvider>
-                                          )
-                                        }
-                                        if (status === 'Bloqueado') {
-                                          return (
-                                            <Badge className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 w-max">
+                                  if (status === 'Confirmado')
+                                    return (
+                                      <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
+                                        Confirmado
+                                      </Badge>
+                                    )
+                                  if (status === 'Agendado') {
+                                    return (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger className="cursor-help">
+                                            <Badge className="bg-slate-400 hover:bg-slate-500 text-white flex items-center gap-1">
                                               <Lock className="w-3 h-3" />
-                                              Bloqueado
+                                              Agendado
                                             </Badge>
-                                          )
-                                        }
-                                        if (status === 'Pendente') {
-                                          return (
-                                            <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
-                                              Pendente
-                                            </Badge>
-                                          )
-                                        }
-                                        if (status === 'Cancelado')
-                                          return <Badge variant="destructive">Cancelado</Badge>
-                                        return <Badge variant="outline">{status}</Badge>
-                                      })()}
-                                    </div>
-                                    <div className="flex gap-2">
-                                      {p.foto_confirmacao_url && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() =>
-                                            setSelectedPhotoUrl(p.foto_confirmacao_url)
-                                          }
-                                        >
-                                          <ImageIcon className="w-4 h-4 mr-2" />
-                                          Foto
-                                        </Button>
-                                      )}
-                                      {canManagePayments &&
-                                        (() => {
-                                          const status = getEvaluatedStatus(p, maxRef)
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>Liberado em: {formatDateDBToBR(p.data_liberacao)}</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )
+                                  }
+                                  if (status === 'Bloqueado') {
+                                    return (
+                                      <Badge className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1 w-max">
+                                        <Lock className="w-3 h-3" />
+                                        Bloqueado
+                                      </Badge>
+                                    )
+                                  }
+                                  if (status === 'Pendente') {
+                                    return (
+                                      <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
+                                        Pendente
+                                      </Badge>
+                                    )
+                                  }
+                                  if (status === 'Cancelado')
+                                    return <Badge variant="destructive">Cancelado</Badge>
+                                  return <Badge variant="outline">{status}</Badge>
+                                })()}
+                              </div>
+                              <div className="flex gap-2">
+                                {p.foto_confirmacao_url && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setSelectedPhotoUrl(p.foto_confirmacao_url)}
+                                  >
+                                    <ImageIcon className="w-4 h-4 mr-2" />
+                                    Foto
+                                  </Button>
+                                )}
+                                {canManagePayments &&
+                                  (() => {
+                                    const status = getEvaluatedStatus(p, maxRef)
 
-                                          const actualRef = p.referencia
-                                          const isOutsideValidity =
-                                            actualRef && maxRef > 0 && actualRef < maxRef - 3
+                                    const actualRef = p.referencia
+                                    const isOutsideValidity =
+                                      actualRef && maxRef > 0 && actualRef < maxRef - 3
 
-                                          const liberadoPagamento = p.liberado_pagamento
+                                    const liberadoPagamento = p.liberado_pagamento
 
-                                          return (
-                                            <>
-                                              {(status === 'Pendente' || status === 'Bloqueado') &&
-                                                isOutsideValidity && (
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={cn(
-                                                      'px-2 hover:bg-amber-100 dark:hover:bg-amber-900/50',
-                                                      liberadoPagamento
-                                                        ? 'text-emerald-500 hover:text-emerald-700'
-                                                        : 'text-amber-500 hover:text-amber-700',
-                                                    )}
-                                                    onClick={() => handleToggleRelease(p)}
-                                                    title={
-                                                      liberadoPagamento
-                                                        ? 'Bloquear Pagamento'
-                                                        : 'Liberar Pagamento'
-                                                    }
-                                                  >
-                                                    {liberadoPagamento ? (
-                                                      <Lock className="h-4 w-4 mr-2" />
-                                                    ) : (
-                                                      <Unlock className="h-4 w-4 mr-2" />
-                                                    )}
-                                                    {liberadoPagamento ? 'Bloquear' : 'Liberar'}
-                                                  </Button>
-                                                )}
-                                              {(status === 'Pendente' ||
-                                                status === 'Bloqueado' ||
-                                                status === 'Agendado') && (
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 px-2"
-                                                  onClick={() => setPaymentToCancel(p)}
-                                                  title="Excluir Pagamento"
-                                                >
-                                                  <Trash2 className="h-4 w-4 mr-2" />
-                                                  Excluir
-                                                </Button>
+                                    return (
+                                      <>
+                                        {(status === 'Pendente' || status === 'Bloqueado') &&
+                                          isOutsideValidity && (
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className={cn(
+                                                'px-2 hover:bg-amber-100 dark:hover:bg-amber-900/50',
+                                                liberadoPagamento
+                                                  ? 'text-emerald-500 hover:text-emerald-700'
+                                                  : 'text-amber-500 hover:text-amber-700',
                                               )}
-                                            </>
-                                          )
-                                        })()}
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        )
-                      })
+                                              onClick={() => handleToggleRelease(p)}
+                                              title={
+                                                liberadoPagamento
+                                                  ? 'Bloquear Pagamento'
+                                                  : 'Liberar Pagamento'
+                                              }
+                                            >
+                                              {liberadoPagamento ? (
+                                                <Lock className="h-4 w-4 mr-2" />
+                                              ) : (
+                                                <Unlock className="h-4 w-4 mr-2" />
+                                              )}
+                                              {liberadoPagamento ? 'Bloquear' : 'Liberar'}
+                                            </Button>
+                                          )}
+                                        {(status === 'Pendente' ||
+                                          status === 'Bloqueado' ||
+                                          status === 'Agendado') && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 px-2"
+                                            onClick={() => setPaymentToCancel(p)}
+                                            title="Excluir Pagamento"
+                                          >
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Excluir
+                                          </Button>
+                                        )}
+                                      </>
+                                    )
+                                  })()}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
                     )}
                   </div>
 
