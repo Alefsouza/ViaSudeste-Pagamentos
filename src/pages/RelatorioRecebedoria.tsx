@@ -216,13 +216,13 @@ export default function RelatorioRecebedoria() {
       })
 
       const sortedData = [...summaryRes].sort((a: any, b: any) => {
-        const refA = normalizeTimestampForSort(a.expand?.colaborador_id?.data) || ''
-        const refB = normalizeTimestampForSort(b.expand?.colaborador_id?.data) || ''
-        if (refA !== refB) return refA.localeCompare(refB)
-
         const pagA = normalizeTimestampForSort(a.data_pagamento) || ''
         const pagB = normalizeTimestampForSort(b.data_pagamento) || ''
         if (pagA !== pagB) return pagB.localeCompare(pagA)
+
+        const refA = normalizeTimestampForSort(a.expand?.colaborador_id?.data) || ''
+        const refB = normalizeTimestampForSort(b.expand?.colaborador_id?.data) || ''
+        if (refA !== refB) return refA.localeCompare(refB)
 
         const createdA = normalizeTimestampForSort(a.created) || ''
         const createdB = normalizeTimestampForSort(b.created) || ''
