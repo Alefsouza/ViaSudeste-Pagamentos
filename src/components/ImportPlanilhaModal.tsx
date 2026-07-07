@@ -171,18 +171,40 @@ export function ImportPlanilhaModal({
         }
 
         const formatHoras = (val: any) => {
-          if (typeof val === 'number') {
-            let hours = val
-            if (val > 0 && val < 1) {
-              hours = val * 24
-            }
-            return Number(hours).toFixed(2).padStart(5, '0')
-          }
           if (typeof val === 'string') {
-            const num = parseFloat(val.replace(',', '.'))
-            return isNaN(num) ? val : num.toFixed(2).padStart(5, '0')
+            const trimmed = val.trim()
+            const match = trimmed.match(/^(\d+):(\d{2})$/)
+            if (match) {
+              return `${match[1].padStart(2, '0')}:${match[2]}`
+            }
+            const num = parseFloat(trimmed.replace(',', '.'))
+            if (!isNaN(num)) {
+              const totalMinutes = Math.round(num * 60)
+              const hours = Math.floor(totalMinutes / 60)
+              const minutes = totalMinutes % 60
+              return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+            }
+            return trimmed || '00:00'
           }
-          return '00.00'
+
+          if (typeof val === 'number') {
+            if (val === 0) return '00:00'
+            if (val > 0 && val < 1) {
+              const totalMinutes = Math.round(val * 24 * 60)
+              const hours = Math.floor(totalMinutes / 60)
+              const minutes = totalMinutes % 60
+              return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+            }
+            if (val >= 1) {
+              const totalMinutes = Math.round(val * 60)
+              const hours = Math.floor(totalMinutes / 60)
+              const minutes = totalMinutes % 60
+              return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+            }
+            return '00:00'
+          }
+
+          return '00:00'
         }
 
         const normalizedData = jsonData.map((row: any) => {

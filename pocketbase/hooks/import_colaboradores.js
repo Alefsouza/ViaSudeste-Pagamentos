@@ -41,6 +41,9 @@ routerAdd(
                   finalValue = d.toISOString().replace('T', ' ')
                 }
               }
+              } else if (key === 'horas') {
+                finalValue = String(finalValue)
+              }
               record.set(key, finalValue)
             }
           }

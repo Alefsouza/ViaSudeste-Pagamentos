@@ -28,10 +28,29 @@ export const formatHoraString = (hStr?: string) => {
 }
 
 export const formatHoras = (horas?: string | number) => {
-  if (!horas) return '00.00'
-  const val = Number(horas)
-  if (isNaN(val)) return String(horas)
-  return val.toFixed(2).padStart(5, '0')
+  if (!horas && horas !== 0) return '00:00'
+
+  const str = String(horas).trim()
+  if (!str) return '00:00'
+
+  if (str.includes(':')) {
+    const parts = str.split(':')
+    if (parts.length >= 2) {
+      const h = String(parseInt(parts[0]) || 0).padStart(2, '0')
+      const m = String(parseInt(parts[1]) || 0).padStart(2, '0')
+      return `${h}:${m}`
+    }
+  }
+
+  const val = parseFloat(str.replace(',', '.'))
+  if (!isNaN(val)) {
+    const totalMinutes = Math.round(val * 60)
+    const h = Math.floor(totalMinutes / 60)
+    const m = totalMinutes % 60
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+
+  return str || '00:00'
 }
 
 export const getTipoPagamento = (id?: number) => {
