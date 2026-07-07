@@ -1,6 +1,6 @@
 routerAdd(
   'POST',
-  '/backend/v1/import/colaboradores',
+  '/backend/v1/import/pagamentos',
   (e) => {
     const body = e.requestInfo().body
     if (!body || !body.data || !Array.isArray(body.data)) {
@@ -11,11 +11,23 @@ routerAdd(
     const errors = []
 
     $app.runInTransaction((txApp) => {
-      const col = txApp.findCollectionByNameOrId('colaboradores')
+      const col = txApp.findCollectionByNameOrId('pagamentos')
 
       for (const item of body.data) {
         // Permanently block re-import of Reference 15 data
         if (item.referencia !== undefined && Number(item.referencia) === 15) {
+          errors.push(
+            `Registro ignorado (Referência 15 bloqueada permanentemente): ${item.registro || 'desconhecido'}`,
+          )
+          continue
+        }
+
+        // Also block if body-level referencia is 15 and item doesn't override
+        if (
+          item.referencia === undefined &&
+          body.referencia !== undefined &&
+          Number(body.referencia) === 15
+        ) {
           errors.push(
             `Registro ignorado (Referência 15 bloqueada permanentemente): ${item.registro || 'desconhecido'}`,
           )
@@ -28,11 +40,7 @@ routerAdd(
           for (const [key, value] of Object.entries(item)) {
             if (value !== undefined && value !== '') {
               let finalValue = value
-              if (
-                ['data_liberacao', 'data_pagamento_v2', 'periodo_inicio', 'periodo_fim'].includes(
-                  key,
-                )
-              ) {
+              if (['data_pagamento', 'data_pagamento_v2'].includes(key)) {
                 if (typeof finalValue === 'string') {
                   const d = new Date(finalValue)
                   if (isNaN(d.getTime())) {
@@ -53,10 +61,6 @@ routerAdd(
             record.set('referencia', body.referencia)
           }
 
-          if (item.liberado_pagamento === undefined) {
-            record.set('liberado_pagamento', true)
-          }
-
           txApp.save(record)
           count++
         } catch (err) {
@@ -64,44 +68,6 @@ routerAdd(
             `Erro na linha (Registro: ${item.registro || 'desconhecido'}): ${err.message}`,
           )
         }
-      }
-
-      try {
-        txApp
-          .db()
-          .newQuery(`
-          UPDATE colaboradores
-          SET liberado_pagamento = 1
-          WHERE referencia IN (
-            SELECT DISTINCT referencia
-            FROM colaboradores
-            WHERE referencia IS NOT NULL AND referencia != 15
-            ORDER BY referencia DESC
-            LIMIT 4
-          ) AND liberado_pagamento = 0
-        `)
-          .execute()
-
-        txApp
-          .db()
-          .newQuery(`
-          UPDATE colaboradores
-          SET liberado_pagamento = 0
-          WHERE (
-            referencia IS NULL
-            OR referencia = 15
-            OR referencia NOT IN (
-              SELECT DISTINCT referencia
-              FROM colaboradores
-              WHERE referencia IS NOT NULL AND referencia != 15
-              ORDER BY referencia DESC
-              LIMIT 4
-            )
-          ) AND liberado_pagamento = 1
-        `)
-          .execute()
-      } catch (err) {
-        console.log('Erro na limpeza de referencias antigas:', err.message)
       }
     })
 
