@@ -1,11 +1,7 @@
 migrate(
   (app) => {
-    // Delete all pagamentos records where referencia = 15
-    // (pagamentos has its own referencia field)
-    app.db().newQuery(`DELETE FROM pagamentos WHERE referencia = 15`).execute()
-
-    // Also delete pagamentos linked to colaboradores with referencia = 15
-    // (safety net for records where pagamentos.referencia was not set)
+    // Delete all pagamentos records linked to colaboradores with referencia = 15
+    // (pagamentos has no referencia column; join via colaborador_id)
     app
       .db()
       .newQuery(
