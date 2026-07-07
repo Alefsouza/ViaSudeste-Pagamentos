@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import pb from '@/lib/pocketbase/client'
-import { updateColaborador } from '@/services/colaboradores'
 import { reconhecimentoFacialService } from '@/services/reconhecimento-facial'
-import { createPagamento, updatePagamento } from '@/services/pagamentos'
+import { batchConfirmPagamentos } from '@/services/pagamentos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -595,7 +594,6 @@ export default function Camera() {
     }
 
     try {
-      // Re-validate to ensure backend consistency and prevent bypassing
       const validationRecords = await pb.collection('colaboradores').getFullList({
         filter: `registro = "${colaborador.registro}"`,
       })
@@ -623,73 +621,40 @@ export default function Camera() {
         return
       }
 
-      let firstFileUrl = ''
+      const payments = recordsToProcess.map((record: any) => ({
+        colaborador_id: record.id,
+        registro: record.registro || '',
+        nome: record.nome || '',
+        valor_pago: String(record.valor_a_receber || record.valor || 0),
+        data_pagamento,
+        hora_pagamento,
+        idtipopgto: record.idtipopgto ?? null,
+        tipo_pagamento: getTipoPagamentoDesc(record.idtipopgto),
+        inicio: record.inicio || '',
+        termino: record.termino || '',
+        horas: record.horas || '',
+        filial: record.filial_id
+          ? Number(record.filial_id)
+          : record.filial === 'Cursino'
+            ? 1
+            : record.filial === 'Sapopemba'
+              ? 2
+              : '',
+        pagamento_id: record.pagamento_id || null,
+      }))
 
-      for (let i = 0; i < recordsToProcess.length; i++) {
-        const record = recordsToProcess[i]
+      const photoMap: Record<number, File> = { 0: file }
+      const result = await batchConfirmPagamentos(payments, photoMap)
 
-        const parsedHoras =
-          typeof record.horas === 'string' ? parseFloat(record.horas) : record.horas
-        const validHoras =
-          typeof parsedHoras === 'number' && !isNaN(parsedHoras) ? parsedHoras : undefined
+      const failures = result.results?.filter((r: any) => !r.success) || []
 
-        const parsedIdTipoPgto =
-          typeof record.idtipopgto === 'string'
-            ? parseInt(record.idtipopgto, 10)
-            : record.idtipopgto
-        const validIdTipoPgto =
-          typeof parsedIdTipoPgto === 'number' && !isNaN(parsedIdTipoPgto)
-            ? parsedIdTipoPgto
-            : undefined
-
-        const dataToSave: any = {
-          colaborador_id: record.id,
-          valor_pago: record.valor_a_receber || record.valor || 0,
-          data_pagamento,
-          hora_pagamento,
-          user_id: user?.id,
-          status: 'Confirmado',
-          inicio: record.inicio,
-          termino: record.termino,
-          horas: validHoras,
-          idtipopgto: validIdTipoPgto,
-          tipo_pagamento: getTipoPagamentoDesc(record.idtipopgto),
-          registro: record.registro,
-          nome: record.nome,
-          filial: record.filial_id ? Number(record.filial_id) : undefined,
-        }
-
-        if (i === 0) {
-          dataToSave.foto_confirmacao = file
-        } else if (firstFileUrl) {
-          dataToSave.foto_confirmacao_url = firstFileUrl
-        }
-
-        let pagamentoRecord
-        if (record.pagamento_id) {
-          pagamentoRecord = await updatePagamento(record.pagamento_id, dataToSave)
-        } else {
-          pagamentoRecord = await createPagamento(dataToSave)
-        }
-
-        if (i === 0) {
-          firstFileUrl = pb.files.getURL(pagamentoRecord, pagamentoRecord.foto_confirmacao)
-          await updatePagamento(pagamentoRecord.id, { foto_confirmacao_url: firstFileUrl })
-        }
-      }
-
-      try {
-        const idsToUpdate = recordsToProcess.map((r) => r.id)
-        for (const id of idsToUpdate) {
-          await updateColaborador(id, { foto_confirmacao_url: firstFileUrl })
-        }
-      } catch (err) {
+      if (failures.length > 0) {
         toast({
-          title: 'Aviso',
-          description: 'Pagamento confirmado, mas erro ao atualizar colaborador(es).',
+          title: `${failures.length} pagamento(s) falhou(ram)`,
+          description: failures.map((f: any) => f.error).join('; '),
           variant: 'destructive',
         })
-        handleReset()
+        setViewState('RECOGNITION_SUCCESS')
         return
       }
 
