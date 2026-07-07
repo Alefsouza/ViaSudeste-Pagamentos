@@ -207,27 +207,33 @@ export default function RelatorioRecebedoria() {
     try {
       const filterString = buildFilter()
 
-      const [paginatedRes, summaryRes] = await Promise.all([
-        pb.collection('pagamentos').getList(page, 20, {
-          filter: filterString,
-          sort: '-data_pagamento,-created',
-          expand: 'colaborador_id,user_id',
-          fields:
-            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor',
-        }),
-        getAllPaginated('pagamentos', {
-          filter: filterString,
-          sort: '-data_pagamento,-created',
-          expand: 'colaborador_id',
-          fields:
-            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor',
-        }),
-      ])
+      const summaryRes = await getAllPaginated('pagamentos', {
+        filter: filterString,
+        sort: '-data_pagamento,-created',
+        expand: 'colaborador_id,user_id',
+        fields:
+          'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor,expand.colaborador_id.referencia',
+      })
 
-      setData(paginatedRes.items)
-      setTotalItems(paginatedRes.totalItems)
-      setTotalPages(paginatedRes.totalPages)
-      setSummaryData(summaryRes)
+      const sortedData = [...summaryRes].sort((a: any, b: any) => {
+        const refA = normalizeTimestampForSort(a.expand?.colaborador_id?.data) || ''
+        const refB = normalizeTimestampForSort(b.expand?.colaborador_id?.data) || ''
+        if (refA !== refB) return refA.localeCompare(refB)
+
+        const pagA = normalizeTimestampForSort(a.data_pagamento) || ''
+        const pagB = normalizeTimestampForSort(b.data_pagamento) || ''
+        if (pagA !== pagB) return pagB.localeCompare(pagA)
+
+        const createdA = normalizeTimestampForSort(a.created) || ''
+        const createdB = normalizeTimestampForSort(b.created) || ''
+        return createdB.localeCompare(createdA)
+      })
+
+      setSummaryData(sortedData)
+      setTotalItems(sortedData.length)
+      setTotalPages(Math.max(1, Math.ceil(sortedData.length / 20)))
+      const startIdx = (page - 1) * 20
+      setData(sortedData.slice(startIdx, startIdx + 20))
     } catch (err: any) {
       console.error(err)
       setError(true)
