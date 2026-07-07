@@ -213,14 +213,14 @@ export default function RelatorioRecebedoria() {
           sort: '-data_pagamento,-created',
           expand: 'colaborador_id,user_id',
           fields:
-            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created',
+            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor',
         }),
         getAllPaginated('pagamentos', {
           filter: filterString,
           sort: '-data_pagamento,-created',
           expand: 'colaborador_id',
           fields:
-            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,updated,created',
+            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor',
         }),
       ])
 
@@ -899,8 +899,8 @@ export default function RelatorioRecebedoria() {
                           </TableCell>
                           <TableCell className="font-medium print:text-black text-left">
                             {formatBRL(
-                              item.expand?.colaborador_id?.valor_a_receber ||
-                                item.valor_pago ||
+                              item.valor_pago ||
+                                item.expand?.colaborador_id?.valor_a_receber ||
                                 item.valor_a_receber ||
                                 item.valor,
                             )}
@@ -981,8 +981,8 @@ export default function RelatorioRecebedoria() {
                           <div className="text-left">
                             <div className="font-bold text-lg text-slate-900 dark:text-slate-100">
                               {formatBRL(
-                                item.expand?.colaborador_id?.valor_a_receber ||
-                                  item.valor_pago ||
+                                item.valor_pago ||
+                                  item.expand?.colaborador_id?.valor_a_receber ||
                                   item.valor_a_receber ||
                                   item.valor,
                               )}
@@ -1356,8 +1356,8 @@ export default function RelatorioRecebedoria() {
                   </span>
                   <p className="font-medium text-emerald-600 dark:text-emerald-400">
                     {formatBRL(
-                      detailsModal.expand?.colaborador_id?.valor_a_receber ||
-                        detailsModal.valor_pago ||
+                      detailsModal.valor_pago ||
+                        detailsModal.expand?.colaborador_id?.valor_a_receber ||
                         detailsModal.valor_a_receber ||
                         detailsModal.valor,
                     )}
