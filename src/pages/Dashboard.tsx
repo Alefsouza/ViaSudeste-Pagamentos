@@ -1401,9 +1401,15 @@ export default function Dashboard() {
                             </div>
                             <div className="text-sm text-muted-foreground flex justify-between">
                               <span>
-                                {p._isGrouped
-                                  ? p.tipos_pagamento.join(', ')
-                                  : getTipoPagamento(p.idtipopgto)}
+                                {p._isGrouped ? (
+                                  <div className="space-y-0.5">
+                                    {p.tipos_pagamento.map((tipo: string, i: number) => (
+                                      <div key={i}>{tipo}</div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  getTipoPagamento(p.idtipopgto)
+                                )}
                               </span>
                             </div>
                             <div className="text-sm text-muted-foreground flex justify-between">
@@ -1424,7 +1430,7 @@ export default function Dashboard() {
                                   if (status === 'Confirmado')
                                     return (
                                       <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                                        Confirmado{p._isGrouped ? ` (${p._groupCount})` : ''}
+                                        Confirmado
                                       </Badge>
                                     )
                                   if (status === 'Agendado') {
@@ -1472,7 +1478,7 @@ export default function Dashboard() {
                                     onClick={() => setSelectedPhotoUrl(p.foto_confirmacao_url)}
                                   >
                                     <ImageIcon className="w-4 h-4 mr-2" />
-                                    {p._isGrouped ? `Foto (${p._groupCount})` : 'Foto'}
+                                    Visualizar
                                   </Button>
                                 )}
                                 {canManagePayments &&

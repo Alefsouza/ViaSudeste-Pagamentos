@@ -112,9 +112,7 @@ function PaymentTableRowComponent({
       </TableCell>
       <TableCell>
         {status === 'Confirmado' && (
-          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
-            Confirmado{isGrouped ? ` (${p._groupCount})` : ''}
-          </Badge>
+          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">Confirmado</Badge>
         )}
         {status === 'Agendado' && (
           <TooltipProvider>
@@ -149,7 +147,7 @@ function PaymentTableRowComponent({
         {p.foto_confirmacao_url && (
           <Button variant="ghost" size="sm" onClick={() => onPhotoClick(p.foto_confirmacao_url)}>
             <ImageIcon className="w-4 h-4 mr-2" />
-            {isGrouped ? `${p._groupCount}` : 'Visualizar'}
+            Visualizar
           </Button>
         )}
       </TableCell>
