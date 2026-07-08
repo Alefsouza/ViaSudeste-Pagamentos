@@ -1,4 +1,4 @@
-import { getTipoPagamento } from '@/lib/formatters'
+import { getTipoPagamento, getTipoPagamentoAbrev } from '@/lib/formatters'
 
 function getEffectiveFotoUrl(record: any): string | null {
   return record.pagamento_relacionado?.foto_confirmacao_url || record.foto_confirmacao_url || null
@@ -55,7 +55,7 @@ export function groupPaymentsByPhoto(records: any[]): any[] {
 
     const tiposSet = new Set<string>()
     groupRecords.forEach((r) => {
-      const tipo = getTipoPagamento(r.idtipopgto)
+      const tipo = getTipoPagamentoAbrev(r.idtipopgto)
       if (tipo) tiposSet.add(tipo)
     })
     const tipos_pagamento = Array.from(tiposSet)

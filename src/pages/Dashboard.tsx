@@ -66,6 +66,7 @@ import { useToast } from '@/hooks/use-toast'
 import {
   formatBRL,
   getTipoPagamento,
+  getTipoPagamentoAbrev,
   checkIsLocked,
   formatDateDBToBR,
   formatDateTimeBR,
@@ -1408,7 +1409,7 @@ export default function Dashboard() {
                                     ))}
                                   </div>
                                 ) : (
-                                  getTipoPagamento(p.idtipopgto)
+                                  getTipoPagamentoAbrev(p.idtipopgto)
                                 )}
                               </span>
                             </div>

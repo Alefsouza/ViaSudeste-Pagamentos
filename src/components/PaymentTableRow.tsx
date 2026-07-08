@@ -7,7 +7,7 @@ import { Lock, Unlock, Trash2, Image as ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   formatBRL,
-  getTipoPagamento,
+  getTipoPagamentoAbrev,
   formatDateTimeBR,
   getPaymentDisplayDate,
   formatDateDBToBR,
@@ -104,7 +104,7 @@ function PaymentTableRowComponent({
             ))}
           </div>
         ) : (
-          getTipoPagamento(p.idtipopgto)
+          getTipoPagamentoAbrev(p.idtipopgto)
         )}
       </TableCell>
       <TableCell className="whitespace-nowrap">

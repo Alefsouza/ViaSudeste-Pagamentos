@@ -60,6 +60,36 @@ export const getTipoPagamento = (id?: number) => {
   return 'Tipo desconhecido'
 }
 
+export const getTipoPagamentoAbrev = (tipo?: string | number) => {
+  if (typeof tipo === 'number') {
+    if (tipo === 1) return 'HE'
+    if (tipo === 3) return 'FT'
+    if (tipo === 4) return 'VR'
+    return 'Tipo desconhecido'
+  }
+  if (typeof tipo === 'string') {
+    const lower = tipo.toLowerCase()
+    if (lower === 'hora extra' || lower.includes('hora') || lower === 'he') return 'HE'
+    if (
+      lower === 'férias trabalhada' ||
+      lower.includes('férias') ||
+      lower.includes('ferias') ||
+      lower === 'ft'
+    )
+      return 'FT'
+    if (
+      lower === 'vale refeição' ||
+      lower.includes('vale') ||
+      lower.includes('refeição') ||
+      lower.includes('refeicao') ||
+      lower === 'vr'
+    )
+      return 'VR'
+    return tipo
+  }
+  return 'Tipo desconhecido'
+}
+
 export const formatBRL = (val: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
 
