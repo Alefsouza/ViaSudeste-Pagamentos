@@ -42,14 +42,15 @@ export const formatHoras = (horas?: string | number) => {
     }
   }
 
-  if (typeof horas === 'string' && (str.includes('.') || str.includes(','))) {
+  if (str.includes('.') || str.includes(',')) {
     const parts = str.split(/[.,]/)
     if (parts.length === 2) {
       const h = parseInt(parts[0]) || 0
       const m = parseInt(parts[1]) || 0
-      if (m >= 0 && m <= 59) {
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-      }
+      const totalMin = h * 60 + m
+      const rh = Math.floor(totalMin / 60)
+      const rm = totalMin % 60
+      return `${String(rh).padStart(2, '0')}:${String(rm).padStart(2, '0')}`
     }
   }
 
@@ -82,9 +83,7 @@ export const parseHorasToMinutes = (horas?: string | number): number => {
     if (parts.length === 2) {
       const h = parseInt(parts[0]) || 0
       const m = parseInt(parts[1]) || 0
-      if (m >= 0 && m <= 59) {
-        return h * 60 + m
-      }
+      return h * 60 + m
     }
   }
 
@@ -100,6 +99,49 @@ export const formatMinutesToHoras = (totalMinutes: number): string => {
   const h = Math.floor(totalMinutes / 60)
   const m = totalMinutes % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+export const parseTimeToMinutes = (timeStr?: string | number): number => {
+  if (!timeStr && timeStr !== 0) return 0
+  const s = String(timeStr).trim()
+  if (!s) return 0
+
+  if (s.includes(':')) {
+    const parts = s.split(':')
+    if (parts.length >= 2) {
+      return (parseInt(parts[0]) || 0) * 60 + (parseInt(parts[1]) || 0)
+    }
+  }
+
+  if (s.includes('.') || s.includes(',')) {
+    const parts = s.split(/[.,]/)
+    if (parts.length === 2) {
+      const h = parseInt(parts[0]) || 0
+      const m = parseInt(parts[1]) || 0
+      return h * 60 + m
+    }
+  }
+
+  const val = parseFloat(s)
+  if (!isNaN(val)) return Math.round(val * 60)
+  return 0
+}
+
+export const calcularIntervaloHoras = (
+  inicio?: string,
+  termino?: string,
+  horas?: string | number,
+): string => {
+  if (horas !== undefined && horas !== null && String(horas).trim()) {
+    return formatHoras(horas)
+  }
+  if (!inicio || !termino) return '00:00'
+
+  const start = parseTimeToMinutes(inicio)
+  const end = parseTimeToMinutes(termino)
+  let diff = end - start
+  if (diff < 0) diff += 24 * 60
+  return formatMinutesToHoras(diff)
 }
 
 export const getTipoPagamento = (id?: number) => {
