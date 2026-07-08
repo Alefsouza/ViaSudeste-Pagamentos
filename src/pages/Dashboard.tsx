@@ -553,6 +553,13 @@ export default function Dashboard() {
     }
   }, [filteredStatsData, page, maxRef])
 
+  const allConfirmed = useMemo(() => {
+    if (tableData.items.length === 0) return false
+    return tableData.items.every((item: any) => getEvaluatedStatus(item, maxRef) === 'Confirmado')
+  }, [tableData.items, maxRef])
+
+  const showActionsColumn = canManagePayments && !allConfirmed
+
   const pagamentosTotals = useMemo(() => {
     return filteredStatsData.reduce(
       (acc, curr) => {
@@ -1325,7 +1332,7 @@ export default function Dashboard() {
                           </TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-center">Foto</TableHead>
-                          {canManagePayments && (
+                          {showActionsColumn && (
                             <TableHead className="text-center">Ações</TableHead>
                           )}
                         </TableRow>
@@ -1334,7 +1341,7 @@ export default function Dashboard() {
                         {(tableData.items || []).length === 0 ? (
                           <TableRow>
                             <TableCell
-                              colSpan={canManagePayments ? 10 : 9}
+                              colSpan={showActionsColumn ? 10 : 9}
                               className="h-24 text-center text-muted-foreground"
                             >
                               {selectedChartDate
@@ -1348,7 +1355,7 @@ export default function Dashboard() {
                               key={p.id}
                               record={p}
                               maxRef={maxRef}
-                              canManagePayments={canManagePayments}
+                              canManagePayments={showActionsColumn}
                               onPhotoClick={setSelectedPhotoUrl}
                               onToggleRelease={handleToggleRelease}
                               onDeleteClick={setPaymentToCancel}
@@ -1476,7 +1483,7 @@ export default function Dashboard() {
                                     Visualizar
                                   </Button>
                                 )}
-                                {canManagePayments &&
+                                {showActionsColumn &&
                                   !p._isGrouped &&
                                   (() => {
                                     const status = getEvaluatedStatus(p, maxRef)
@@ -1532,7 +1539,7 @@ export default function Dashboard() {
                                       </>
                                     )
                                   })()}
-                                {canManagePayments &&
+                                {showActionsColumn &&
                                   p._isGrouped &&
                                   getEvaluatedStatus(p, maxRef) !== 'Confirmado' && (
                                     <Badge variant="secondary" className="text-xs">
