@@ -37,7 +37,12 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { PhotoPreviewModal } from '@/components/PhotoPreviewModal'
 import { cn } from '@/lib/utils'
 import { fetchPhotoAsBase64 } from '@/lib/photo-cache'
-import { formatMinutesToHoras, parseHorasToMinutes } from '@/lib/formatters'
+import {
+  formatMinutesToHoras,
+  parseHorasToMinutes,
+  formatHoras,
+  calcularIntervaloHoras,
+} from '@/lib/formatters'
 
 type ViewState =
   | 'EMPTY'
@@ -415,37 +420,6 @@ export default function Camera() {
     const parts = timeStr.split(':')
     if (parts.length >= 2) return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`
     return timeStr
-  }
-
-  const formatHoras = (horas?: number | string) => {
-    if (horas === undefined || horas === null || horas === '') return '00.00'
-    const num = typeof horas === 'string' ? parseFloat(horas) : horas
-    if (isNaN(num)) return '00.00'
-    return num.toFixed(2).padStart(5, '0')
-  }
-
-  const calcularIntervaloHoras = (
-    inicio?: string,
-    termino?: string,
-    fallbackHoras?: number | string,
-  ) => {
-    const fInicio = formatTime(inicio)
-    const fTermino = formatTime(termino)
-
-    if (fInicio !== '--:--' && fTermino !== '--:--') {
-      const [h1, m1] = fInicio.split(':').map(Number)
-      const [h2, m2] = fTermino.split(':').map(Number)
-
-      if (!isNaN(h1) && !isNaN(m1) && !isNaN(h2) && !isNaN(m2)) {
-        let startMin = h1 * 60 + m1
-        let endMin = h2 * 60 + m2
-        if (endMin < startMin) endMin += 24 * 60 // cross midnight
-
-        const diffHoras = (endMin - startMin) / 60
-        return diffHoras.toFixed(2).padStart(5, '0')
-      }
-    }
-    return formatHoras(fallbackHoras)
   }
 
   const getTipoPagamentoDesc = (idtipopgto?: number | string) => {
