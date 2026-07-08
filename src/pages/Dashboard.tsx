@@ -1402,15 +1402,9 @@ export default function Dashboard() {
                             </div>
                             <div className="text-sm text-muted-foreground flex justify-between">
                               <span>
-                                {p._isGrouped ? (
-                                  <div className="space-y-0.5">
-                                    {p.tipos_pagamento.map((tipo: string, i: number) => (
-                                      <div key={i}>{tipo}</div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  getTipoPagamentoAbrev(p.idtipopgto)
-                                )}
+                                {p._isGrouped
+                                  ? p.tipos_pagamento.join(', ')
+                                  : getTipoPagamentoAbrev(p.idtipopgto)}
                               </span>
                             </div>
                             <div className="text-sm text-muted-foreground flex justify-between">

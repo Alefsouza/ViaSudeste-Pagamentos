@@ -97,15 +97,7 @@ function PaymentTableRowComponent({
         {formatBRL(getActualValue(p))}
       </TableCell>
       <TableCell>
-        {isGrouped ? (
-          <div className="space-y-0.5">
-            {p.tipos_pagamento.map((tipo: string, i: number) => (
-              <div key={i}>{tipo}</div>
-            ))}
-          </div>
-        ) : (
-          getTipoPagamentoAbrev(p.idtipopgto)
-        )}
+        {isGrouped ? p.tipos_pagamento.join(', ') : getTipoPagamentoAbrev(p.idtipopgto)}
       </TableCell>
       <TableCell className="whitespace-nowrap">
         {displayDate ? formatDateTimeBR(displayDate) : '-'}
