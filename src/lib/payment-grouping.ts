@@ -1,4 +1,4 @@
-import { getTipoPagamento, getTipoPagamentoAbrev } from '@/lib/formatters'
+import { getTipoPagamentoAbrev, checkIsLocked } from '@/lib/formatters'
 
 function getEffectiveFotoUrl(record: any): string | null {
   return record.pagamento_relacionado?.foto_confirmacao_url || record.foto_confirmacao_url || null
@@ -11,12 +11,43 @@ function getActualValue(curr: any): number {
   return curr.valor_a_receber || curr.valor || 0
 }
 
-export function groupPaymentsByPhoto(records: any[]): any[] {
+function evaluateStatus(curr: any, maxRef: number): string {
+  if (curr.pagamento_relacionado?.status === 'Cancelado') return 'Cancelado'
+  if (curr.pagamento_relacionado?.status === 'Confirmado') return 'Confirmado'
+  let status = curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
+  const liberadoPagamento = curr.liberado_pagamento
+  const dataLiberacao = curr.data_liberacao
+  const ref = curr.referencia || 0
+  if (status === 'Pendente') {
+    const isLocked = checkIsLocked(dataLiberacao)
+    const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
+    if (isLocked) status = 'Agendado'
+    else if (isOutsideWindow && !liberadoPagamento) status = 'Bloqueado'
+  }
+  return status
+}
+
+const GROUPABLE_STATUSES = new Set(['Pendente', 'Bloqueado', 'Agendado'])
+
+export function groupPaymentsByPhoto(records: any[], maxRef: number = 0): any[] {
   const groups = new Map<string, any[]>()
 
   for (const record of records) {
     const fotoUrl = getEffectiveFotoUrl(record)
-    const key = fotoUrl || `unique_${record.id}`
+
+    let key: string
+    if (fotoUrl) {
+      key = fotoUrl
+    } else {
+      const status = evaluateStatus(record, maxRef)
+      if (GROUPABLE_STATUSES.has(status)) {
+        const registro = record.registro || 'unknown'
+        const referencia = record.referencia ?? 'null'
+        key = `sem_foto_${registro}_${referencia}`
+      } else {
+        key = `unique_${record.id}`
+      }
+    }
 
     if (!groups.has(key)) {
       groups.set(key, [])
@@ -32,7 +63,8 @@ export function groupPaymentsByPhoto(records: any[]): any[] {
       continue
     }
 
-    const fotoUrl = key.startsWith('unique_') ? null : key
+    const isPhotoGroup = !key.startsWith('sem_foto_') && !key.startsWith('unique_')
+    const fotoUrl = isPhotoGroup ? key : null
 
     const totalValor = groupRecords.reduce((sum, r) => sum + getActualValue(r), 0)
 
@@ -80,6 +112,17 @@ export function groupPaymentsByPhoto(records: any[]): any[] {
       if (!earliestCreated || created < earliestCreated) earliestCreated = created
     }
 
+    const pagamentoRelacionado = isPhotoGroup
+      ? {
+          status: 'Confirmado',
+          valor_pago: totalValor,
+          foto_confirmacao_url: fotoUrl,
+          data_pagamento: dataPagamento,
+          hora_pagamento: horaPagamento,
+          updated: latestUpdated,
+        }
+      : null
+
     result.push({
       id: key,
       _isGrouped: true,
@@ -106,14 +149,7 @@ export function groupPaymentsByPhoto(records: any[]): any[] {
       periodo_inicio: groupRecords[0].periodo_inicio,
       periodo_fim: groupRecords[0].periodo_fim,
       idtipopgto: groupRecords[0].idtipopgto,
-      pagamento_relacionado: {
-        status: 'Confirmado',
-        valor_pago: totalValor,
-        foto_confirmacao_url: fotoUrl,
-        data_pagamento: dataPagamento,
-        hora_pagamento: horaPagamento,
-        updated: latestUpdated,
-      },
+      pagamento_relacionado: pagamentoRelacionado,
     })
   }
 

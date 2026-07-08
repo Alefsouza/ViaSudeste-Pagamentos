@@ -507,7 +507,7 @@ export default function Dashboard() {
   }, [baseStatsData, selectedChartFilial, selectedChartDate, selectedChartRef, chartRefSearch])
 
   const tableData = useMemo(() => {
-    const grouped = groupPaymentsByPhoto(filteredStatsData)
+    const grouped = groupPaymentsByPhoto(filteredStatsData, maxRef)
     const sorted = [...grouped].sort((a, b) => {
       const dateA = getPaymentSortDate(a)
       const dateB = getPaymentSortDate(b)
