@@ -315,16 +315,21 @@ export default function Dashboard() {
       try {
         const liberadoPagamento = payment.liberado_pagamento
         const newStatus = !liberadoPagamento
-        const targetId = payment.id
 
         const dataUpdate: any = { liberado_pagamento: newStatus }
         if (newStatus) {
           dataUpdate.data_liberacao = new Date().toISOString()
         }
 
-        await pb.collection('colaboradores').update(targetId, dataUpdate)
+        const records = payment._isGrouped ? payment._records : [payment]
+        for (const record of records) {
+          await pb.collection('colaboradores').update(record.id, dataUpdate)
+        }
+
         toast({
-          title: newStatus ? 'Pagamento liberado com sucesso.' : 'Pagamento bloqueado com sucesso.',
+          title: newStatus
+            ? `${records.length} pagamento(s) liberado(s) com sucesso.`
+            : `${records.length} pagamento(s) bloqueado(s) com sucesso.`,
         })
         scheduleRefresh(false)
       } catch (err: any) {
@@ -348,21 +353,23 @@ export default function Dashboard() {
       return
     }
     try {
-      await pb.collection('colaboradores').delete(paymentToCancel.id)
+      const records = paymentToCancel._isGrouped ? paymentToCancel._records : [paymentToCancel]
+      for (const record of records) {
+        await pb.collection('colaboradores').delete(record.id)
 
-      // Try to delete related pagamento if exists just in case to ensure strict compliance
-      try {
-        const relatedPags = await pb
-          .collection('pagamentos')
-          .getFullList({ filter: `colaborador_id="${paymentToCancel.id}"` })
-        for (const p of relatedPags) {
-          await pb.collection('pagamentos').delete(p.id)
+        try {
+          const relatedPags = await pb
+            .collection('pagamentos')
+            .getFullList({ filter: `colaborador_id="${record.id}"` })
+          for (const p of relatedPags) {
+            await pb.collection('pagamentos').delete(p.id)
+          }
+        } catch {
+          /* intentionally ignored */
         }
-      } catch {
-        /* intentionally ignored */
       }
 
-      toast({ title: 'Registro excluído com sucesso!' })
+      toast({ title: `${records.length} registro(s) excluído(s) com sucesso!` })
       setPaymentToCancel(null)
       scheduleRefresh(false)
     } catch (err: any) {
@@ -1484,7 +1491,7 @@ export default function Dashboard() {
                                   </Button>
                                 )}
                                 {showActionsColumn &&
-                                  !p._isGrouped &&
+                                  getEvaluatedStatus(p, maxRef) !== 'Confirmado' &&
                                   (() => {
                                     const status = getEvaluatedStatus(p, maxRef)
 
@@ -1539,13 +1546,6 @@ export default function Dashboard() {
                                       </>
                                     )
                                   })()}
-                                {showActionsColumn &&
-                                  p._isGrouped &&
-                                  getEvaluatedStatus(p, maxRef) !== 'Confirmado' && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {p._groupCount} pagamentos
-                                    </Badge>
-                                  )}
                               </div>
                             </div>
                           </CardContent>
@@ -1618,7 +1618,13 @@ export default function Dashboard() {
             <DialogTitle>Excluir Pagamento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p>Tem certeza que deseja excluir este pagamento? Esta ação não pode ser desfeita.</p>
+            <p>
+              Tem certeza que deseja excluir{' '}
+              {paymentToCancel?._isGrouped
+                ? `estes ${paymentToCancel._records.length} pagamentos`
+                : 'este pagamento'}
+              ? Esta ação não pode ser desfeita.
+            </p>
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md space-y-2 text-sm border">
               <div className="flex justify-between">
                 <span className="font-semibold text-muted-foreground">Colaborador:</span>

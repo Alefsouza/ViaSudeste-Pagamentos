@@ -145,11 +145,7 @@ function PaymentTableRowComponent({
       </TableCell>
       {canManagePayments && (
         <TableCell className="text-center">
-          {status === 'Confirmado' ? null : isGrouped ? (
-            <Badge variant="secondary" className="text-xs">
-              {p._groupCount} pagamentos
-            </Badge>
-          ) : (
+          {status === 'Confirmado' ? null : (
             <div className="flex justify-center gap-1">
               {(status === 'Pendente' || status === 'Bloqueado') && isOutsideValidity && (
                 <Button
