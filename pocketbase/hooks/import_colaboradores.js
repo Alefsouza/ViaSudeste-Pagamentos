@@ -11,6 +11,15 @@ routerAdd(
       return e.badRequestError('Payload inválido: nenhum registro fornecido.')
     }
 
+    var authRecord = e.auth
+    if (!authRecord) {
+      return e.unauthorizedError('Autenticação necessária.')
+    }
+    var userRole = authRecord.getString('tipo_usuario') || ''
+    if (userRole !== 'Administrador' && userRole !== 'recebedoria' && userRole !== 'DP') {
+      return e.forbiddenError('Você não tem permissão para realizar esta operação.')
+    }
+
     for (let i = 0; i < body.data.length; i++) {
       const item = body.data[i]
       if (!item.registro || String(item.registro).trim() === '') {
@@ -43,8 +52,8 @@ routerAdd(
           record.set('registro', String(item.registro))
           record.set('nome', String(item.nome))
 
-          if (item.horas !== undefined && item.horas !== '') {
-            record.set('horas', String(item.horas))
+          if (item.horas !== undefined && item.horas !== null && String(item.horas).trim() !== '') {
+            record.set('horas', String(item.horas).trim())
           } else {
             record.set('horas', '00:00')
           }

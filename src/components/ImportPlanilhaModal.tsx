@@ -325,29 +325,35 @@ export function ImportPlanilhaModal({
           try {
             const res = await pb.send('/backend/v1/import/colaboradores', {
               method: 'POST',
-              body: JSON.stringify({
+              body: {
                 data: chunk,
                 dataLiberacao,
                 periodoInicio,
                 periodoFim,
                 referencia: refNumber,
-              }),
+              },
             })
 
             if (res.errors && res.errors.length > 0) {
               allErrors.push(...res.errors)
             }
-            totalImported += res.count || chunk.length
+            totalImported += res.count || 0
           } catch (chunkErr: any) {
             failedBatch = i + 1
-            lastErrorMsg = chunkErr.response?.message || chunkErr.message || 'Falha na requisição'
-            break // Stop processing further chunks
+            const status = chunkErr.status || 0
+            const apiMsg = chunkErr.response?.message || chunkErr.message || 'Falha na requisição'
+            lastErrorMsg = status > 0 ? `(${status}) ${apiMsg}` : apiMsg
+            break
           }
           setProgress(Math.round(((i + 1) / totalChunks) * 100))
         }
 
-        if (failedBatch !== -1) {
-          toast.error(`Importação interrompida no lote ${failedBatch}. Erro: ${lastErrorMsg}`)
+        const hasFailure = failedBatch !== -1
+
+        if (hasFailure) {
+          toast.error(
+            `Importação interrompida no lote ${failedBatch}.${totalImported > 0 ? ` ${totalImported} registros foram importados antes da falha.` : ''} Erro: ${lastErrorMsg}`,
+          )
         } else if (allErrors.length > 0) {
           allErrors.slice(0, 5).forEach((err: string) => toast.error(err))
           if (allErrors.length > 5) {
@@ -355,7 +361,7 @@ export function ImportPlanilhaModal({
           }
         }
 
-        if (totalImported > 0) {
+        if (!hasFailure && totalImported > 0) {
           toast.success(`${totalImported} registros importados com sucesso`)
           onOpenChange(false)
           setFile(null)
@@ -364,7 +370,7 @@ export function ImportPlanilhaModal({
           setDataLiberacao(
             `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
           )
-        } else if (failedBatch === -1 && allErrors.length === 0) {
+        } else if (!hasFailure && allErrors.length === 0 && totalImported === 0) {
           toast.error(
             'Nenhum registro foi importado. Verifique os dados da planilha e tente novamente.',
           )
