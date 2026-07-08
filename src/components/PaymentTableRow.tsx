@@ -54,28 +54,67 @@ function PaymentTableRowComponent({
   onToggleRelease,
   onDeleteClick,
 }: PaymentTableRowProps) {
+  const isGrouped = p._isGrouped === true
   const status = getEvaluatedStatus(p, maxRef)
   const actualRef = p.referencia
   const isOutsideValidity = actualRef && maxRef > 0 && actualRef < maxRef - 3
   const liberadoPagamento = p.liberado_pagamento
   const displayDate = getPaymentDisplayDate(p)
 
+  const filialDisplay = isGrouped
+    ? p.filiais.join(', ')
+    : p.filial === 2
+      ? 'Cursino'
+      : p.filial === 4
+        ? 'Sapopemba'
+        : p.filial || '-'
+
+  const refDisplay = isGrouped
+    ? p.referencias.length > 0
+      ? p.referencias.join(', ')
+      : '-'
+    : (p.referencia ?? '-')
+
   return (
     <TableRow>
-      <TableCell className="font-medium pl-8">{p.nome || 'Desconhecido'}</TableCell>
-      <TableCell>{p.registro || '-'}</TableCell>
-      <TableCell>
-        {p.filial === 2 ? 'Cursino' : p.filial === 4 ? 'Sapopemba' : p.filial || '-'}
+      <TableCell className="font-medium pl-8">
+        {isGrouped ? (
+          <div className="space-y-0.5">
+            {p.nomes.map((nome: string, i: number) => (
+              <div key={i} className="truncate">
+                {nome}
+              </div>
+            ))}
+          </div>
+        ) : (
+          p.nome || 'Desconhecido'
+        )}
       </TableCell>
-      <TableCell>{p.referencia ?? '-'}</TableCell>
+      <TableCell>{isGrouped ? p.registros.join(', ') : p.registro || '-'}</TableCell>
+      <TableCell>{filialDisplay}</TableCell>
+      <TableCell className="whitespace-nowrap">{refDisplay}</TableCell>
       <TableCell className="text-emerald-600 dark:text-emerald-500 font-medium text-left">
         {formatBRL(getActualValue(p))}
       </TableCell>
-      <TableCell>{getTipoPagamento(p.idtipopgto)}</TableCell>
-      <TableCell>{displayDate ? formatDateTimeBR(displayDate) : '-'}</TableCell>
+      <TableCell>
+        {isGrouped ? (
+          <div className="space-y-0.5">
+            {p.tipos_pagamento.map((tipo: string, i: number) => (
+              <div key={i}>{tipo}</div>
+            ))}
+          </div>
+        ) : (
+          getTipoPagamento(p.idtipopgto)
+        )}
+      </TableCell>
+      <TableCell className="whitespace-nowrap">
+        {displayDate ? formatDateTimeBR(displayDate) : '-'}
+      </TableCell>
       <TableCell>
         {status === 'Confirmado' && (
-          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">Confirmado</Badge>
+          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
+            Confirmado{isGrouped ? ` (${p._groupCount})` : ''}
+          </Badge>
         )}
         {status === 'Agendado' && (
           <TooltipProvider>
@@ -110,41 +149,51 @@ function PaymentTableRowComponent({
         {p.foto_confirmacao_url && (
           <Button variant="ghost" size="sm" onClick={() => onPhotoClick(p.foto_confirmacao_url)}>
             <ImageIcon className="w-4 h-4 mr-2" />
-            Visualizar
+            {isGrouped ? `${p._groupCount}` : 'Visualizar'}
           </Button>
         )}
       </TableCell>
       {canManagePayments && (
         <TableCell className="text-center">
-          <div className="flex justify-center gap-1">
-            {(status === 'Pendente' || status === 'Bloqueado') && isOutsideValidity && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  'hover:bg-amber-100 dark:hover:bg-amber-900/50',
-                  liberadoPagamento
-                    ? 'text-emerald-500 hover:text-emerald-700'
-                    : 'text-amber-500 hover:text-amber-700',
-                )}
-                onClick={() => onToggleRelease(p)}
-                title={liberadoPagamento ? 'Bloquear Pagamento' : 'Liberar Pagamento'}
-              >
-                {liberadoPagamento ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-              </Button>
-            )}
-            {(status === 'Pendente' || status === 'Bloqueado' || status === 'Agendado') && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
-                onClick={() => onDeleteClick(p)}
-                title="Excluir Pagamento"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          {isGrouped ? (
+            <Badge variant="secondary" className="text-xs">
+              {p._groupCount} pagamentos
+            </Badge>
+          ) : (
+            <div className="flex justify-center gap-1">
+              {(status === 'Pendente' || status === 'Bloqueado') && isOutsideValidity && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    'hover:bg-amber-100 dark:hover:bg-amber-900/50',
+                    liberadoPagamento
+                      ? 'text-emerald-500 hover:text-emerald-700'
+                      : 'text-amber-500 hover:text-amber-700',
+                  )}
+                  onClick={() => onToggleRelease(p)}
+                  title={liberadoPagamento ? 'Bloquear Pagamento' : 'Liberar Pagamento'}
+                >
+                  {liberadoPagamento ? (
+                    <Lock className="h-4 w-4" />
+                  ) : (
+                    <Unlock className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+              {(status === 'Pendente' || status === 'Bloqueado' || status === 'Agendado') && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+                  onClick={() => onDeleteClick(p)}
+                  title="Excluir Pagamento"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
         </TableCell>
       )}
     </TableRow>

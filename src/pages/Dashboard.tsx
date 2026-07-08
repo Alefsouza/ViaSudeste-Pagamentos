@@ -76,6 +76,7 @@ import {
 import { ExportFolhaModal } from '@/components/ExportFolhaModal'
 import { DashboardPaymentModal } from '@/components/DashboardPaymentModal'
 import { PaymentTableRow } from '@/components/PaymentTableRow'
+import { groupPaymentsByPhoto } from '@/lib/payment-grouping'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   if (curr.pagamento_relacionado?.status === 'Cancelado') return 'Cancelado'
@@ -505,7 +506,8 @@ export default function Dashboard() {
   }, [baseStatsData, selectedChartFilial, selectedChartDate, selectedChartRef, chartRefSearch])
 
   const tableData = useMemo(() => {
-    const sorted = [...filteredStatsData].sort((a, b) => {
+    const grouped = groupPaymentsByPhoto(filteredStatsData)
+    const sorted = [...grouped].sort((a, b) => {
       const dateA = getPaymentSortDate(a)
       const dateB = getPaymentSortDate(b)
 
@@ -1369,24 +1371,40 @@ export default function Dashboard() {
                         <Card key={p.id} className="shadow-sm">
                           <CardContent className="p-4 flex flex-col gap-2">
                             <div className="flex justify-between font-bold">
-                              <span className="truncate">{p.nome || 'Desconhecido'}</span>
+                              <span className="truncate">
+                                {p._isGrouped ? p.nomes.join(', ') : p.nome || 'Desconhecido'}
+                              </span>
                               <span className="text-emerald-600 dark:text-emerald-500">
                                 {formatBRL(getActualValue(p))}
                               </span>
                             </div>
                             <div className="text-sm text-muted-foreground flex justify-between">
-                              <span>Reg: {p.registro || '-'}</span>
                               <span>
-                                {p.filial === 2
-                                  ? 'Cursino'
-                                  : p.filial === 4
-                                    ? 'Sapopemba'
-                                    : p.filial || '-'}
-                                {p.referencia ? ` (Ref: ${p.referencia})` : ''}
+                                Reg: {p._isGrouped ? p.registros.join(', ') : p.registro || '-'}
+                              </span>
+                              <span>
+                                {p._isGrouped
+                                  ? p.filiais.join(', ')
+                                  : p.filial === 2
+                                    ? 'Cursino'
+                                    : p.filial === 4
+                                      ? 'Sapopemba'
+                                      : p.filial || '-'}
+                                {p._isGrouped
+                                  ? p.referencias.length > 0
+                                    ? ` (Ref: ${p.referencias.join(', ')})`
+                                    : ''
+                                  : p.referencia
+                                    ? ` (Ref: ${p.referencia})`
+                                    : ''}
                               </span>
                             </div>
                             <div className="text-sm text-muted-foreground flex justify-between">
-                              <span>{getTipoPagamento(p.idtipopgto)}</span>
+                              <span>
+                                {p._isGrouped
+                                  ? p.tipos_pagamento.join(', ')
+                                  : getTipoPagamento(p.idtipopgto)}
+                              </span>
                             </div>
                             <div className="text-sm text-muted-foreground flex justify-between">
                               <span>Data de Pagamento:</span>
@@ -1406,7 +1424,7 @@ export default function Dashboard() {
                                   if (status === 'Confirmado')
                                     return (
                                       <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                                        Confirmado
+                                        Confirmado{p._isGrouped ? ` (${p._groupCount})` : ''}
                                       </Badge>
                                     )
                                   if (status === 'Agendado') {
@@ -1454,10 +1472,11 @@ export default function Dashboard() {
                                     onClick={() => setSelectedPhotoUrl(p.foto_confirmacao_url)}
                                   >
                                     <ImageIcon className="w-4 h-4 mr-2" />
-                                    Foto
+                                    {p._isGrouped ? `Foto (${p._groupCount})` : 'Foto'}
                                   </Button>
                                 )}
                                 {canManagePayments &&
+                                  !p._isGrouped &&
                                   (() => {
                                     const status = getEvaluatedStatus(p, maxRef)
 
@@ -1512,6 +1531,11 @@ export default function Dashboard() {
                                       </>
                                     )
                                   })()}
+                                {canManagePayments && p._isGrouped && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {p._groupCount} pagamentos
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </CardContent>
