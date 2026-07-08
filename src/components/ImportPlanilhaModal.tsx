@@ -355,7 +355,7 @@ export function ImportPlanilhaModal({
           }
         }
 
-        if (totalImported > 0 || failedBatch === -1) {
+        if (totalImported > 0) {
           toast.success(`${totalImported} registros importados com sucesso`)
           onOpenChange(false)
           setFile(null)
@@ -363,6 +363,10 @@ export function ImportPlanilhaModal({
           const d = new Date()
           setDataLiberacao(
             `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+          )
+        } else if (failedBatch === -1 && allErrors.length === 0) {
+          toast.error(
+            'Nenhum registro foi importado. Verifique os dados da planilha e tente novamente.',
           )
         }
       } catch (error: any) {
