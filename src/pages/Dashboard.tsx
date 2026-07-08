@@ -846,6 +846,8 @@ export default function Dashboard() {
                 <SelectItem value="Todos">Todos</SelectItem>
                 <SelectItem value="Confirmado">Confirmado</SelectItem>
                 <SelectItem value="Pendente">Pendente</SelectItem>
+                <SelectItem value="Bloqueado">Bloqueado</SelectItem>
+                <SelectItem value="Agendado">Agendado</SelectItem>
               </SelectContent>
             </Select>
           </div>
