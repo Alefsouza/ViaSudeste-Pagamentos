@@ -145,7 +145,7 @@ function PaymentTableRowComponent({
       </TableCell>
       {canManagePayments && (
         <TableCell className="text-center">
-          {isGrouped ? (
+          {status === 'Confirmado' ? null : isGrouped ? (
             <Badge variant="secondary" className="text-xs">
               {p._groupCount} pagamentos
             </Badge>

@@ -1532,11 +1532,13 @@ export default function Dashboard() {
                                       </>
                                     )
                                   })()}
-                                {canManagePayments && p._isGrouped && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {p._groupCount} pagamentos
-                                  </Badge>
-                                )}
+                                {canManagePayments &&
+                                  p._isGrouped &&
+                                  getEvaluatedStatus(p, maxRef) !== 'Confirmado' && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {p._groupCount} pagamentos
+                                    </Badge>
+                                  )}
                               </div>
                             </div>
                           </CardContent>
