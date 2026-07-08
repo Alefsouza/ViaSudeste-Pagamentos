@@ -39,13 +39,6 @@ routerAdd(
       const col = txApp.findCollectionByNameOrId('colaboradores')
 
       for (const item of body.data) {
-        if (item.referencia !== undefined && Number(item.referencia) === 15) {
-          errors.push(
-            `Registro ignorado (Referência 15 bloqueada permanentemente): ${item.registro || 'desconhecido'}`,
-          )
-          continue
-        }
-
         try {
           const record = new Record(col)
 
@@ -118,9 +111,6 @@ routerAdd(
           }
           if (refVal !== undefined && refVal !== '') {
             var numRef = Number(refVal)
-            if (numRef === 15) {
-              throw new Error('Importação da Referência 15 está bloqueada permanentemente.')
-            }
             record.set('referencia', numRef)
           }
 
@@ -143,14 +133,18 @@ routerAdd(
         txApp
           .db()
           .newQuery(
-            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 1\n          WHERE referencia IN (\n            SELECT DISTINCT referencia\n            FROM colaboradores\n            WHERE referencia IS NOT NULL AND referencia != 15\n            ORDER BY referencia DESC\n            LIMIT 4\n          ) AND liberado_pagamento = 0\n        ',
+            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 1\n          WHERE referencia IN (\n            SELECT DISTINCT referencia
+            FROM colaboradores
+            WHERE referencia IS NOT NULL
+            ORDER BY referencia DESC
+            LIMIT 4\n          ) AND liberado_pagamento = 0\n        ',
           )
           .execute()
 
         txApp
           .db()
           .newQuery(
-            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 0\n          WHERE (\n            referencia IS NULL\n            OR referencia = 15\n            OR referencia NOT IN (\n              SELECT DISTINCT referencia\n              FROM colaboradores\n              WHERE referencia IS NOT NULL AND referencia != 15\n              ORDER BY referencia DESC\n              LIMIT 4\n            )\n          ) AND liberado_pagamento = 1\n        ',
+            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 0\n          WHERE (\n            referencia IS NULL\n            OR referencia NOT IN (\n              SELECT DISTINCT referencia\n              FROM colaboradores\n              WHERE referencia IS NOT NULL\n              ORDER BY referencia DESC\n              LIMIT 4\n            )\n          ) AND liberado_pagamento = 1\n        ',
           )
           .execute()
       } catch (err) {

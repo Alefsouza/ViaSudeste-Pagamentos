@@ -14,26 +14,6 @@ routerAdd(
       const col = txApp.findCollectionByNameOrId('pagamentos')
 
       for (const item of body.data) {
-        // Permanently block re-import of Reference 15 data
-        if (item.referencia !== undefined && Number(item.referencia) === 15) {
-          errors.push(
-            `Registro ignorado (Referência 15 bloqueada permanentemente): ${item.registro || 'desconhecido'}`,
-          )
-          continue
-        }
-
-        // Also block if body-level referencia is 15 and item doesn't override
-        if (
-          item.referencia === undefined &&
-          body.referencia !== undefined &&
-          Number(body.referencia) === 15
-        ) {
-          errors.push(
-            `Registro ignorado (Referência 15 bloqueada permanentemente): ${item.registro || 'desconhecido'}`,
-          )
-          continue
-        }
-
         try {
           const record = new Record(col)
 
@@ -56,10 +36,6 @@ routerAdd(
           }
 
           if (!item.referencia && body.referencia !== undefined) {
-            const bodyRef = Number(body.referencia)
-            if (bodyRef === 15) {
-              throw new Error('Importação da Referência 15 está bloqueada permanentemente.')
-            }
             record.set('referencia', body.referencia)
           }
 
