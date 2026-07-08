@@ -37,6 +37,7 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { PhotoPreviewModal } from '@/components/PhotoPreviewModal'
 import { cn } from '@/lib/utils'
 import { fetchPhotoAsBase64 } from '@/lib/photo-cache'
+import { formatMinutesToHoras, parseHorasToMinutes } from '@/lib/formatters'
 
 type ViewState =
   | 'EMPTY'
