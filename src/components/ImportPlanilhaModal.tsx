@@ -7,7 +7,8 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { UploadCloud, FileSpreadsheet, Loader2, X } from 'lucide-react'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { UploadCloud, FileSpreadsheet, Loader2, X, Copy, Check, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { Input } from '@/components/ui/input'
@@ -33,6 +34,8 @@ export function ImportPlanilhaModal({
   const [periodoFim, setPeriodoFim] = useState('')
   const [referencia, setReferencia] = useState('')
   const [progress, setProgress] = useState(0)
+  const [importErrors, setImportErrors] = useState<string[]>([])
+  const [copied, setCopied] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -86,8 +89,23 @@ export function ImportPlanilhaModal({
     if (validExtensions.includes(fileExtension)) {
       setFile(selectedFile)
       setConfirming(false)
+      setImportErrors([])
     } else {
       toast.error('Formato inválido. Por favor, envie um arquivo .xlsx ou .xls.')
+    }
+  }
+
+  const handleCopyErrors = async () => {
+    const errorText = importErrors.map((err, idx) => `${idx + 1}. ${err}`).join('\n')
+    const fullText = `Erros de Importação (${importErrors.length} total):\n\n${errorText}`
+    try {
+      await navigator.clipboard.writeText(fullText)
+      setCopied(true)
+      toast.success('Erros copiados para a área de transferência')
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Erro ao copiar:', err)
+      toast.error('Não foi possível copiar os erros')
     }
   }
 
@@ -95,6 +113,7 @@ export function ImportPlanilhaModal({
     if (!file) return
 
     setLoading(true)
+    setImportErrors([])
 
     const processFile = async () => {
       try {
@@ -220,15 +239,12 @@ export function ImportPlanilhaModal({
           if (typeof val === 'number') return Number(val.toFixed(2))
           if (!val) return 0
           const strVal = String(val).trim()
-          // Remove optional currency symbols and spaces (e.g. "R$ ")
           const cleanCurrency = strVal.replace(/^R\$\s*/i, '')
-          // If there's a comma, treat as decimal separator and remove dots
           if (cleanCurrency.includes(',')) {
             const cleanStr = cleanCurrency.replace(/\./g, '').replace(',', '.')
             const num = parseFloat(cleanStr)
             return isNaN(num) ? 0 : Number(num.toFixed(2))
           }
-          // If only dots or no separators, parse directly
           const num = parseFloat(cleanCurrency)
           return isNaN(num) ? 0 : Number(num.toFixed(2))
         }
@@ -244,7 +260,7 @@ export function ImportPlanilhaModal({
             const parts = dateOnly.split('/')
             if (parts.length === 3) {
               let year = parseInt(parts[2])
-              if (year < 100) year += 2000 // handle YY format
+              if (year < 100) year += 2000
               d = new Date(year, parseInt(parts[1]) - 1, parseInt(parts[0]))
             } else {
               d = new Date(val)
@@ -339,10 +355,16 @@ export function ImportPlanilhaModal({
             }
             totalImported += res.count || 0
           } catch (chunkErr: any) {
+            console.error('[ImportPlanilha] Erro na requisição do lote', i + 1, ':', chunkErr)
+            console.error(
+              '[ImportPlanilha] Resposta completa do erro:',
+              chunkErr?.response || chunkErr,
+            )
             failedBatch = i + 1
             const status = chunkErr.status || 0
             const apiMsg = chunkErr.response?.message || chunkErr.message || 'Falha na requisição'
             lastErrorMsg = status > 0 ? `(${status}) ${apiMsg}` : apiMsg
+            allErrors.push(`Lote ${failedBatch}: ${lastErrorMsg}`)
             break
           }
           setProgress(Math.round(((i + 1) / totalChunks) * 100))
@@ -351,40 +373,36 @@ export function ImportPlanilhaModal({
         const hasFailure = failedBatch !== -1
 
         if (hasFailure) {
-          toast.error(
+          allErrors.unshift(
             `Importação interrompida no lote ${failedBatch}.${totalImported > 0 ? ` ${totalImported} registros foram importados antes da falha.` : ''} Erro: ${lastErrorMsg}`,
           )
-        } else if (allErrors.length > 0) {
-          allErrors.slice(0, 5).forEach((err: string) => toast.error(err))
-          if (allErrors.length > 5) {
-            toast.error(`Mais ${allErrors.length - 5} erros ocorreram durante a importação.`)
-          }
         }
 
-        if (!hasFailure && totalImported > 0) {
+        if (allErrors.length > 0) {
+          setImportErrors(allErrors)
+        }
+
+        if (!hasFailure && totalImported > 0 && allErrors.length === 0) {
           toast.success(`${totalImported} registros importados com sucesso`)
           onOpenChange(false)
           setFile(null)
           setProgress(0)
+          setImportErrors([])
           const d = new Date()
           setDataLiberacao(
             `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
           )
         } else if (!hasFailure && allErrors.length === 0 && totalImported === 0) {
-          toast.error(
+          setImportErrors([
             'Nenhum registro foi importado. Verifique os dados da planilha e tente novamente.',
-          )
+          ])
         }
       } catch (error: any) {
+        console.error('[ImportPlanilha] Erro geral na importação:', error)
+        console.error('[ImportPlanilha] Resposta completa do erro:', error?.response || error)
         const errorMsg = error.response?.message || error.message || 'Erro desconhecido'
         const isValidationError = errorMsg.includes('Arquivo invalido')
-
-        toast.error(isValidationError ? errorMsg : `Erro ao importar: ${errorMsg}`, {
-          action: {
-            label: 'Tentar novamente',
-            onClick: () => {},
-          },
-        })
+        setImportErrors([isValidationError ? errorMsg : `Erro ao importar: ${errorMsg}`])
       } finally {
         window.dispatchEvent(new Event('import-end'))
         setLoading(false)
@@ -397,7 +415,8 @@ export function ImportPlanilhaModal({
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
       script.onload = processFile
       script.onerror = () => {
-        toast.error('Erro ao carregar dependência para leitura de planilhas.')
+        console.error('[ImportPlanilha] Falha ao carregar biblioteca XLSX')
+        setImportErrors(['Erro ao carregar dependência para leitura de planilhas.'])
         setLoading(false)
       }
       document.body.appendChild(script)
@@ -420,6 +439,8 @@ export function ImportPlanilhaModal({
           setPeriodoFim('')
           setReferencia('')
           setProgress(0)
+          setImportErrors([])
+          setCopied(false)
         }
       }}
     >
@@ -431,6 +452,53 @@ export function ImportPlanilhaModal({
             colaboradores.
           </DialogDescription>
         </DialogHeader>
+
+        {importErrors.length > 0 && (
+          <div className="w-full rounded-lg border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-4 animate-fade-in-up">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0" />
+                <span className="text-sm font-semibold text-rose-800 dark:text-rose-200">
+                  {importErrors.length}{' '}
+                  {importErrors.length === 1 ? 'erro encontrado' : 'erros encontrados'}
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyErrors}
+                className="shrink-0 gap-1.5 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    Copiar Erros
+                  </>
+                )}
+              </Button>
+            </div>
+            <ScrollArea className="h-48 w-full rounded-md bg-white dark:bg-background border border-rose-100 dark:border-rose-900/50">
+              <div className="p-3 space-y-1.5">
+                {importErrors.map((err, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-2 text-xs text-rose-700 dark:text-rose-300 leading-relaxed"
+                  >
+                    <span className="font-bold text-rose-500 dark:text-rose-400 shrink-0 min-w-[2rem]">
+                      {idx + 1}.
+                    </span>
+                    <span className="break-words">{err}</span>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
 
         <div
           className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg mt-2 transition-colors w-full ${!file ? 'cursor-pointer' : ''} ${isDragging ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'} ${loading ? 'opacity-50 pointer-events-none' : ''}`}
@@ -464,6 +532,7 @@ export function ImportPlanilhaModal({
                   onClick={(e) => {
                     e.stopPropagation()
                     setFile(null)
+                    setImportErrors([])
                   }}
                 >
                   <X className="h-4 w-4" />
@@ -580,6 +649,20 @@ export function ImportPlanilhaModal({
                       <Progress value={progress} className="h-2" />
                     </div>
                   )}
+                </div>
+              )}
+
+              {importErrors.length > 0 && (
+                <div className="w-full flex justify-center mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUpload}
+                    disabled={loading}
+                    className="gap-1.5"
+                  >
+                    Tentar Novamente
+                  </Button>
                 </div>
               )}
             </div>
