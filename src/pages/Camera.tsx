@@ -1060,15 +1060,14 @@ export default function Camera() {
                       Total de Horas
                     </span>
                     <span className="font-bold text-sm text-slate-900 dark:text-white tabular-nums">
-                      {formatHoras(
+                      {formatMinutesToHoras(
                         visibleRecords.reduce((acc: number, record: any) => {
                           const horasStr = calcularIntervaloHoras(
                             record.inicio,
                             record.termino,
                             record.horas,
                           )
-                          const num = parseFloat(horasStr)
-                          return acc + (isNaN(num) ? 0 : num)
+                          return acc + parseHorasToMinutes(horasStr)
                         }, 0),
                       )}
                     </span>

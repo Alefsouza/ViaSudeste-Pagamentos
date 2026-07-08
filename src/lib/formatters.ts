@@ -42,6 +42,17 @@ export const formatHoras = (horas?: string | number) => {
     }
   }
 
+  if (typeof horas === 'string' && (str.includes('.') || str.includes(','))) {
+    const parts = str.split(/[.,]/)
+    if (parts.length === 2) {
+      const h = parseInt(parts[0]) || 0
+      const m = parseInt(parts[1]) || 0
+      if (m >= 0 && m <= 59) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      }
+    }
+  }
+
   const val = parseFloat(str.replace(',', '.'))
   if (!isNaN(val)) {
     const totalMinutes = Math.round(val * 60)
@@ -51,6 +62,44 @@ export const formatHoras = (horas?: string | number) => {
   }
 
   return str || '00:00'
+}
+
+export const parseHorasToMinutes = (horas?: string | number): number => {
+  if (!horas && horas !== 0) return 0
+
+  const str = String(horas).trim()
+  if (!str) return 0
+
+  if (str.includes(':')) {
+    const parts = str.split(':')
+    if (parts.length >= 2) {
+      return (parseInt(parts[0]) || 0) * 60 + (parseInt(parts[1]) || 0)
+    }
+  }
+
+  if (str.includes('.') || str.includes(',')) {
+    const parts = str.split(/[.,]/)
+    if (parts.length === 2) {
+      const h = parseInt(parts[0]) || 0
+      const m = parseInt(parts[1]) || 0
+      if (m >= 0 && m <= 59) {
+        return h * 60 + m
+      }
+    }
+  }
+
+  const val = parseFloat(str.replace(',', '.'))
+  if (!isNaN(val)) {
+    return Math.round(val * 60)
+  }
+
+  return 0
+}
+
+export const formatMinutesToHoras = (totalMinutes: number): string => {
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
 export const getTipoPagamento = (id?: number) => {
