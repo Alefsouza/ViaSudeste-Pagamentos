@@ -23,7 +23,7 @@ function getEvaluatedStatus(curr: any, maxRef: number): string {
   const ref = curr.referencia || 0
   if (status === 'Pendente') {
     const isLocked = checkIsLocked(dataLiberacao)
-    const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
+    const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 5
     if (isLocked) status = 'Agendado'
     else if (isOutsideWindow && !liberadoPagamento) status = 'Bloqueado'
   }
@@ -57,7 +57,7 @@ function PaymentTableRowComponent({
   const isGrouped = p._isGrouped === true
   const status = getEvaluatedStatus(p, maxRef)
   const actualRef = p.referencia
-  const isOutsideValidity = actualRef && maxRef > 0 && actualRef < maxRef - 3
+  const isOutsideValidity = actualRef && maxRef > 0 && actualRef < maxRef - 5
   const liberadoPagamento = p.liberado_pagamento
   const displayDate = getPaymentDisplayDate(p)
 

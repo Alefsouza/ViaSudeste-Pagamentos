@@ -58,7 +58,7 @@ export function DashboardPaymentModal({
         if (r.foto_confirmacao_url) return false
         if (checkIsLocked(r.data_liberacao)) return false
         const ref = r.referencia || 0
-        if (ref > 0 && maxRef > 0 && ref < maxRef - 3) {
+        if (ref > 0 && maxRef > 0 && ref < maxRef - 5) {
           return r.liberado_pagamento === true
         }
         return true

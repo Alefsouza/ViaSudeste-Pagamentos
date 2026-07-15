@@ -90,7 +90,7 @@ export const getEvaluatedStatus = (curr: any, maxRef: number) => {
 
   if (status === 'Pendente') {
     const isLocked = checkIsLocked(dataLiberacao)
-    const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 3
+    const isOutsideWindow = ref > 0 && maxRef > 0 && ref < maxRef - 5
 
     if (isLocked) {
       status = 'Agendado'
@@ -1624,7 +1624,7 @@ export default function Dashboard() {
 
                                     const actualRef = p.referencia
                                     const isOutsideValidity =
-                                      actualRef && maxRef > 0 && actualRef < maxRef - 3
+                                      actualRef && maxRef > 0 && actualRef < maxRef - 5
 
                                     const liberadoPagamento = p.liberado_pagamento
 
