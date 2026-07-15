@@ -513,6 +513,72 @@ export default function Dashboard() {
     })
   }, [baseStatsData, selectedChartFilial, selectedChartDate, selectedChartRef, chartRefSearch])
 
+  // Cross-filtered datasets: each chart excludes its own filter so it shows
+  // the full distribution within the current context (Power BI behavior)
+  const pieStatsData = useMemo(() => {
+    return baseStatsData.filter((curr) => {
+      if (selectedChartRef.size > 0) {
+        const actualRef = curr.referencia
+        const cRef = actualRef != null ? String(actualRef) : 'N/A'
+        if (!selectedChartRef.has(cRef)) return false
+      }
+      if (chartRefSearch) {
+        const actualRef = curr.referencia
+        const cRef = actualRef != null ? String(actualRef) : 'N/A'
+        if (!cRef.toLowerCase().includes(chartRefSearch.toLowerCase())) return false
+      }
+      if (selectedChartDate) {
+        const hasPhoto =
+          curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
+        let dateKey: string | null = null
+        if (hasPhoto) {
+          const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
+          dateKey = toBrasiliaDateString(updatedDate)
+        }
+        if (!dateKey || dateKey !== selectedChartDate) return false
+      }
+      return true
+    })
+  }, [baseStatsData, selectedChartRef, selectedChartDate, chartRefSearch])
+
+  const refStatsData = useMemo(() => {
+    return baseStatsData.filter((curr) => {
+      const filialStr =
+        curr.filial === 2 ? 'Cursino' : curr.filial === 4 ? 'Sapopemba' : curr.filial || 'Outra'
+      if (selectedChartFilial && filialStr !== selectedChartFilial) return false
+      if (selectedChartDate) {
+        const hasPhoto =
+          curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
+        let dateKey: string | null = null
+        if (hasPhoto) {
+          const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
+          dateKey = toBrasiliaDateString(updatedDate)
+        }
+        if (!dateKey || dateKey !== selectedChartDate) return false
+      }
+      return true
+    })
+  }, [baseStatsData, selectedChartFilial, selectedChartDate])
+
+  const dailyStatsData = useMemo(() => {
+    return baseStatsData.filter((curr) => {
+      const filialStr =
+        curr.filial === 2 ? 'Cursino' : curr.filial === 4 ? 'Sapopemba' : curr.filial || 'Outra'
+      if (selectedChartFilial && filialStr !== selectedChartFilial) return false
+      if (selectedChartRef.size > 0) {
+        const actualRef = curr.referencia
+        const cRef = actualRef != null ? String(actualRef) : 'N/A'
+        if (!selectedChartRef.has(cRef)) return false
+      }
+      if (chartRefSearch) {
+        const actualRef = curr.referencia
+        const cRef = actualRef != null ? String(actualRef) : 'N/A'
+        if (!cRef.toLowerCase().includes(chartRefSearch.toLowerCase())) return false
+      }
+      return true
+    })
+  }, [baseStatsData, selectedChartFilial, selectedChartRef, chartRefSearch])
+
   const tableData = useMemo(() => {
     const grouped = groupPaymentsByPhoto(filteredStatsData, maxRef)
     const sorted = [...grouped].sort((a, b) => {
@@ -597,11 +663,13 @@ export default function Dashboard() {
 
         if (status === 'Confirmado') {
           acc.pago += val
+          acc.confirmadoCount += 1
           if (acronym === 'HE') acc.pagoHE += val
           if (acronym === 'VR') acc.pagoVR += val
           if (acronym === 'FT') acc.pagoFT += val
         } else if (status === 'Pendente') {
           acc.pendente += val
+          acc.pendenteCount += 1
           if (acronym === 'HE') acc.pendenteHE += val
           if (acronym === 'VR') acc.pendenteVR += val
           if (acronym === 'FT') acc.pendenteFT += val
@@ -617,6 +685,8 @@ export default function Dashboard() {
         pendenteVR: 0,
         pendenteHE: 0,
         pendenteFT: 0,
+        confirmadoCount: 0,
+        pendenteCount: 0,
       },
     )
   }, [filteredStatsData])
@@ -643,7 +713,7 @@ export default function Dashboard() {
   const avgPago = confirmedValues.length ? pagamentosTotals.pago / confirmedValues.length : 0
 
   // Chart Data Preparation using baseStatsData to show global filtered context without interactive charts applied yet
-  const pieDataMap = baseStatsData.reduce(
+  const pieDataMap = pieStatsData.reduce(
     (acc, curr) => {
       const filialStr =
         curr.filial === 2 ? 'Cursino' : curr.filial === 4 ? 'Sapopemba' : curr.filial || 'Outra'
@@ -655,7 +725,7 @@ export default function Dashboard() {
 
   const pieData = Object.entries(pieDataMap).map(([name, value]) => ({ name, value }))
 
-  const dailyDataMap = baseStatsData.reduce(
+  const dailyDataMap = dailyStatsData.reduce(
     (acc, curr) => {
       const status = getEvaluatedStatus(curr, maxRef)
       if (status !== 'Confirmado') return acc
@@ -686,7 +756,7 @@ export default function Dashboard() {
       }
     })
 
-  const refDataMap = baseStatsData.reduce(
+  const refDataMap = refStatsData.reduce(
     (acc, curr) => {
       const actualRef = curr.referencia
       const ref = actualRef != null ? String(actualRef) : 'N/A'
@@ -785,21 +855,62 @@ export default function Dashboard() {
             selectedChartDate ||
             selectedChartRef.size > 0 ||
             chartRefSearch) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSelectedChartFilial(null)
-                setSelectedChartDate(null)
-                setSelectedChartRef(new Set())
-                setChartRefSearch('')
-                setPage(1)
-              }}
-              className="animate-fade-in text-muted-foreground"
-            >
-              <FilterX className="h-4 w-4 mr-2" />
-              Limpar Filtros de Gráfico
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap animate-fade-in">
+              {selectedChartFilial && (
+                <Badge
+                  variant="secondary"
+                  className="cursor-pointer gap-1"
+                  onClick={() => {
+                    setSelectedChartFilial(null)
+                    setPage(1)
+                  }}
+                >
+                  Filial: {selectedChartFilial}
+                  <FilterX className="h-3 w-3" />
+                </Badge>
+              )}
+              {selectedChartRef.size > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="cursor-pointer gap-1"
+                  onClick={() => {
+                    setSelectedChartRef(new Set())
+                    setPage(1)
+                  }}
+                >
+                  Ref: {Array.from(selectedChartRef).join(', ')}
+                  <FilterX className="h-3 w-3" />
+                </Badge>
+              )}
+              {selectedChartDate && (
+                <Badge
+                  variant="secondary"
+                  className="cursor-pointer gap-1"
+                  onClick={() => {
+                    setSelectedChartDate(null)
+                    setPage(1)
+                  }}
+                >
+                  Data: {selectedChartDate.split('-').reverse().join('/')}
+                  <FilterX className="h-3 w-3" />
+                </Badge>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedChartFilial(null)
+                  setSelectedChartDate(null)
+                  setSelectedChartRef(new Set())
+                  setChartRefSearch('')
+                  setPage(1)
+                }}
+                className="text-muted-foreground"
+              >
+                <FilterX className="h-4 w-4 mr-2" />
+                Limpar Filtros
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -1284,7 +1395,21 @@ export default function Dashboard() {
                           dataKey="total"
                           stroke="var(--color-total)"
                           strokeWidth={3}
-                          dot={{ r: 4, fill: 'var(--color-total)', strokeWidth: 2 }}
+                          dot={({ cx, cy, payload }: any) => {
+                            const isActive =
+                              !selectedChartDate || payload?.date === selectedChartDate
+                            return (
+                              <circle
+                                key={`dot-${payload?.date}`}
+                                cx={cx}
+                                cy={cy}
+                                r={isActive ? 5 : 3}
+                                fill="var(--color-total)"
+                                opacity={isActive ? 1 : 0.3}
+                                style={{ transition: 'all 0.2s' }}
+                              />
+                            )
+                          }}
                           activeDot={{ r: 8, strokeWidth: 0, fill: 'var(--color-total)' }}
                         />
                       </LineChart>
