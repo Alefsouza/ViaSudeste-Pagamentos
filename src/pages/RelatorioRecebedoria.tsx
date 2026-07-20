@@ -55,6 +55,7 @@ import {
   normalizeTimestampForSort,
   getBrasiliaStartUTC,
   getBrasiliaEndUTC,
+  toBrasiliaDateString,
 } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 import { getAllPaginated } from '@/lib/pocketbase/helpers'
@@ -429,7 +430,9 @@ export default function RelatorioRecebedoria() {
         ? matchedCategory.name
         : item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || 'Outros'
       const rawDisplayDate = getPaymentDisplayDate(item)
-      const dataPagamento = rawDisplayDate ? rawDisplayDate.split(/[ T]/)[0] : '-'
+      const dataPagamento = rawDisplayDate
+        ? toBrasiliaDateString(rawDisplayDate) || rawDisplayDate.split(/[ T]/)[0]
+        : '-'
 
       const val =
         item.expand?.colaborador_id?.valor_a_receber ||
