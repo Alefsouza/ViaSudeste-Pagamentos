@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-20T15:15:54.156Z",
+  "generatedAt": "2026-07-20T18:08:06.777Z",
   "collections": [
     {
       "name": "users",
@@ -29,21 +29,30 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "tipo_usuario",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Administrador", "recebedoria", "DP"]
+          "selectValues": [
+            "Administrador",
+            "recebedoria",
+            "DP"
+          ]
         },
         {
           "name": "garagem",
@@ -91,21 +100,29 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Cursino", "Sapopemba"]
+          "selectValues": [
+            "Cursino",
+            "Sapopemba"
+          ]
         },
         {
           "name": "created",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "foto_confirmacao_url",
@@ -253,14 +270,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "hora_pagamento",
@@ -279,7 +301,13 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Confirmado", "Pendente", "Cancelado", "Agendado", "Bloqueado"]
+          "selectValues": [
+            "Confirmado",
+            "Pendente",
+            "Cancelado",
+            "Agendado",
+            "Bloqueado"
+          ]
         },
         {
           "name": "tipo_pagamento",
@@ -367,7 +395,10 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Cursino", "Sapopemba"]
+          "selectValues": [
+            "Cursino",
+            "Sapopemba"
+          ]
         },
         {
           "name": "foto",
@@ -392,21 +423,29 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "origem",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["captura", "lote"]
+          "selectValues": [
+            "captura",
+            "lote"
+          ]
         }
       ],
       "indexes": [
@@ -448,14 +487,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -499,17 +543,24 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
-      "indexes": ["CREATE UNIQUE INDEX idx_app_settings_name ON app_settings (name)"]
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_app_settings_name ON app_settings (name)"
+      ]
     }
   ]
 }
