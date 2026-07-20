@@ -158,21 +158,6 @@ routerAdd(
     if (fotoPred.startsWith('data:')) fotoPred = fotoPred.split(',')[1]
 
     const userId = e.auth.id
-    const d = new Date(Date.now() - 60000)
-    const pad = (n) => (n < 10 ? '0' + n : '' + n)
-    const oneMinAgo = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.000Z`
-
-    const recentLogs = $app.findRecordsByFilter(
-      'api_audit_logs',
-      `user='${userId}' && created>='${oneMinAgo}'`,
-      '-created',
-      11,
-      0,
-    )
-    if (recentLogs.length >= 10)
-      return e.json(429, {
-        message: 'Limite de requisicoes atingido. Tente novamente em alguns segundos',
-      })
 
     const logRecord = new Record($app.findCollectionByNameOrId('api_audit_logs'))
     logRecord.set('user', userId)
