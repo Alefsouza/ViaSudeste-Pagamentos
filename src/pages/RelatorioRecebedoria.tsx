@@ -154,9 +154,16 @@ export default function RelatorioRecebedoria() {
       conditions.push(`hora_pagamento <= "${endTime}"`)
     }
     if (debouncedSearchTerm) {
-      conditions.push(
-        `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}" || colaborador_id.nome ~ "${debouncedSearchTerm}" || colaborador_id.registro ~ "${debouncedSearchTerm}")`,
-      )
+      const isNumeric = /^\d+$/.test(debouncedSearchTerm)
+      if (isNumeric) {
+        conditions.push(
+          `(nome ~ "${debouncedSearchTerm}" || registro = "${debouncedSearchTerm}" || colaborador_id.nome ~ "${debouncedSearchTerm}" || colaborador_id.registro = "${debouncedSearchTerm}")`,
+        )
+      } else {
+        conditions.push(
+          `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}" || colaborador_id.nome ~ "${debouncedSearchTerm}" || colaborador_id.registro ~ "${debouncedSearchTerm}")`,
+        )
+      }
     }
     if (debouncedReferenciaFilter && !isNaN(Number(debouncedReferenciaFilter))) {
       conditions.push(`colaborador_id.referencia = ${Number(debouncedReferenciaFilter)}`)
