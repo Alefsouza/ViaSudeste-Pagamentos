@@ -37,11 +37,22 @@ import {
   Unlock,
   Lock,
   FileDown,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -78,6 +89,7 @@ import { ExportFolhaModal } from '@/components/ExportFolhaModal'
 import { DashboardPaymentModal } from '@/components/DashboardPaymentModal'
 import { PaymentTableRow } from '@/components/PaymentTableRow'
 import { groupPaymentsByPhoto } from '@/lib/payment-grouping'
+import { purgeReference } from '@/services/purge'
 
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   if (curr.pagamento_relacionado?.status === 'Cancelado') return 'Cancelado'
@@ -169,6 +181,8 @@ export default function Dashboard() {
   const [statsData, setStatsData] = useState<any[]>([])
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
   const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [isPurging, setIsPurging] = useState(false)
+  const [purgeDialogOpen, setPurgeDialogOpen] = useState(false)
 
   // Chart Interactive Filters
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
@@ -398,6 +412,32 @@ export default function Dashboard() {
       }),
     )
   }, [])
+
+  const handlePurgeReference = useCallback(async () => {
+    const refsToDelete = Array.from(selectedChartRef)
+    if (refsToDelete.length === 0) return
+
+    setIsPurging(true)
+    try {
+      for (const ref of refsToDelete) {
+        await purgeReference(Number(ref))
+      }
+      toast({
+        title: `Referência ${refsToDelete.join(', ')} excluída com sucesso.`,
+      })
+      setSelectedChartRef(new Set())
+      setChartRefSearch('')
+      setPurgeDialogOpen(false)
+      performFetch(true)
+    } catch (err) {
+      toast({
+        title: 'Erro ao excluir referência. Tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsPurging(false)
+    }
+  }, [selectedChartRef, toast, performFetch])
 
   useEffect(() => {
     if (statsData.length > 0) {
@@ -1211,14 +1251,32 @@ export default function Dashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle>Distribuição por Referência</CardTitle>
-                <div className="relative w-32 md:w-40">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar ref..."
-                    className="pl-8 h-9 text-sm"
-                    value={chartRefSearch}
-                    onChange={(e) => setChartRefSearch(e.target.value)}
-                  />
+                <div className="flex items-center gap-2">
+                  {isAuthorized && selectedChartRef.size > 0 && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+                      onClick={() => setPurgeDialogOpen(true)}
+                      disabled={isPurging}
+                      title="Excluir referência selecionada"
+                    >
+                      {isPurging ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
+                  <div className="relative w-32 md:w-40">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar ref..."
+                      className="pl-8 h-9 text-sm"
+                      value={chartRefSearch}
+                      onChange={(e) => setChartRefSearch(e.target.value)}
+                    />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1794,6 +1852,39 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={purgeDialogOpen} onOpenChange={setPurgeDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja excluir?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá remover permanentemente todos os colaboradores e pagamentos associados à
+              referência {Array.from(selectedChartRef).join(', ')}. Esta operação não pode ser
+              desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPurging}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handlePurgeReference()
+              }}
+              disabled={isPurging}
+              className="bg-rose-500 hover:bg-rose-600 text-white"
+            >
+              {isPurging ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                'Confirmar Exclusão'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
