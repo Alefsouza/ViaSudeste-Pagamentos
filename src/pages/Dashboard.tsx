@@ -1130,7 +1130,7 @@ export default function Dashboard() {
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold transition-all duration-300">{uniqueColabs}</div>
+              <div className="text-xl font-bold transition-all duration-300">{uniqueColabs}</div>
             )}
           </CardContent>
         </Card>
@@ -1143,7 +1143,7 @@ export default function Dashboard() {
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold transition-all duration-300">
+              <div className="text-xl font-bold transition-all duration-300">
                 {formatBRL(maxPago)}
               </div>
             )}
@@ -1158,7 +1158,7 @@ export default function Dashboard() {
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold transition-all duration-300">
+              <div className="text-xl font-bold transition-all duration-300">
                 {formatBRL(minPago)}
               </div>
             )}
@@ -1173,7 +1173,7 @@ export default function Dashboard() {
             {statsLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold transition-all duration-300">
+              <div className="text-xl font-bold transition-all duration-300">
                 {formatBRL(avgPago)}
               </div>
             )}
