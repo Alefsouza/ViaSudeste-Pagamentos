@@ -63,11 +63,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  getColaboradoresAnalytics,
-  fetchPagamentosForColabs,
-  getPagamentosForColaboradoresFilter,
-} from '@/services/colaboradores'
+import { getColaboradoresAnalytics, fetchPagamentosForColabs } from '@/services/colaboradores'
+import { getPagamentosForColaboradoresFilter } from '@/services/pagamentos'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useAuth } from '@/hooks/use-auth'
 import pb from '@/lib/pocketbase/client'
@@ -183,6 +180,8 @@ export default function Dashboard() {
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [isPurging, setIsPurging] = useState(false)
   const [purgeDialogOpen, setPurgeDialogOpen] = useState(false)
+  const [fetchError, setFetchError] = useState(false)
+  const retryCountRef = useRef(0)
 
   // Chart Interactive Filters
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
@@ -250,7 +249,11 @@ export default function Dashboard() {
       }
 
       isFetchingRef.current = true
-      if (showLoading) setStatsLoading(true)
+      if (showLoading) {
+        setStatsLoading(true)
+        setFetchError(false)
+        retryCountRef.current = 0
+      }
 
       try {
         const result = await fetchCoreData(debouncedFiltersRef.current)
@@ -268,6 +271,8 @@ export default function Dashboard() {
         setMaxRef(result.maxRef)
         setError(false)
         setIsRetrying(false)
+        setFetchError(false)
+        retryCountRef.current = 0
 
         isFetchingRef.current = false
         setStatsLoading(false)
@@ -284,14 +289,22 @@ export default function Dashboard() {
           window.location.href = '/'
           return
         }
-        setIsRetrying(true)
+
+        retryCountRef.current += 1
         isFetchingRef.current = false
 
-        // Auto retry after 2 seconds instead of showing a hard error (e.g. database busy during normalization)
-        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
-        retryTimeoutRef.current = setTimeout(() => {
-          performFetch(showLoading)
-        }, 2000)
+        if (retryCountRef.current < 3) {
+          setIsRetrying(true)
+          if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
+          retryTimeoutRef.current = setTimeout(() => {
+            performFetch(showLoading)
+          }, 2000)
+        } else {
+          setIsRetrying(false)
+          setStatsLoading(false)
+          setFetchError(true)
+          retryCountRef.current = 0
+        }
       }
     },
     [toast],
@@ -956,232 +969,253 @@ export default function Dashboard() {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="p-4 flex flex-wrap gap-4 *:flex-1 *:min-w-[140px]">
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Buscar</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Busque por nome ou número de registro (RE).</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+      {!fetchError && (
+        <Card>
+          <CardContent className="p-4 flex flex-wrap gap-4 *:flex-1 *:min-w-[140px]">
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Buscar</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Busque por nome ou número de registro (RE).</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Nome ou registro..."
+                  className="pl-8"
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                />
+              </div>
             </div>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Status</Label>
+              </div>
+              <Select
+                value={filters.status}
+                onValueChange={(val) => setFilters({ ...filters, status: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todos">Todos</SelectItem>
+                  <SelectItem value="Confirmado">Confirmado</SelectItem>
+                  <SelectItem value="Pendente">Pendente</SelectItem>
+                  <SelectItem value="Bloqueado">Bloqueado</SelectItem>
+                  <SelectItem value="Agendado">Agendado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Tipo</Label>
+              </div>
+              <Select
+                value={filters.tipoPagamento}
+                onValueChange={(val) => setFilters({ ...filters, tipoPagamento: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todos">Todos</SelectItem>
+                  {availableTipos.map((t) => (
+                    <SelectItem key={t} value={String(t)}>
+                      {getTipoPagamento(t)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Filial</Label>
+              </div>
+              <Select
+                value={filters.filial}
+                onValueChange={(val) => setFilters({ ...filters, filial: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todas">Ambas</SelectItem>
+                  <SelectItem value="Cursino">Cursino</SelectItem>
+                  <SelectItem value="Sapopemba">Sapopemba</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Data Inicial</Label>
+              </div>
               <Input
-                placeholder="Nome ou registro..."
-                className="pl-8"
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Status</Label>
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Data Final</Label>
+              </div>
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+              />
             </div>
-            <Select
-              value={filters.status}
-              onValueChange={(val) => setFilters({ ...filters, status: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todos</SelectItem>
-                <SelectItem value="Confirmado">Confirmado</SelectItem>
-                <SelectItem value="Pendente">Pendente</SelectItem>
-                <SelectItem value="Bloqueado">Bloqueado</SelectItem>
-                <SelectItem value="Agendado">Agendado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Tipo</Label>
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Referência</Label>
+              </div>
+              <Input
+                type="number"
+                placeholder="Todas"
+                value={filters.referencia === 'Todas' ? '' : filters.referencia}
+                onChange={(e) => setFilters({ ...filters, referencia: e.target.value || 'Todas' })}
+              />
             </div>
-            <Select
-              value={filters.tipoPagamento}
-              onValueChange={(val) => setFilters({ ...filters, tipoPagamento: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todos</SelectItem>
-                {availableTipos.map((t) => (
-                  <SelectItem key={t} value={String(t)}>
-                    {getTipoPagamento(t)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Filial</Label>
-            </div>
-            <Select
-              value={filters.filial}
-              onValueChange={(val) => setFilters({ ...filters, filial: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todas">Ambas</SelectItem>
-                <SelectItem value="Cursino">Cursino</SelectItem>
-                <SelectItem value="Sapopemba">Sapopemba</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Data Inicial</Label>
-            </div>
-            <Input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Data Final</Label>
-            </div>
-            <Input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label>Referência</Label>
-            </div>
-            <Input
-              type="number"
-              placeholder="Todas"
-              value={filters.referencia === 'Todas' ? '' : filters.referencia}
-              onChange={(e) => setFilters({ ...filters, referencia: e.target.value || 'Todas' })}
-            />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-8 items-stretch">
-        <Card className="lg:col-span-2 flex flex-col h-full">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col">
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="flex flex-col h-full space-y-1">
-                <div className="text-2xl font-bold transition-all duration-300">
-                  {formatBRL(pagamentosTotals.pago)}
+      {!fetchError && (
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-8 items-stretch">
+          <Card className="lg:col-span-2 flex flex-col h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
+              <DollarSign className="h-4 w-4 text-emerald-500" />
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col">
+              {statsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="flex flex-col h-full space-y-1">
+                  <div className="text-2xl font-bold transition-all duration-300">
+                    {formatBRL(pagamentosTotals.pago)}
+                  </div>
+                  <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-auto space-y-0.5 pt-1 border-t border-border/50">
+                    <span>VR: {formatBRL(pagamentosTotals.pagoVR)}</span>
+                    <span>HE: {formatBRL(pagamentosTotals.pagoHE)}</span>
+                    <span>FT: {formatBRL(pagamentosTotals.pagoFT)}</span>
+                  </div>
                 </div>
-                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-auto space-y-0.5 pt-1 border-t border-border/50">
-                  <span>VR: {formatBRL(pagamentosTotals.pagoVR)}</span>
-                  <span>HE: {formatBRL(pagamentosTotals.pagoHE)}</span>
-                  <span>FT: {formatBRL(pagamentosTotals.pagoFT)}</span>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="lg:col-span-2 flex flex-col h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Valor a Pagar</CardTitle>
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col">
+              {statsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="flex flex-col h-full space-y-1">
+                  <div className="text-2xl font-bold transition-all duration-300">
+                    {formatBRL(pagamentosTotals.pendente)}
+                  </div>
+                  <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-auto space-y-0.5 pt-1 border-t border-border/50">
+                    <span>VR: {formatBRL(pagamentosTotals.pendenteVR)}</span>
+                    <span>HE: {formatBRL(pagamentosTotals.pendenteHE)}</span>
+                    <span>FT: {formatBRL(pagamentosTotals.pendenteFT)}</span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="lg:col-span-2 flex flex-col h-full">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Valor a Pagar</CardTitle>
-            <AlertCircle className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col">
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="flex flex-col h-full space-y-1">
-                <div className="text-2xl font-bold transition-all duration-300">
-                  {formatBRL(pagamentosTotals.pendente)}
+              )}
+            </CardContent>
+          </Card>
+          <Card className="flex flex-col h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Qtd. Colaboradores</CardTitle>
+              <Users className="h-4 w-4 text-emerald-500" />
+            </CardHeader>
+            <CardContent className="flex-1">
+              {statsLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-xl font-bold transition-all duration-300">{uniqueColabs}</div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="flex flex-col h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Maior Valor</CardTitle>
+              <ArrowUp className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent className="flex-1">
+              {statsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="text-xl font-bold transition-all duration-300">
+                  {formatBRL(maxPago)}
                 </div>
-                <div className="flex flex-col text-[11px] md:text-xs text-muted-foreground leading-tight mt-auto space-y-0.5 pt-1 border-t border-border/50">
-                  <span>VR: {formatBRL(pagamentosTotals.pendenteVR)}</span>
-                  <span>HE: {formatBRL(pagamentosTotals.pendenteHE)}</span>
-                  <span>FT: {formatBRL(pagamentosTotals.pendenteFT)}</span>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="flex flex-col h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Menor Valor</CardTitle>
+              <ArrowDown className="h-4 w-4 text-rose-500" />
+            </CardHeader>
+            <CardContent className="flex-1">
+              {statsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="text-xl font-bold transition-all duration-300">
+                  {formatBRL(minPago)}
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="flex flex-col h-full">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Qtd. Colaboradores</CardTitle>
-            <Users className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent className="flex-1">
-            {statsLoading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-xl font-bold transition-all duration-300">{uniqueColabs}</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="flex flex-col h-full">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Maior Valor</CardTitle>
-            <ArrowUp className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent className="flex-1">
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-xl font-bold transition-all duration-300">
-                {formatBRL(maxPago)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="flex flex-col h-full">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Menor Valor</CardTitle>
-            <ArrowDown className="h-4 w-4 text-rose-500" />
-          </CardHeader>
-          <CardContent className="flex-1">
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-xl font-bold transition-all duration-300">
-                {formatBRL(minPago)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="flex flex-col h-full">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Média Paga</CardTitle>
-            <TrendingUp className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent className="flex-1">
-            {statsLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-xl font-bold transition-all duration-300">
-                {formatBRL(avgPago)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="flex flex-col h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Média Paga</CardTitle>
+              <TrendingUp className="h-4 w-4 text-purple-500" />
+            </CardHeader>
+            <CardContent className="flex-1">
+              {statsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="text-xl font-bold transition-all duration-300">
+                  {formatBRL(avgPago)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {isEmpty ? (
+      {fetchError ? (
+        <Card className="flex flex-col items-center justify-center p-12">
+          <AlertCircle className="h-12 w-12 text-rose-500 mb-4" />
+          <p className="text-lg font-medium text-foreground mb-2">Erro ao carregar dados</p>
+          <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
+            Ocorreu um erro ao sincronizar os pagamentos. Verifique sua conexão e tente novamente.
+          </p>
+          <Button
+            onClick={() => {
+              setFetchError(false)
+              retryCountRef.current = 0
+              performFetch(true)
+            }}
+          >
+            Tentar novamente
+          </Button>
+        </Card>
+      ) : isEmpty ? (
         <Card className="flex flex-col items-center justify-center p-12">
           <Inbox className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-lg font-medium text-muted-foreground">Nenhum dado encontrado</p>

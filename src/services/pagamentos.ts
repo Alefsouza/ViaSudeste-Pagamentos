@@ -197,3 +197,48 @@ export const getPagamentosAnalytics = async (filters: any) => {
     fields: PAGAMENTO_FIELDS,
   })
 }
+
+const PAGAMENTOS_FOR_COLABS_FIELDS =
+  'id,colaborador_id,status,valor_pago,data_pagamento,hora_pagamento,foto_confirmacao_url,updated,created'
+
+export const getPagamentosForColaboradoresFilter = async (filters: any) => {
+  const filterConditions: string[] = ['status = "Confirmado"']
+
+  if (filters.search) {
+    const isNumeric = /^\d+$/.test(filters.search)
+    if (isNumeric) {
+      filterConditions.push(
+        `(registro = "${filters.search}" || colaborador_id.registro = "${filters.search}")`,
+      )
+    } else {
+      filterConditions.push(
+        `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
+      )
+    }
+  }
+
+  if (filters.tipoPagamento && filters.tipoPagamento !== 'Todos') {
+    filterConditions.push(`idtipopgto = ${filters.tipoPagamento}`)
+  }
+
+  if (filters.filial && filters.filial !== 'Todas') {
+    const filialId = filters.filial === 'Cursino' ? 1 : filters.filial === 'Sapopemba' ? 2 : null
+    if (filialId !== null) {
+      filterConditions.push(`(filial = ${filialId} || colaborador_id.filial = "${filters.filial}")`)
+    } else {
+      filterConditions.push(`colaborador_id.filial = "${filters.filial}"`)
+    }
+  }
+
+  if (filters.referencia && filters.referencia !== 'Todas') {
+    filterConditions.push(`colaborador_id.referencia = ${filters.referencia}`)
+  }
+
+  const filterString = filterConditions.join(' && ')
+
+  return getAllPaginated('pagamentos', {
+    filter: filterString,
+    expand: 'colaborador_id',
+    fields: PAGAMENTOS_FOR_COLABS_FIELDS,
+  })
+}

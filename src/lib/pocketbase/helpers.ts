@@ -9,10 +9,17 @@ export async function getAllPaginated(
   let all: any[] = []
   let totalPages = 1
   while (page <= totalPages) {
-    const res = await pb.collection(collection).getList(page, perPage, options)
-    all.push(...res.items)
-    totalPages = res.totalPages
-    page++
+    try {
+      const res = await pb.collection(collection).getList(page, perPage, options)
+      all.push(...res.items)
+      totalPages = res.totalPages
+      page++
+    } catch (err: any) {
+      if (page > 1 && (err?.status === 400 || err?.status === 404)) {
+        break
+      }
+      throw err
+    }
   }
   return all
 }
