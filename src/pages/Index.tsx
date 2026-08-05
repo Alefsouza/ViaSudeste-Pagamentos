@@ -30,19 +30,19 @@ export default function Index() {
       try {
         const record = await pb
           .collection('app_settings')
-          .getFirstListItem('name="login_background_new"')
+          .getFirstListItem('name="login_background"')
         if (record && record.file) {
           setBackgroundUrl(pb.files.getURL(record, record.file))
         }
-      } catch (err) {
-        console.error('Failed to load dynamic background:', err)
+      } catch {
+        // Background resource not found — fall back to default silently
       }
     }
     loadBackground()
   }, [])
 
   useRealtime('app_settings', (e) => {
-    if (e.record.name === 'login_background_new') {
+    if (e.record.name === 'login_background') {
       if (e.action === 'update' || e.action === 'create') {
         if (e.record.file) {
           setBackgroundUrl(pb.files.getURL(e.record, e.record.file))
