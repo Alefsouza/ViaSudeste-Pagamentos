@@ -133,14 +133,14 @@ routerAdd(
         txApp
           .db()
           .newQuery(
-            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 1\n          WHERE referencia IN (\n            SELECT DISTINCT referencia\n            FROM colaboradores\n            WHERE referencia IS NOT NULL\n            ORDER BY referencia DESC\n            LIMIT 4\n          ) AND liberado_pagamento = 0\n        ',
+            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 1\n          WHERE referencia IN (\n            SELECT DISTINCT referencia\n            FROM colaboradores\n            WHERE referencia IS NOT NULL\n            ORDER BY referencia DESC\n            LIMIT 6\n          ) AND liberado_pagamento = 0\n        ',
           )
           .execute()
 
         txApp
           .db()
           .newQuery(
-            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 0\n          WHERE (\n            referencia IS NULL\n            OR referencia NOT IN (\n              SELECT DISTINCT referencia\n              FROM colaboradores\n              WHERE referencia IS NOT NULL\n              ORDER BY referencia DESC\n              LIMIT 4\n            )\n          ) AND liberado_pagamento = 1\n        ',
+            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 0\n          WHERE (\n            referencia IS NULL\n            OR referencia NOT IN (\n              SELECT DISTINCT referencia\n              FROM colaboradores\n              WHERE referencia IS NOT NULL\n              ORDER BY referencia DESC\n              LIMIT 6\n            )\n          ) AND liberado_pagamento = 1\n        ',
           )
           .execute()
       } catch (err) {
