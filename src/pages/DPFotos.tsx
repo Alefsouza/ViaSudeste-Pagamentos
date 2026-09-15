@@ -385,7 +385,7 @@ export default function DPFotos() {
             type="submit"
             form="foto-form"
             className="w-full h-12 text-lg bg-forest hover:bg-forest/90 text-white gap-2 shadow-md"
-            disabled={submitting || !file || !registro || isLoadingNome || !!nomeError}
+            disabled={submitting || !file || !registro || isLoadingNome}
           >
             {submitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />
