@@ -33,7 +33,10 @@ routerAdd(
         return e.internalServerError('Formato de dados externo inválido')
       }
 
-      var compItems = data.items.filter((item) => item.competencia === comp)
+      var compItems = data.items.filter(function (item) {
+        var itemComp = item.competencia !== undefined ? item.competencia : item.COMPETENCIA
+        return itemComp === comp
+      })
 
       if (compItems.length === 0) {
         return e.notFoundError('Nenhum registro encontrado para esta competência')
@@ -66,12 +69,14 @@ routerAdd(
       let lines = []
       for (const item of items) {
         // Remove leading zeros, keep at least one '0' if it's all zeros
-        let reg = String(item.registro || '').replace(/^0+(?!$)/, '')
-
+        let rawReg = item.registro !== undefined ? item.registro : item.REGISTRO
+        let reg = String(rawReg || '').replace(/^0+(?!$)/, '')
         // Format number to 2 decimal places with comma
-        let val = Number(item.valor_calculado || 0)
+        // Check both lowercase and uppercase property names if present
+        let rawVal =
+          item.valor_calculado !== undefined ? item.valor_calculado : item.VALOR_CALCULADO
+        let val = Number(rawVal || 0)
         let valStr = val.toFixed(2).replace('.', ',')
-
         // Concatenate directly: registro + exactly 10 spaces + valor
         lines.push(`${reg}          ${valStr}`)
       }
