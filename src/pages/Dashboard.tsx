@@ -358,7 +358,7 @@ export default function Dashboard() {
             ? `${records.length} pagamento(s) liberado(s) com sucesso.`
             : `${records.length} pagamento(s) bloqueado(s) com sucesso.`,
         })
-        scheduleRefresh(false)
+        scheduleRefresh()
       } catch (err: any) {
         toast({
           title: 'Erro ao alterar o status do pagamento. Tente novamente.',
@@ -398,7 +398,7 @@ export default function Dashboard() {
 
       toast({ title: `${records.length} registro(s) excluído(s) com sucesso!` })
       setPaymentToCancel(null)
-      scheduleRefresh(false)
+      scheduleRefresh()
     } catch (err: any) {
       toast({
         title: 'Erro ao excluir o registro. Por favor, tente novamente.',
@@ -848,7 +848,7 @@ export default function Dashboard() {
       if (!isNumA && isNumB) return 1
       return a.localeCompare(b)
     })
-    .map(([ref, data]) => ({
+    .map(([ref, data]: [string, any]) => ({
       referenciaName: ref,
       total: data.total,
       periodo_inicio: data.periodo_inicio,

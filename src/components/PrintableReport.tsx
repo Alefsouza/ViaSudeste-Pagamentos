@@ -156,7 +156,7 @@ export function PrintableReport({ data, type, filters }: PrintableReportProps) {
                       ))}
                     </Pie>
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <ChartLegend content={<ChartLegendContent />} />
+                    <ChartLegend content={<ChartLegendContent payload={[]} />} />
                   </PieChart>
                 </ChartContainer>
               </div>

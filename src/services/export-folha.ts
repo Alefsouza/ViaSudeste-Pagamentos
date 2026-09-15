@@ -1,20 +1,25 @@
 import pb from '@/lib/pocketbase/client'
 
 export type ExportFolhaResult =
-  | { success: true; blob: Blob; filename: string }
-  | { success: false; status: number; message: string }
+  | { success: true; blob: Blob; filename: string; message?: never }
+  | { success: false; status: number; message: string; blob?: never; filename?: never }
 
-export async function exportFolha(competencia: string): Promise<ExportFolhaResult> {
+export async function exportFolha(
+  competencia: string,
+  garagem?: string,
+): Promise<ExportFolhaResult> {
   try {
-    const response = await fetch(
-      `${pb.baseURL}/backend/v1/export-folha?competencia=${encodeURIComponent(competencia)}`,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: pb.authStore.token,
-        },
+    const params = new URLSearchParams({ competencia })
+    if (garagem && garagem !== 'ambas' && garagem !== 'Ambas Garagens') {
+      params.append('garagem', garagem)
+    }
+
+    const response = await fetch(`${pb.baseURL}/backend/v1/export-folha?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        Authorization: pb.authStore.token,
       },
-    )
+    })
 
     if (!response.ok) {
       if (response.status === 404) {

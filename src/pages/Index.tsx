@@ -20,7 +20,7 @@ export default function Index() {
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
 
-  const { login, signIn, user } = useAuth()
+  const { login, user } = useAuth() as any
   const navigate = useNavigate()
   const { toast } = useToast()
   const [backgroundUrl, setBackgroundUrl] = useState<string>(defaultBg)
@@ -74,10 +74,7 @@ export default function Index() {
 
     setIsLoading(true)
     try {
-      const doLogin = login || signIn
-      if (!doLogin) throw new Error('Método de login não encontrado')
-
-      const { error } = await doLogin(email, password)
+      const { error } = await login(email, password)
       if (error) {
         setErrors({ form: 'Credenciais inválidas. Verifique seu e-mail e senha.' })
         toast({

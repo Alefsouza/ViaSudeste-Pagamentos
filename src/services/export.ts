@@ -1,7 +1,11 @@
 import pb from '@/lib/pocketbase/client'
 
-export async function exportFolha(competencia: string): Promise<string> {
-  const url = pb.buildUrl('/backend/v1/export-folha?competencia=' + encodeURIComponent(competencia))
+export async function exportFolha(competencia: string, garagem?: string): Promise<string> {
+  const params = new URLSearchParams({ competencia })
+  if (garagem && garagem !== 'ambas' && garagem !== 'Ambas Garagens') {
+    params.append('garagem', garagem)
+  }
+  const url = pb.buildUrl('/backend/v1/export-folha?' + params.toString())
 
   const res = await fetch(url, {
     method: 'GET',

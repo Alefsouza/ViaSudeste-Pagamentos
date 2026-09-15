@@ -142,9 +142,11 @@ export function DashboardPaymentModal({
           description: failures.map((f: any) => f.error).join('; '),
           variant: 'destructive',
         })
-        const failedIds = new Set(failures.map((f: any) => f.colaborador_id).filter(Boolean))
+        const failedIds = new Set<string>(
+          failures.map((f: any) => f.colaborador_id).filter(Boolean),
+        )
         setRecords((prev) => prev.filter((r) => failedIds.has(r.id)))
-        setSelected(new Set(failedIds))
+        setSelected(failedIds)
       } else {
         toast({ title: `${successes.length} pagamento(s) confirmado(s) com sucesso!` })
         setRecords([])

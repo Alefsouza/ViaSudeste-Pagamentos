@@ -9,6 +9,13 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Loader2, FileText, FileSpreadsheet, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { exportFolha } from '@/services/export-folha'
@@ -29,6 +36,7 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
+  const [garagem, setGaragem] = useState<string>('Ambas Garagens')
   const [registro, setRegistro] = useState('')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFinal, setDataFinal] = useState('')
@@ -37,6 +45,7 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
     if (!nextOpen) {
       setMode('select')
       setLoading(false)
+      setGaragem('Ambas Garagens')
       setRegistro('')
       setDataInicio('')
       setDataFinal('')
@@ -50,20 +59,21 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
       setLoading(true)
       const [yyyy, mm] = competencia.split('-')
       const mmYyyy = `${mm}/${yyyy}`
-      const result = await exportFolha(mmYyyy)
+      const result = await exportFolha(mmYyyy, garagem)
 
       if (!result.success) {
-        toast.error(result.message)
+        toast.error(result.message || 'Erro ao exportar folha')
         return
       }
 
+      const resBlob = result.blob
       let filename = result.filename
       if (!filename) {
         const lastDay = new Date(parseInt(yyyy, 10), parseInt(mm, 10), 0).getDate()
         filename = `01.${mm}.${yyyy}_${String(lastDay).padStart(2, '0')}.${mm}.${yyyy}.txt`
       }
 
-      const url = URL.createObjectURL(result.blob)
+      const url = URL.createObjectURL(resBlob)
       const a = document.createElement('a')
       a.href = url
       a.download = filename
@@ -189,6 +199,23 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
                   className="col-span-3"
                   disabled={loading}
                 />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="garagem" className="text-right">
+                  Garagem
+                </Label>
+                <div className="col-span-3">
+                  <Select value={garagem} onValueChange={setGaragem} disabled={loading}>
+                    <SelectTrigger id="garagem" className="w-full">
+                      <SelectValue placeholder="Selecione a garagem" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Ambas Garagens">Ambas Garagens</SelectItem>
+                      <SelectItem value="Cursino">Cursino</SelectItem>
+                      <SelectItem value="Sapopemba">Sapopemba</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             <DialogFooter>

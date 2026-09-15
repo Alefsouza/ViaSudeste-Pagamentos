@@ -33,10 +33,34 @@ routerAdd(
         return e.internalServerError('Formato de dados externo inválido')
       }
 
-      const items = data.items.filter((item) => item.competencia === comp)
+      var compItems = data.items.filter((item) => item.competencia === comp)
 
-      if (items.length === 0) {
+      if (compItems.length === 0) {
         return e.notFoundError('Nenhum registro encontrado para esta competência')
+      }
+
+      var garagemParam = e.request.url.query().get('garagem')
+      var items = compItems
+      if (garagemParam && garagemParam !== 'ambas' && garagemParam !== 'Ambas Garagens') {
+        var normalizeGaragem = function (val) {
+          return String(val || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim()
+            .toUpperCase()
+        }
+        var targetGaragem = normalizeGaragem(garagemParam)
+        items = compItems.filter(function (item) {
+          var itemGaragem = item.GARAGEM !== undefined ? item.GARAGEM : item.garagem
+          if (!itemGaragem) return false
+          return normalizeGaragem(itemGaragem) === targetGaragem
+        })
+
+        if (items.length === 0) {
+          return e.notFoundError(
+            'Nenhum registro encontrado para esta competência e garagem selecionada',
+          )
+        }
       }
 
       let lines = []
