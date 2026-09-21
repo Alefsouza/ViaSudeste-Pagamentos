@@ -67,6 +67,7 @@ export default function RelatorioRecebedoria() {
   const [data, setData] = useState<any[]>([])
   const [summaryData, setSummaryData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isRetrying, setIsRetrying] = useState(false)
   const [activeTab, setActiveTab] = useState('detalhado')
   const [error, setError] = useState(false)
   const [page, setPage] = useState(1)
@@ -95,6 +96,10 @@ export default function RelatorioRecebedoria() {
 
   const [antigasData, setAntigasData] = useState<any[]>([])
   const cachedRefsRef = useRef<number[] | null>(null)
+  const retryCountRef = useRef(0)
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFetchingRef = useRef(false)
+  const pendingRefreshRef = useRef(false)
 
   const [photoModal, setPhotoModal] = useState<string | null>(null)
   const [detailsModal, setDetailsModal] = useState<any | null>(null)
@@ -210,8 +215,15 @@ export default function RelatorioRecebedoria() {
       setTimeError('')
     }
 
+    if (isFetchingRef.current) {
+      pendingRefreshRef.current = true
+      return
+    }
+
+    isFetchingRef.current = true
     setLoading(true)
     setError(false)
+
     try {
       const filterString = buildFilter()
 
@@ -242,11 +254,40 @@ export default function RelatorioRecebedoria() {
       setTotalPages(Math.max(1, Math.ceil(sortedData.length / 20)))
       const startIdx = (page - 1) * 20
       setData(sortedData.slice(startIdx, startIdx + 20))
+      setError(false)
+      setIsRetrying(false)
+      retryCountRef.current = 0
+      isFetchingRef.current = false
+      setLoading(false)
+
+      if (pendingRefreshRef.current) {
+        pendingRefreshRef.current = false
+        loadData()
+      }
     } catch (err: any) {
       console.error(err)
-      setError(true)
-    } finally {
-      setLoading(false)
+      isFetchingRef.current = false
+
+      if (err?.status === 401 || err?.response?.status === 401) {
+        setLoading(false)
+        pb.authStore.clear()
+        window.location.href = '/'
+        return
+      }
+
+      retryCountRef.current += 1
+      if (retryCountRef.current < 3) {
+        setIsRetrying(true)
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = setTimeout(() => {
+          loadData()
+        }, 2000)
+      } else {
+        setIsRetrying(false)
+        setLoading(false)
+        setError(true)
+        retryCountRef.current = 0
+      }
     }
   }, [user, startTime, endTime, page, buildFilter])
 
@@ -317,6 +358,7 @@ export default function RelatorioRecebedoria() {
   }, [startDate, endDate, startTime, endTime, statusFilter, usuarioFilter, tipoPagamentoFilter])
 
   useEffect(() => {
+    retryCountRef.current = 0
     loadData()
   }, [loadData])
 
@@ -326,12 +368,20 @@ export default function RelatorioRecebedoria() {
     }
   }, [activeTab, loadAntigasData])
 
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
+    }
+  }, [])
+
   useDebouncedRealtime(
     'pagamentos',
     () => {
       loadData()
     },
-    600,
+    1000,
+    true,
+    { pollingIntervalMs: 20000, maxConsecutiveErrors: 3 },
   )
 
   useDebouncedRealtime(
@@ -341,7 +391,9 @@ export default function RelatorioRecebedoria() {
       loadData()
       if (activeTab === 'antigas') loadAntigasData()
     },
-    600,
+    1000,
+    true,
+    { pollingIntervalMs: 20000, maxConsecutiveErrors: 3 },
   )
 
   const clearFilters = () => {
@@ -360,6 +412,7 @@ export default function RelatorioRecebedoria() {
   }
 
   const handleExport = () => {
+    // Export triggers browser print directly with the already loaded data
     window.print()
   }
 
@@ -567,9 +620,39 @@ export default function RelatorioRecebedoria() {
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white print:text-black">
-            Relatórios de Pagamentos
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white print:text-black">
+              Relatórios de Pagamentos
+            </h1>
+            {isRetrying && (
+              <Badge
+                variant="outline"
+                className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 animate-pulse flex items-center gap-1.5"
+              >
+                <svg
+                  className="animate-spin h-3.5 w-3.5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Finalizando sincronização de dados...
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1 print:text-slate-700">
             {usuarioFilter === 'Todos'
               ? 'Todos os pagamentos processados.'
@@ -704,15 +787,29 @@ export default function RelatorioRecebedoria() {
         <div className="text-center py-12 bg-rose-50 dark:bg-rose-950/20 rounded-xl border border-rose-100 dark:border-rose-900/50 print:hidden">
           <AlertCircle className="mx-auto h-12 w-12 mb-4 text-rose-500 opacity-80" />
           <h3 className="text-lg font-semibold text-rose-700 dark:text-rose-400">
-            Erro ao carregar pagamentos
+            Erro ao sincronizar dados
           </h3>
-          <Button
-            variant="outline"
-            className="mt-4 border-rose-200 text-rose-600 hover:bg-rose-100"
-            onClick={loadData}
-          >
-            Tentar novamente
-          </Button>
+          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+            Ocorreu um erro ao sincronizar os pagamentos. Verifique sua conexão e tente novamente.
+          </p>
+          <div className="flex justify-center gap-3 mt-4">
+            <Button
+              variant="default"
+              onClick={() => {
+                setError(false)
+                retryCountRef.current = 0
+                loadData()
+              }}
+            >
+              Tentar novamente
+            </Button>
+            {summaryData.length > 0 && (
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar dados carregados
+              </Button>
+            )}
+          </div>
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

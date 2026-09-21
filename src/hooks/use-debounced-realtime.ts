@@ -2,11 +2,17 @@ import { useRef, useEffect } from 'react'
 import type { RecordModel, RecordSubscription } from 'pocketbase'
 import { useRealtime } from '@/hooks/use-realtime'
 
+interface UseDebouncedRealtimeOptions {
+  pollingIntervalMs?: number
+  maxConsecutiveErrors?: number
+}
+
 export function useDebouncedRealtime<TRecord extends RecordModel = RecordModel>(
   collectionName: string,
   callback: () => void,
   debounceMs: number = 600,
   enabled: boolean = true,
+  options?: UseDebouncedRealtimeOptions,
 ) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const callbackRef = useRef(callback)
@@ -27,5 +33,6 @@ export function useDebouncedRealtime<TRecord extends RecordModel = RecordModel>(
       }, debounceMs)
     },
     enabled,
+    options,
   )
 }
