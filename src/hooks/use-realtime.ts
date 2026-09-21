@@ -59,6 +59,24 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
       }
     }
 
+    // Monitor PocketBase realtime eventSource or subscribe errors
+    const checkRealtimeHealth = () => {
+      try {
+        const realtimeService = (pb as any).realtime
+        const eventSource = realtimeService?.eventSource
+        // If eventSource exists and is in CLOSED state (2)
+        if (
+          eventSource &&
+          typeof eventSource.readyState === 'number' &&
+          eventSource.readyState === 2
+        ) {
+          startPollingFallback()
+        }
+      } catch {
+        // Ignore inspection errors
+      }
+    }
+
     // Try subscribing to the PocketBase realtime collection
     pb.collection<TRecord>(collectionName)
       .subscribe('*', (e) => {
@@ -78,9 +96,7 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
       .catch((err) => {
         console.warn(`[useRealtime] Failed to subscribe to ${collectionName}, using fallback:`, err)
         consecutiveErrors++
-        if (consecutiveErrors >= maxConsecutiveErrors || !realtimeConnected) {
-          startPollingFallback()
-        }
+        startPollingFallback()
       })
 
     // Also monitor PB_CONNECT or SSE connection status if available
@@ -109,6 +125,9 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
       // Ignore if realtime client structure differs
     }
 
+    // Periodically check if eventSource is broken or closed
+    const healthInterval = setInterval(checkRealtimeHealth, 5000)
+
     // Safety timeout: if realtime hasn't established or confirmed within 5s, start polling as fallback
     const safetyTimer = setTimeout(() => {
       if (!cancelled && !realtimeConnected) {
@@ -119,6 +138,7 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
     return () => {
       cancelled = true
       clearTimeout(safetyTimer)
+      clearInterval(healthInterval)
       stopPollingFallback()
       if (unsubscribeFn) {
         unsubscribeFn().catch(() => {})

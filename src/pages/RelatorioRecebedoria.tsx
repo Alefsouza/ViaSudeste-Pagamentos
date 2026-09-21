@@ -204,92 +204,109 @@ export default function RelatorioRecebedoria() {
     tipoPagamentoFilter,
   ])
 
-  const loadData = useCallback(async () => {
-    if (!user) return
+  const loadData = useCallback(
+    async (isInitialOrFilterChange = false) => {
+      if (!user) return
 
-    if (startTime && endTime && endTime < startTime) {
-      setTimeError('Horário Final não pode ser menor que o Horário Inicial.')
-      setLoading(false)
-      return
-    } else {
-      setTimeError('')
-    }
-
-    if (isFetchingRef.current) {
-      pendingRefreshRef.current = true
-      return
-    }
-
-    isFetchingRef.current = true
-    setLoading(true)
-    setError(false)
-
-    try {
-      const filterString = buildFilter()
-
-      const summaryRes = await getAllPaginated('pagamentos', {
-        filter: filterString,
-        sort: '-data_pagamento,-created',
-        expand: 'colaborador_id,user_id',
-        fields:
-          'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor,expand.colaborador_id.referencia',
-      })
-
-      const sortedData = [...summaryRes].sort((a: any, b: any) => {
-        const pagA = normalizeTimestampForSort(a.data_pagamento) || ''
-        const pagB = normalizeTimestampForSort(b.data_pagamento) || ''
-        if (pagA !== pagB) return pagB.localeCompare(pagA)
-
-        const refA = normalizeTimestampForSort(a.expand?.colaborador_id?.data) || ''
-        const refB = normalizeTimestampForSort(b.expand?.colaborador_id?.data) || ''
-        if (refA !== refB) return refA.localeCompare(refB)
-
-        const createdA = normalizeTimestampForSort(a.created) || ''
-        const createdB = normalizeTimestampForSort(b.created) || ''
-        return createdB.localeCompare(createdA)
-      })
-
-      setSummaryData(sortedData)
-      setTotalItems(sortedData.length)
-      setTotalPages(Math.max(1, Math.ceil(sortedData.length / 20)))
-      const startIdx = (page - 1) * 20
-      setData(sortedData.slice(startIdx, startIdx + 20))
-      setError(false)
-      setIsRetrying(false)
-      retryCountRef.current = 0
-      isFetchingRef.current = false
-      setLoading(false)
-
-      if (pendingRefreshRef.current) {
-        pendingRefreshRef.current = false
-        loadData()
-      }
-    } catch (err: any) {
-      console.error(err)
-      isFetchingRef.current = false
-
-      if (err?.status === 401 || err?.response?.status === 401) {
+      if (startTime && endTime && endTime < startTime) {
+        setTimeError('Horário Final não pode ser menor que o Horário Inicial.')
         setLoading(false)
-        pb.authStore.clear()
-        window.location.href = '/'
+        return
+      } else {
+        setTimeError('')
+      }
+
+      if (isFetchingRef.current) {
+        pendingRefreshRef.current = true
         return
       }
 
-      retryCountRef.current += 1
-      if (retryCountRef.current < 3) {
-        setIsRetrying(true)
-        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
-        retryTimeoutRef.current = setTimeout(() => {
-          loadData()
-        }, 2000)
-      } else {
-        setIsRetrying(false)
-        setLoading(false)
-        setError(true)
+      isFetchingRef.current = true
+      if (isInitialOrFilterChange) {
+        setLoading(true)
+        setError(false)
         retryCountRef.current = 0
       }
-    }
-  }, [user, startTime, endTime, page, buildFilter])
+
+      try {
+        const filterString = buildFilter()
+
+        const summaryRes = await getAllPaginated('pagamentos', {
+          filter: filterString,
+          sort: '-data_pagamento,-created',
+          expand: 'colaborador_id,user_id',
+          fields:
+            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor,expand.colaborador_id.referencia',
+        })
+
+        const sortedData = [...summaryRes].sort((a: any, b: any) => {
+          const pagA = normalizeTimestampForSort(a.data_pagamento) || ''
+          const pagB = normalizeTimestampForSort(b.data_pagamento) || ''
+          if (pagA !== pagB) return pagB.localeCompare(pagA)
+
+          const refA = normalizeTimestampForSort(a.expand?.colaborador_id?.data) || ''
+          const refB = normalizeTimestampForSort(b.expand?.colaborador_id?.data) || ''
+          if (refA !== refB) return refA.localeCompare(refB)
+
+          const createdA = normalizeTimestampForSort(a.created) || ''
+          const createdB = normalizeTimestampForSort(b.created) || ''
+          return createdB.localeCompare(createdA)
+        })
+
+        setSummaryData(sortedData)
+        setTotalItems(sortedData.length)
+        setTotalPages(Math.max(1, Math.ceil(sortedData.length / 20)))
+        const startIdx = (page - 1) * 20
+        setData(sortedData.slice(startIdx, startIdx + 20))
+        setError(false)
+        setIsRetrying(false)
+        retryCountRef.current = 0
+        isFetchingRef.current = false
+        setLoading(false)
+
+        if (pendingRefreshRef.current) {
+          pendingRefreshRef.current = false
+          loadData(false)
+        }
+      } catch (err: any) {
+        console.error(err)
+        isFetchingRef.current = false
+
+        if (err?.status === 401 || err?.response?.status === 401) {
+          setLoading(false)
+          setIsRetrying(false)
+          pb.authStore.clear()
+          window.location.href = '/'
+          return
+        }
+
+        retryCountRef.current += 1
+        if (retryCountRef.current < 3) {
+          setIsRetrying(true)
+          if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
+          retryTimeoutRef.current = setTimeout(() => {
+            loadData(isInitialOrFilterChange)
+          }, 2000)
+        } else {
+          setIsRetrying(false)
+          setLoading(false)
+          retryCountRef.current = 0
+          // Only show full error card if we don't have previously loaded data to view/export
+          if (summaryData.length === 0) {
+            setError(true)
+          } else {
+            toast({
+              title: 'Erro de sincronização',
+              description:
+                'Não foi possível atualizar os dados mais recentes. Os dados atuais continuam disponíveis para exportação.',
+              variant: 'destructive',
+            })
+          }
+        }
+      }
+    },
+    [user, startTime, endTime, page, buildFilter, summaryData.length, toast],
+  )
 
   const loadAntigasData = useCallback(async () => {
     try {
@@ -359,7 +376,7 @@ export default function RelatorioRecebedoria() {
 
   useEffect(() => {
     retryCountRef.current = 0
-    loadData()
+    loadData(true)
   }, [loadData])
 
   useEffect(() => {
@@ -377,7 +394,7 @@ export default function RelatorioRecebedoria() {
   useDebouncedRealtime(
     'pagamentos',
     () => {
-      loadData()
+      loadData(false)
     },
     1000,
     true,
@@ -388,7 +405,7 @@ export default function RelatorioRecebedoria() {
     'colaboradores',
     () => {
       cachedRefsRef.current = null
-      loadData()
+      loadData(false)
       if (activeTab === 'antigas') loadAntigasData()
     },
     1000,
@@ -798,11 +815,11 @@ export default function RelatorioRecebedoria() {
               onClick={() => {
                 setError(false)
                 retryCountRef.current = 0
-                loadData()
+                loadData(true)
               }}
             >
               Tentar novamente
-            </Button>
+            </Button>{' '}
             {summaryData.length > 0 && (
               <Button variant="outline" onClick={handleExport}>
                 <Download className="mr-2 h-4 w-4" />
