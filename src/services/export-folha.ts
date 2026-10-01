@@ -4,6 +4,28 @@ export type ExportFolhaResult =
   | { success: true; blob: Blob; filename: string; message?: never }
   | { success: false; status: number; message: string; blob?: never; filename?: never }
 
+/**
+ * Formata uma linha do arquivo TXT da folha de pagamento:
+ * 1. Número do registro com zeros à esquerda até 6 dígitos (ex: 6853 -> 006853)
+ * 2. Tabulação (\t)
+ * 3. Código fixo 360
+ * 4. Tabulação (\t)
+ * 5. Valor com zeros à esquerda até 14 posições, com vírgula decimal (ex: 000000000263,32)
+ */
+export function formatFolhaTxtLine(registro: string | number, valor: number | string): string {
+  const cleanReg = String(registro ?? '')
+    .replace(/^0+(?!$)/, '')
+    .trim()
+  const regPadded = cleanReg.padStart(6, '0')
+
+  const numVal =
+    typeof valor === 'number' ? valor : parseFloat(String(valor).replace(',', '.')) || 0
+  const valDecimalStr = numVal.toFixed(2).replace('.', ',')
+  const valPadded = valDecimalStr.padStart(14, '0')
+
+  return `${regPadded}\t360\t${valPadded}`
+}
+
 export async function exportFolha(
   competencia: string,
   garagem?: string,

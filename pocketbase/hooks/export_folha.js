@@ -68,17 +68,25 @@ routerAdd(
 
       let lines = []
       for (const item of items) {
-        // Remove leading zeros, keep at least one '0' if it's all zeros
+        // Formato da linha conforme especificação:
+        // 1. Número do registro do colaborador preenchido com zeros à esquerda até 6 dígitos (ex: 6853 -> 006853)
+        // 2. Tabulação (\t)
+        // 3. Código fixo 360
+        // 4. Tabulação (\t)
+        // 5. Valor com zeros à esquerda até 14 posições, vírgula decimal (ex: 000000000263,32)
         let rawReg = item.registro !== undefined ? item.registro : item.REGISTRO
-        let reg = String(rawReg || '').replace(/^0+(?!$)/, '')
-        // Format number to 2 decimal places with comma
-        // Check both lowercase and uppercase property names if present
+        let cleanReg = String(rawReg || '')
+          .replace(/^0+(?!$)/, '')
+          .trim()
+        let reg = cleanReg.padStart(6, '0')
+
         let rawVal =
           item.valor_calculado !== undefined ? item.valor_calculado : item.VALOR_CALCULADO
         let val = Number(rawVal || 0)
-        let valStr = val.toFixed(2).replace('.', ',')
-        // Concatenate directly: registro + exactly 10 spaces + valor
-        lines.push(`${reg}          ${valStr}`)
+        let valDecimalStr = val.toFixed(2).replace('.', ',')
+        let valPadded = valDecimalStr.padStart(14, '0')
+
+        lines.push(`${reg}\t360\t${valPadded}`)
       }
 
       const compParts = comp.split('/')

@@ -1,5 +1,7 @@
 import pb from '@/lib/pocketbase/client'
 
+export { formatFolhaTxtLine } from './export-folha'
+
 export async function exportFolha(competencia: string, garagem?: string): Promise<string> {
   const params = new URLSearchParams({ competencia })
   if (garagem && garagem !== 'ambas' && garagem !== 'Ambas Garagens') {
