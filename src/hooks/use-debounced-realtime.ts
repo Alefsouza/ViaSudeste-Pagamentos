@@ -33,6 +33,5 @@ export function useDebouncedRealtime<TRecord extends RecordModel = RecordModel>(
       }, debounceMs)
     },
     enabled,
-    options,
   )
 }

@@ -81,6 +81,31 @@ routerAdd(
         lines.push(`${reg}          ${valStr}`)
       }
 
+      const compParts = comp.split('/')
+      const mm = compParts[0]
+      const yyyy = compParts[1]
+      const lastDay = new Date(parseInt(yyyy, 10), parseInt(mm, 10), 0).getDate()
+      const lastDayStr = lastDay < 10 ? '0' + lastDay : String(lastDay)
+
+      let filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}.txt`
+      if (garagemParam && garagemParam !== 'ambas' && garagemParam !== 'Ambas Garagens') {
+        const norm = String(garagemParam || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim()
+          .toUpperCase()
+        if (norm === 'CURSINO') {
+          filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}_Cursino.txt`
+        } else if (norm === 'SAPOPEMBA') {
+          filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}_Sapopemba.txt`
+        } else {
+          filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}_${garagemParam.trim()}.txt`
+        }
+      }
+
+      e.response.header().set('Content-Disposition', `attachment; filename="${filename}"`)
+      e.response.header().set('Access-Control-Expose-Headers', 'Content-Disposition')
+
       return e.string(200, lines.join('\n'))
     } catch (err) {
       $app.logger().error('Erro ao exportar folha', 'error', err.message)

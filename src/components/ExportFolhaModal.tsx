@@ -70,7 +70,16 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
       let filename = result.filename
       if (!filename) {
         const lastDay = new Date(parseInt(yyyy, 10), parseInt(mm, 10), 0).getDate()
-        filename = `01.${mm}.${yyyy}_${String(lastDay).padStart(2, '0')}.${mm}.${yyyy}.txt`
+        const lastDayStr = String(lastDay).padStart(2, '0')
+        if (garagem === 'Cursino') {
+          filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}_Cursino.txt`
+        } else if (garagem === 'Sapopemba') {
+          filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}_Sapopemba.txt`
+        } else if (garagem && garagem !== 'ambas' && garagem !== 'Ambas Garagens') {
+          filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}_${garagem}.txt`
+        } else {
+          filename = `01.${mm}.${yyyy}_${lastDayStr}.${mm}.${yyyy}.txt`
+        }
       }
 
       const url = URL.createObjectURL(resBlob)
