@@ -486,6 +486,10 @@ export default function RelatorioRecebedoria() {
       { name: 'Hora Extra', keywords: ['hora extra', 'hora extras', 'horas extras'] },
       { name: 'Férias', keywords: ['férias', 'ferias', 'férias trabalhada', 'ferias trabalhada'] },
       { name: 'VR', keywords: ['vr', 'vale refeição', 'vale refeicao', 'vale-refeição'] },
+      {
+        name: 'Adicional Periculosidade',
+        keywords: ['adicional periculosidade', 'periculosidade', 'ap'],
+      },
     ]
 
     const typeGroups: Record<

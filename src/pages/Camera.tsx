@@ -431,6 +431,8 @@ export default function Camera() {
         return 'Ferias Trabalhada'
       case 4:
         return 'Vale Refeicao'
+      case 5:
+        return 'Adicional Periculosidade'
       default:
         return 'Tipo desconhecido'
     }

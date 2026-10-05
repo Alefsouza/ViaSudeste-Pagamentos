@@ -148,6 +148,7 @@ export const getTipoPagamento = (id?: number) => {
   if (id === 1) return 'Hora Extra'
   if (id === 3) return 'Férias Trabalhada'
   if (id === 4) return 'Vale Refeição'
+  if (id === 5) return 'Adicional Periculosidade'
   return 'Tipo desconhecido'
 }
 
@@ -156,6 +157,7 @@ export const getTipoPagamentoAbrev = (tipo?: string | number) => {
     if (tipo === 1) return 'HE'
     if (tipo === 3) return 'FT'
     if (tipo === 4) return 'VR'
+    if (tipo === 5) return 'AP'
     return 'Tipo desconhecido'
   }
   if (typeof tipo === 'string') {
@@ -176,6 +178,8 @@ export const getTipoPagamentoAbrev = (tipo?: string | number) => {
       lower === 'vr'
     )
       return 'VR'
+    if (lower === 'adicional periculosidade' || lower.includes('periculosidade') || lower === 'ap')
+      return 'AP'
     return tipo
   }
   return 'Tipo desconhecido'

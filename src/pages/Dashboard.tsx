@@ -713,6 +713,12 @@ export default function Dashboard() {
           lowerTipo.includes('ft')
         )
           acronym = 'FT'
+        else if (
+          curr.idtipopgto === 5 ||
+          lowerTipo.includes('periculosidade') ||
+          lowerTipo.includes('ap')
+        )
+          acronym = 'AP'
 
         if (status === 'Confirmado') {
           acc.pago += val
@@ -720,12 +726,14 @@ export default function Dashboard() {
           if (acronym === 'HE') acc.pagoHE += val
           if (acronym === 'VR') acc.pagoVR += val
           if (acronym === 'FT') acc.pagoFT += val
+          if (acronym === 'AP') acc.pagoAP += val
         } else if (status === 'Pendente') {
           acc.pendente += val
           acc.pendenteCount += 1
           if (acronym === 'HE') acc.pendenteHE += val
           if (acronym === 'VR') acc.pendenteVR += val
           if (acronym === 'FT') acc.pendenteFT += val
+          if (acronym === 'AP') acc.pendenteAP += val
         }
         return acc
       },
@@ -735,9 +743,11 @@ export default function Dashboard() {
         pagoVR: 0,
         pagoHE: 0,
         pagoFT: 0,
+        pagoAP: 0,
         pendenteVR: 0,
         pendenteHE: 0,
         pendenteFT: 0,
+        pendenteAP: 0,
         confirmadoCount: 0,
         pendenteCount: 0,
       },
@@ -1110,6 +1120,7 @@ export default function Dashboard() {
                     <span>VR: {formatBRL(pagamentosTotals.pagoVR)}</span>
                     <span>HE: {formatBRL(pagamentosTotals.pagoHE)}</span>
                     <span>FT: {formatBRL(pagamentosTotals.pagoFT)}</span>
+                    <span>AP: {formatBRL(pagamentosTotals.pagoAP)}</span>
                   </div>
                 </div>
               )}
@@ -1132,6 +1143,7 @@ export default function Dashboard() {
                     <span>VR: {formatBRL(pagamentosTotals.pendenteVR)}</span>
                     <span>HE: {formatBRL(pagamentosTotals.pendenteHE)}</span>
                     <span>FT: {formatBRL(pagamentosTotals.pendenteFT)}</span>
+                    <span>AP: {formatBRL(pagamentosTotals.pendenteAP)}</span>
                   </div>
                 </div>
               )}
