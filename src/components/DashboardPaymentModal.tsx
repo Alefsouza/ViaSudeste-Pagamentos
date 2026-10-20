@@ -43,15 +43,52 @@ export function DashboardPaymentModal({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [batchLoading, setBatchLoading] = useState(false)
 
+  const parseDataColumn = (val?: string | null): number => {
+    if (!val || typeof val !== 'string') return Number.POSITIVE_INFINITY
+    const trimmed = val.trim()
+    if (!trimmed) return Number.POSITIVE_INFINITY
+
+    // Formato brasileiro: dd/mm/aaaa (com ou sem hora após espaço)
+    const matchBr = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+    if (matchBr) {
+      const dia = parseInt(matchBr[1], 10)
+      const mes = parseInt(matchBr[2], 10)
+      const ano = parseInt(matchBr[3], 10)
+      const date = new Date(ano, mes - 1, dia)
+      if (!isNaN(date.getTime())) {
+        return date.getTime()
+      }
+    }
+
+    // Formato ISO: aaaa-mm-dd
+    const matchIso = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+    if (matchIso) {
+      const ano = parseInt(matchIso[1], 10)
+      const mes = parseInt(matchIso[2], 10)
+      const dia = parseInt(matchIso[3], 10)
+      const date = new Date(ano, mes - 1, dia)
+      if (!isNaN(date.getTime())) {
+        return date.getTime()
+      }
+    }
+
+    // Tentar parse padrão como fallback
+    const fallbackDate = new Date(trimmed)
+    if (!isNaN(fallbackDate.getTime())) {
+      return fallbackDate.getTime()
+    }
+
+    return Number.POSITIVE_INFINITY
+  }
+
   const handleSearch = async () => {
     if (!search.trim()) return
     setLoading(true)
     try {
       const res = await pb.collection('colaboradores').getList(1, 50, {
         filter: `(nome ~ "${search}" || registro = "${search}") && foto_confirmacao_url = ""`,
-        sort: '-created',
         fields:
-          'id,registro,nome,valor_a_receber,valor,referencia,liberado_pagamento,data_liberacao,idtipopgto,tipo_pagamento,inicio,termino,horas,filial,filial_id',
+          'id,registro,nome,valor_a_receber,valor,referencia,liberado_pagamento,data_liberacao,idtipopgto,tipo_pagamento,inicio,termino,horas,filial,filial_id,data',
       })
 
       const filtered = res.items.filter((r: any) => {
@@ -62,6 +99,15 @@ export function DashboardPaymentModal({
           return r.liberado_pagamento === true
         }
         return true
+      })
+
+      // Ordenar por ordem cronológica crescente da coluna 'data' (da menor data a maior data)
+      // Registros com data vazia, ausente ou inválida vão para o fim da lista
+      filtered.sort((a: any, b: any) => {
+        const timeA = parseDataColumn(a.data)
+        const timeB = parseDataColumn(b.data)
+        if (timeA === timeB) return 0
+        return timeA - timeB
       })
 
       setRecords(filtered)
