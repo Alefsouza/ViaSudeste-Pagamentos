@@ -213,7 +213,15 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [filters])
 
-  const fetchCoreData = async (filtersToUse: any, retries = 3, backoff = 1000): Promise<any> => {
+  // Cache of pagamentos confirming records to avoid repeatedly scanning all 25+ pages of pagamentos
+  const cachedPagamentosRef = useRef<{ data: any[]; timestamp: number } | null>(null)
+
+  const fetchCoreData = async (
+    filtersToUse: any,
+    retries = 3,
+    backoff = 2000,
+    forceRefreshPagamentos = false,
+  ): Promise<any> => {
     try {
       const apiFilters = {
         ...filtersToUse,
@@ -222,9 +230,34 @@ export default function Dashboard() {
         status: 'Todos',
       }
 
+      // Check if we can reuse cached pagamentos data (valid for 60 seconds unless forced)
+      const now = Date.now()
+      const isFilterSpecific =
+        Boolean(apiFilters.search) ||
+        Boolean(apiFilters.filial && apiFilters.filial !== 'Todas') ||
+        Boolean(apiFilters.tipoPagamento && apiFilters.tipoPagamento !== 'Todos') ||
+        Boolean(apiFilters.referencia && apiFilters.referencia !== 'Todas')
+
+      let pagsPromise: Promise<any[]>
+      if (
+        !forceRefreshPagamentos &&
+        !isFilterSpecific &&
+        cachedPagamentosRef.current &&
+        now - cachedPagamentosRef.current.timestamp < 60000
+      ) {
+        pagsPromise = Promise.resolve(cachedPagamentosRef.current.data)
+      } else {
+        pagsPromise = getPagamentosForColaboradoresFilter(apiFilters).then((data) => {
+          if (!isFilterSpecific) {
+            cachedPagamentosRef.current = { data, timestamp: Date.now() }
+          }
+          return data
+        })
+      }
+
       const [stats, pags, maxRefRec] = await Promise.all([
         getColaboradoresAnalytics(apiFilters),
-        getPagamentosForColaboradoresFilter(apiFilters),
+        pagsPromise,
         pb
           .collection('colaboradores')
           .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
@@ -233,16 +266,23 @@ export default function Dashboard() {
 
       return { stats, pags, maxRef: maxRefRec?.referencia || 0 }
     } catch (e: any) {
-      if (e.status === 429 && retries > 0) {
+      const is429 =
+        e?.status === 429 ||
+        e?.response?.status === 429 ||
+        e?.message?.includes('429') ||
+        e?.message?.includes('Too Many Requests')
+
+      if (is429 && retries > 0) {
+        // Apply backoff before retrying
         await new Promise((r) => setTimeout(r, backoff))
-        return fetchCoreData(filtersToUse, retries - 1, backoff * 2)
+        return fetchCoreData(filtersToUse, retries - 1, backoff * 2, forceRefreshPagamentos)
       }
       throw e
     }
   }
 
   const performFetch = useCallback(
-    async (showLoading = true) => {
+    async (showLoading = true, forceRefreshPagamentos = false) => {
       if (isFetchingRef.current) {
         pendingRefreshRef.current = true
         return
@@ -256,11 +296,27 @@ export default function Dashboard() {
       }
 
       try {
-        const result = await fetchCoreData(debouncedFiltersRef.current)
+        const result = await fetchCoreData(
+          debouncedFiltersRef.current,
+          3,
+          2000,
+          forceRefreshPagamentos,
+        )
+
+        // Build index of pagamentos by colaborador_id for O(1) lookup
+        const pagByColabId = new Map<string, any>()
+        for (const p of result.pags) {
+          if (
+            p.colaborador_id &&
+            p.status === 'Confirmado' &&
+            !pagByColabId.has(p.colaborador_id)
+          ) {
+            pagByColabId.set(p.colaborador_id, p)
+          }
+        }
+
         const mergedStats = result.stats.map((colab: any) => {
-          const pag = result.pags.find(
-            (p: any) => p.colaborador_id === colab.id && p.status === 'Confirmado',
-          )
+          const pag = pagByColabId.get(colab.id)
           if (pag) {
             colab.pagamento_relacionado = pag
           }
@@ -279,7 +335,7 @@ export default function Dashboard() {
 
         if (pendingRefreshRef.current) {
           pendingRefreshRef.current = false
-          performFetch(false)
+          performFetch(false, false)
         }
       } catch (e: any) {
         if (e?.status === 401 || e?.response?.status === 401) {
@@ -290,15 +346,23 @@ export default function Dashboard() {
           return
         }
 
+        const is429 =
+          e?.status === 429 ||
+          e?.response?.status === 429 ||
+          e?.message?.includes('429') ||
+          e?.message?.includes('Too Many Requests')
+
         retryCountRef.current += 1
         isFetchingRef.current = false
 
         if (retryCountRef.current < 3) {
           setIsRetrying(true)
           if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
+          // On 429, back off significantly (3s for first retry, 6s for second) instead of 2s
+          const retryDelay = is429 ? retryCountRef.current * 3000 : 2000
           retryTimeoutRef.current = setTimeout(() => {
-            performFetch(showLoading)
-          }, 2000)
+            performFetch(showLoading, forceRefreshPagamentos)
+          }, retryDelay)
         } else {
           setIsRetrying(false)
           setStatsLoading(false)
@@ -310,14 +374,18 @@ export default function Dashboard() {
     [toast],
   )
 
-  const scheduleRefresh = useCallback(() => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current)
-    }
-    debounceTimeoutRef.current = setTimeout(() => {
-      performFetch(false)
-    }, 1000)
-  }, [performFetch])
+  const scheduleRefresh = useCallback(
+    (forceRefreshPagamentos = false) => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+      // Debounce realtime events by 3 seconds to batch rapid bursts of updates
+      debounceTimeoutRef.current = setTimeout(() => {
+        performFetch(false, forceRefreshPagamentos)
+      }, 3000)
+    },
+    [performFetch],
+  )
 
   useEffect(() => {
     performFetch(true)
@@ -472,8 +540,8 @@ export default function Dashboard() {
     }
   }, [statsData])
 
-  useRealtime('colaboradores', () => scheduleRefresh(), !isImporting)
-  useRealtime('pagamentos', () => scheduleRefresh(), !isImporting)
+  useRealtime('colaboradores', () => scheduleRefresh(false), !isImporting)
+  useRealtime('pagamentos', () => scheduleRefresh(true), !isImporting)
 
   useEffect(() => {
     const handleImportStart = () => setIsImporting(true)

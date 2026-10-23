@@ -85,11 +85,32 @@ export function DashboardPaymentModal({
     if (!search.trim()) return
     setLoading(true)
     try {
-      const res = await pb.collection('colaboradores').getList(1, 50, {
-        filter: `(nome ~ "${search}" || registro = "${search}") && foto_confirmacao_url = ""`,
-        fields:
-          'id,registro,nome,valor_a_receber,valor,referencia,liberado_pagamento,data_liberacao,idtipopgto,tipo_pagamento,inicio,termino,horas,filial,filial_id,data',
-      })
+      const isNumeric = /^\d+$/.test(search.trim())
+      const filterStr = isNumeric
+        ? `registro = "${search.trim()}" && foto_confirmacao_url = ""`
+        : `(nome ~ "${search.trim()}" || registro = "${search.trim()}") && foto_confirmacao_url = ""`
+
+      let attempts = 0
+      let res: any = null
+      while (attempts < 3) {
+        try {
+          res = await pb.collection('colaboradores').getList(1, 50, {
+            filter: filterStr,
+            fields:
+              'id,registro,nome,valor_a_receber,valor,referencia,liberado_pagamento,data_liberacao,idtipopgto,tipo_pagamento,inicio,termino,horas,filial,filial_id,data',
+          })
+          break
+        } catch (err: any) {
+          const is429 =
+            err?.status === 429 || err?.response?.status === 429 || err?.message?.includes('429')
+          if (is429 && attempts < 2) {
+            attempts++
+            await new Promise((r) => setTimeout(r, attempts * 1500))
+            continue
+          }
+          throw err
+        }
+      }
 
       const filtered = res.items.filter((r: any) => {
         if (r.foto_confirmacao_url) return false

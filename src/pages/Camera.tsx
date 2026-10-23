@@ -224,9 +224,11 @@ export default function Camera() {
   const fetchColaboradorSilent = useCallback(async () => {
     if (!registro) return
     try {
-      const records = await pb
+      // Limit to 50 records per colaborador to reduce payload and response time
+      const res = await pb
         .collection('colaboradores')
-        .getFullList({ filter: `registro = "${registro}"` })
+        .getList(1, 50, { filter: `registro = "${registro}"` })
+      const records = res.items
       if (records && records.length > 0) {
         setColaborador({
           registro: records[0].registro,
@@ -276,9 +278,10 @@ export default function Camera() {
     setFotoCapturada(null)
 
     try {
-      const records = await pb.collection('colaboradores').getFullList({
+      const res = await pb.collection('colaboradores').getList(1, 50, {
         filter: `registro = "${registro}"`,
       })
+      const records = res.items
 
       if (!records || records.length === 0) {
         const msg = 'Não há pagamento para esse colaborador.'
@@ -571,9 +574,10 @@ export default function Camera() {
     }
 
     try {
-      const validationRecords = await pb.collection('colaboradores').getFullList({
+      const vRes = await pb.collection('colaboradores').getList(1, 50, {
         filter: `registro = "${colaborador.registro}"`,
       })
+      const validationRecords = vRes.items
       const currentValidRecordsIds = new Set(
         validationRecords
           .filter((r: any) => {

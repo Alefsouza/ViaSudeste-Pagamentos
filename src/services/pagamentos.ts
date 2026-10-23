@@ -238,7 +238,6 @@ export const getPagamentosForColaboradoresFilter = async (filters: any) => {
 
   return getAllPaginated('pagamentos', {
     filter: filterString,
-    expand: 'colaborador_id',
     fields: PAGAMENTOS_FOR_COLABS_FIELDS,
   })
 }
