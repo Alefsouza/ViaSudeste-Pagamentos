@@ -11,14 +11,15 @@ routerAdd(
       // 1. Obter maxRef
       let maxRef = 0
       try {
-        const maxRefRow = $app
+        const maxRefPlaceholder = new DynamicModel({ max_ref: 0 })
+        $app
           .db()
-          .newQuery('SELECT MAX(referencia) AS max_ref FROM colaboradores WHERE referencia > 0')
-          .one()
-        if (maxRefRow && maxRefRow.max_ref != null) {
-          maxRef = Number(maxRefRow.max_ref) || 0
-        }
-      } catch (err) {
+          .newQuery(
+            'SELECT COALESCE(MAX(referencia), 0) AS max_ref FROM colaboradores WHERE referencia > 0',
+          )
+          .one(maxRefPlaceholder)
+        maxRef = Number(maxRefPlaceholder.max_ref) || 0
+      } catch (errMaxRef) {
         maxRef = 0
       }
 
@@ -33,7 +34,15 @@ routerAdd(
         WHERE status = 'Confirmado'
         GROUP BY idtipopgto, tipo_pagamento
       `
-      const rowsPagos = $app.db().newQuery(queryPagos).all()
+      const rowsPagos = arrayOf(
+        new DynamicModel({
+          idtipopgto: 0,
+          tipo_pagamento: '',
+          total_pago: -0,
+          total_count: 0,
+        }),
+      )
+      $app.db().newQuery(queryPagos).all(rowsPagos)
 
       // 3. Consulta de Pendentes agrupados por tipo (da tabela colaboradores onde ainda não foi confirmado)
       const queryPendentes = `
@@ -49,22 +58,37 @@ routerAdd(
           )
         GROUP BY c.idtipopgto
       `
-      const rowsPendentes = $app.db().newQuery(queryPendentes).all()
+      const rowsPendentes = arrayOf(
+        new DynamicModel({
+          idtipopgto: 0,
+          total_pendente: -0,
+          total_count: 0,
+        }),
+      )
+      $app.db().newQuery(queryPendentes).all(rowsPendentes)
 
       // 4. Totais por Referência (histórico completo para gráficos de referência)
       const queryRefPagos = `
         SELECT
           COALESCE(c.referencia, 0) AS referencia,
           SUM(COALESCE(p.valor_pago, 0)) AS total_pago,
-          MIN(c.periodo_inicio) AS periodo_inicio,
-          MAX(c.periodo_fim) AS periodo_fim
+          COALESCE(MIN(c.periodo_inicio), '') AS periodo_inicio,
+          COALESCE(MAX(c.periodo_fim), '') AS periodo_fim
         FROM pagamentos p
         JOIN colaboradores c ON p.colaborador_id = c.id
         WHERE p.status = 'Confirmado' AND c.referencia > 0
         GROUP BY c.referencia
         ORDER BY c.referencia DESC
       `
-      const rowsRef = $app.db().newQuery(queryRefPagos).all()
+      const rowsRef = arrayOf(
+        new DynamicModel({
+          referencia: 0,
+          total_pago: -0,
+          periodo_inicio: '',
+          periodo_fim: '',
+        }),
+      )
+      $app.db().newQuery(queryRefPagos).all(rowsRef)
 
       // 5. Nomes distintos de tipo_pagamento para alimentar filtros do app sem varredura em pagamentos
       const queryTiposDistintos = `
@@ -85,7 +109,8 @@ routerAdd(
       `
       let tiposPagamento = []
       try {
-        const rowsTipos = $app.db().newQuery(queryTiposDistintos).all()
+        const rowsTipos = arrayOf(new DynamicModel({ tipo_pagamento: '' }))
+        $app.db().newQuery(queryTiposDistintos).all(rowsTipos)
         tiposPagamento = rowsTipos
           .map((r) => String(r.tipo_pagamento || '').trim())
           .filter((t) => t.length > 0)
@@ -185,7 +210,13 @@ routerAdd(
       `
       let filialTotals = []
       try {
-        const rowsFilial = $app.db().newQuery(queryFilialPagos).all()
+        const rowsFilial = arrayOf(
+          new DynamicModel({
+            filial_nome: '',
+            total_pago: -0,
+          }),
+        )
+        $app.db().newQuery(queryFilialPagos).all(rowsFilial)
         filialTotals = rowsFilial.map((r) => ({
           name: String(r.filial_nome || 'Outra'),
           value: Number(r.total_pago) || 0,
@@ -214,7 +245,13 @@ routerAdd(
       `
       let dailyTotals = []
       try {
-        const rowsDaily = $app.db().newQuery(queryDailyPagos).all()
+        const rowsDaily = arrayOf(
+          new DynamicModel({
+            data_brasilia: '',
+            total_pago: -0,
+          }),
+        )
+        $app.db().newQuery(queryDailyPagos).all(rowsDaily)
         dailyTotals = rowsDaily.map((r) => {
           const dateStr = String(r.data_brasilia || '')
           const parts = dateStr.split('-')
@@ -258,8 +295,17 @@ routerAdd(
         tiposPagamento,
       })
     } catch (err) {
-      $app.logger().error('Erro ao calcular totais de pagamentos', 'error', err.message)
-      return e.internalServerError('Erro ao calcular totais')
+      console.log('HOOK_ERROR_PAGAMENTOS_TOTALS:', err && err.message ? err.message : String(err))
+      $app
+        .logger()
+        .error(
+          'Erro ao calcular totais de pagamentos',
+          'error',
+          err && err.message ? err.message : String(err),
+        )
+      return e.internalServerError(
+        'Erro ao calcular totais: ' + (err && err.message ? err.message : String(err)),
+      )
     }
   },
   $apis.requireAuth(),

@@ -477,8 +477,12 @@ export default function Dashboard() {
       if (data.maxRef && data.maxRef > 0) {
         setMaxRef((prev) => Math.max(prev, data.maxRef))
       }
-    } catch (err) {
-      console.warn('[Dashboard] Não foi possível carregar totais pré-agregados do servidor:', err)
+    } catch (err: any) {
+      console.error(
+        '[Dashboard] Falha ao carregar totais pré-agregados do servidor (usando fallback local):',
+        err?.message || err,
+        err,
+      )
     } finally {
       setServerTotalsLoading(false)
     }
@@ -1105,6 +1109,8 @@ export default function Dashboard() {
       !debouncedFilters.endDate &&
       (!debouncedFilters.filial || debouncedFilters.filial === 'Todas') &&
       (!debouncedFilters.tipoPagamento || debouncedFilters.tipoPagamento === 'Todos') &&
+      (!debouncedFilters.status || debouncedFilters.status === 'Todos') &&
+      (!debouncedFilters.referencia || debouncedFilters.referencia === 'Todas') &&
       !debouncedFilters.search
     ) {
       let list = serverTotals.referencias

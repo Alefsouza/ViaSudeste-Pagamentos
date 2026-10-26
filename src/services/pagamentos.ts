@@ -71,17 +71,9 @@ export interface PagamentosDashboardTotals {
 }
 
 export const fetchDashboardTotals = async (): Promise<PagamentosDashboardTotals> => {
-  const response = await fetch(`${pb.baseURL}/backend/v1/pagamentos/totals`, {
+  return pb.send<PagamentosDashboardTotals>('/backend/v1/pagamentos/totals', {
     method: 'GET',
-    headers: { Authorization: pb.authStore.token },
   })
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Failed to fetch totals' }))
-    throw new Error(error.message || `HTTP ${response.status}`)
-  }
-
-  return response.json()
 }
 
 export const getPagamentosTotals = async (filters: any) => {
