@@ -29,21 +29,37 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
 
     pb.collection<TRecord>(collectionName)
       .subscribe('*', (e) => {
-        callbackRef.current(e)
+        if (!cancelled) {
+          callbackRef.current(e)
+        }
       })
       .then((fn) => {
         if (cancelled) {
-          fn().catch(() => {})
+          fn().catch((err: any) => {
+            // Ignora 404 de client id ao desalocar
+            if (err?.status !== 404) {
+              console.debug(`[useRealtime] cleanup error on ${collectionName}:`, err)
+            }
+          })
         } else {
           unsubscribeFn = fn
         }
       })
-      .catch(() => {})
+      .catch((err: any) => {
+        // Ignora 404 (Missing or invalid client id) caso o SSE esteja reiniciando
+        if (!cancelled && err?.status !== 404) {
+          console.debug(`[useRealtime] subscription notice for ${collectionName}:`, err)
+        }
+      })
 
     return () => {
       cancelled = true
       if (unsubscribeFn) {
-        unsubscribeFn().catch(() => {})
+        unsubscribeFn().catch((err: any) => {
+          if (err?.status !== 404) {
+            console.debug(`[useRealtime] unsubscribe error on ${collectionName}:`, err)
+          }
+        })
       }
     }
   }, [collectionName, enabled])

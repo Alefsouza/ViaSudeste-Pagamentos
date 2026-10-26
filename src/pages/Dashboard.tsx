@@ -193,6 +193,7 @@ export default function Dashboard() {
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
   const [selectedChartDate, setSelectedChartDate] = useState<string | null>(null)
   const [selectedChartRef, setSelectedChartRef] = useState<Set<string>>(new Set())
+  const selectedChartRefRef = useRef(selectedChartRef)
   const [chartRefSearch, setChartRefSearch] = useState('')
 
   // Concurrency & Debounce Refs
@@ -201,6 +202,10 @@ export default function Dashboard() {
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const debouncedFiltersRef = useRef(debouncedFilters)
+
+  useEffect(() => {
+    selectedChartRefRef.current = selectedChartRef
+  }, [selectedChartRef])
 
   useEffect(() => {
     debouncedFiltersRef.current = debouncedFilters
@@ -230,11 +235,15 @@ export default function Dashboard() {
     retries = 3,
     backoff = 2000,
     forceRefreshPagamentos = false,
+    explicitChartRefs?: number[],
   ): Promise<any> => {
     try {
-      const chartRefsList = Array.from(selectedChartRef)
-        .map((r) => Number(r))
-        .filter((n) => !isNaN(n) && n > 0)
+      const chartRefsList =
+        explicitChartRefs !== undefined
+          ? explicitChartRefs
+          : Array.from(selectedChartRefRef.current)
+              .map((r) => Number(r))
+              .filter((n) => !isNaN(n) && n > 0)
 
       const apiFilters = {
         ...filtersToUse,
@@ -362,7 +371,7 @@ export default function Dashboard() {
   }
 
   const performFetch = useCallback(
-    async (showLoading = true, forceRefreshPagamentos = false) => {
+    async (showLoading = true, forceRefreshPagamentos = false, explicitChartRefs?: number[]) => {
       if (isFetchingRef.current) {
         pendingRefreshRef.current = true
         return
@@ -381,6 +390,7 @@ export default function Dashboard() {
           3,
           2000,
           forceRefreshPagamentos,
+          explicitChartRefs,
         )
 
         // Build index of pagamentos by colaborador_id for O(1) lookup
@@ -525,7 +535,6 @@ export default function Dashboard() {
     debouncedFilters.filial,
     debouncedFilters.tipoPagamento,
     debouncedFilters.referencia,
-    selectedChartRef,
     performFetch,
   ])
 
@@ -963,12 +972,22 @@ export default function Dashboard() {
           if (acronym === 'FT') acc.pagoFT += val
           if (acronym === 'AP') acc.pagoAP += val
         } else if (status === 'Pendente') {
-          acc.pendente += val
-          acc.pendenteCount += 1
-          if (acronym === 'HE') acc.pendenteHE += val
-          if (acronym === 'VR') acc.pendenteVR += val
-          if (acronym === 'FT') acc.pendenteFT += val
-          if (acronym === 'AP') acc.pendenteAP += val
+          // Critério: "Valor a Pagar" = pendências da janela ativa (6 mais recentes)
+          // MAIS pendências de qualquer colaborador com liberado_pagamento = true fora da janela.
+          // Não somar pendências antigas nunca liberadas no "Valor a Pagar".
+          const colabRef = curr.referencia
+          const isDentroDaJanela =
+            !maxRef || maxRef <= 5 || (colabRef != null && colabRef >= maxRef - 5)
+          const isLiberado = Boolean(curr.liberado_pagamento)
+
+          if (isDentroDaJanela || isLiberado) {
+            acc.pendente += val
+            acc.pendenteCount += 1
+            if (acronym === 'HE') acc.pendenteHE += val
+            if (acronym === 'VR') acc.pendenteVR += val
+            if (acronym === 'FT') acc.pendenteFT += val
+            if (acronym === 'AP') acc.pendenteAP += val
+          }
         }
         return acc
       },
@@ -1269,7 +1288,9 @@ export default function Dashboard() {
                   className="cursor-pointer gap-1"
                   onClick={() => {
                     setSelectedChartRef(new Set())
+                    selectedChartRefRef.current = new Set()
                     setPage(1)
+                    performFetch(true, false, [])
                   }}
                 >
                   Ref: {Array.from(selectedChartRef).join(', ')}
@@ -1296,11 +1317,14 @@ export default function Dashboard() {
                   setSelectedChartFilial(null)
                   setSelectedChartDate(null)
                   setSelectedChartRef(new Set())
+                  selectedChartRefRef.current = new Set()
                   setChartRefSearch('')
                   setPage(1)
+                  performFetch(true, false, [])
                 }}
                 className="text-muted-foreground"
               >
+                {' '}
                 <FilterX className="h-4 w-4 mr-2" />
                 Limpar Filtros
               </Button>
@@ -1728,6 +1752,7 @@ export default function Dashboard() {
                             (refData[index] && refData[index].referenciaName)
                           if (!refVal) return
                           const isCtrl = event && (event.ctrlKey || event.metaKey)
+                          let nextRefList: number[] = []
                           setSelectedChartRef((prev) => {
                             const next = new Set(prev)
                             if (isCtrl) {
@@ -1744,9 +1769,14 @@ export default function Dashboard() {
                                 next.add(refVal)
                               }
                             }
+                            selectedChartRefRef.current = next
+                            nextRefList = Array.from(next)
+                              .map((r) => Number(r))
+                              .filter((n) => !isNaN(n) && n > 0)
                             return next
                           })
                           setPage(1)
+                          performFetch(true, false, nextRefList)
                         }}
                         style={{ cursor: 'pointer' }}
                       >

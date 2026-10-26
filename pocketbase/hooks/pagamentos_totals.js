@@ -45,6 +45,10 @@ routerAdd(
       $app.db().newQuery(queryPagos).all(rowsPagos)
 
       // 3. Consulta de Pendentes agrupados por tipo (da tabela colaboradores onde ainda não foi confirmado)
+      // Critério: pendências da janela ativa (6 referências mais recentes)
+      // MAIS pendências de qualquer colaborador com liberado_pagamento = 1 fora da janela.
+      // Não somar pendências antigas nunca liberadas no "Valor a Pagar".
+      const minJanelaRef = maxRef > 5 ? maxRef - 5 : 1
       const queryPendentes = `
         SELECT
           COALESCE(c.idtipopgto, 0) AS idtipopgto,
@@ -52,6 +56,7 @@ routerAdd(
           COUNT(*) AS total_count
         FROM colaboradores c
         WHERE (c.foto_confirmacao_url IS NULL OR c.foto_confirmacao_url = '')
+          AND (c.referencia >= {:minRef} OR c.liberado_pagamento = 1)
           AND NOT EXISTS (
             SELECT 1 FROM pagamentos p
             WHERE p.colaborador_id = c.id AND p.status = 'Confirmado'
@@ -65,7 +70,7 @@ routerAdd(
           total_count: 0,
         }),
       )
-      $app.db().newQuery(queryPendentes).all(rowsPendentes)
+      $app.db().newQuery(queryPendentes).bind({ minRef: minJanelaRef }).all(rowsPendentes)
 
       // 4. Totais por Referência (histórico completo para gráficos de referência)
       const queryRefPagos = `
