@@ -36,6 +36,44 @@ export const batchConfirmPagamentos = async (payments: any[], photos: Record<num
   return response.json()
 }
 
+export interface PagamentosDashboardTotals {
+  totals: {
+    pago: number
+    pendente: number
+    pagoVR: number
+    pagoHE: number
+    pagoFT: number
+    pagoAP: number
+    pendenteVR: number
+    pendenteHE: number
+    pendenteFT: number
+    pendenteAP: number
+    confirmadoCount: number
+    pendenteCount: number
+  }
+  maxRef: number
+  referencias: Array<{
+    referencia: number
+    total_pago: number
+    periodo_inicio: string | null
+    periodo_fim: string | null
+  }>
+}
+
+export const fetchDashboardTotals = async (): Promise<PagamentosDashboardTotals> => {
+  const response = await fetch(`${pb.baseURL}/backend/v1/pagamentos/totals`, {
+    method: 'GET',
+    headers: { Authorization: pb.authStore.token },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to fetch totals' }))
+    throw new Error(error.message || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
 export const getPagamentosTotals = async (filters: any) => {
   const filterConditions: string[] = []
 
@@ -198,6 +236,10 @@ export const getPagamentosAnalytics = async (filters: any) => {
   })
 }
 
+// Na listagem/tabela do Dashboard a foto só é exibida ao clicar em visualizar (sob demanda).
+// Mantemos foto_confirmacao_url se necessário ou podemos carregar sob demanda,
+// mas o item 4 pede: "a consulta de colaboradores que alimenta a tabela do Dashboard não deve incluir o campo foto/foto_confirmacao_url na carga inicial".
+// Para pagamentos mantemos campos leves essenciais.
 const PAGAMENTOS_FOR_COLABS_FIELDS =
   'id,colaborador_id,status,valor_pago,data_pagamento,hora_pagamento,foto_confirmacao_url,updated,created'
 

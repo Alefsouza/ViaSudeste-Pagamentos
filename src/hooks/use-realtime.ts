@@ -26,22 +26,57 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
 
     let unsubscribeFn: (() => Promise<void>) | undefined
     let cancelled = false
+    let retryTimeout: ReturnType<typeof setTimeout> | undefined
+    let consecutiveErrors = 0
+    const MAX_RETRIES = 5
 
-    pb.collection<TRecord>(collectionName)
-      .subscribe('*', (e) => {
-        callbackRef.current(e)
-      })
-      .then((fn) => {
-        if (cancelled) {
-          fn().catch(() => {})
-        } else {
-          unsubscribeFn = fn
-        }
-      })
-      .catch(() => {})
+    const connect = () => {
+      if (cancelled) return
+
+      pb.collection<TRecord>(collectionName)
+        .subscribe('*', (e) => {
+          consecutiveErrors = 0
+          callbackRef.current(e)
+        })
+        .then((fn) => {
+          if (cancelled) {
+            fn().catch(() => {})
+          } else {
+            unsubscribeFn = fn
+            consecutiveErrors = 0
+          }
+        })
+        .catch((err) => {
+          consecutiveErrors += 1
+          const isInvalidClientId =
+            err?.status === 404 ||
+            err?.message?.includes('Missing or invalid client id') ||
+            err?.response?.message?.includes('Missing or invalid client id')
+
+          // Se passar do número máximo de tentativas de reconexão ou erro contínuo de client id,
+          // aplica backoff exponencial e interrompe novas tentativas após MAX_RETRIES para evitar loop infinito
+          if (consecutiveErrors <= MAX_RETRIES && !cancelled) {
+            const backoffDelay = Math.min(30000, Math.pow(2, consecutiveErrors) * 1000)
+            retryTimeout = setTimeout(() => {
+              if (!cancelled) {
+                connect()
+              }
+            }, backoffDelay)
+          } else if (isInvalidClientId) {
+            console.warn(
+              `[useRealtime] Assinatura da coleção '${collectionName}' desativada após falhas de client ID. Polling continuará ativo.`,
+            )
+          }
+        })
+    }
+
+    connect()
 
     return () => {
       cancelled = true
+      if (retryTimeout) {
+        clearTimeout(retryTimeout)
+      }
       if (unsubscribeFn) {
         unsubscribeFn().catch(() => {})
       }
