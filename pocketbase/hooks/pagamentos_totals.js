@@ -47,7 +47,7 @@ routerAdd(
       // 3. Consulta de Pendentes agrupados por tipo (da tabela colaboradores onde ainda não foi confirmado)
       // Critério: pendências da janela ativa (6 referências mais recentes)
       // MAIS pendências de qualquer colaborador com liberado_pagamento = 1 fora da janela.
-      // Não somar pendências antigas nunca liberadas no "Valor a Pagar".
+      // Otimização: substituição do NOT EXISTS por LEFT JOIN ... IS NULL para usar os índices compostos
       const minJanelaRef = maxRef > 5 ? maxRef - 5 : 1
       const queryPendentes = `
         SELECT
@@ -55,12 +55,10 @@ routerAdd(
           SUM(COALESCE(c.valor_a_receber, c.valor, 0)) AS total_pendente,
           COUNT(*) AS total_count
         FROM colaboradores c
+        LEFT JOIN pagamentos p ON p.colaborador_id = c.id AND p.status = 'Confirmado'
         WHERE (c.foto_confirmacao_url IS NULL OR c.foto_confirmacao_url = '')
           AND (c.referencia >= {:minRef} OR c.liberado_pagamento = 1)
-          AND NOT EXISTS (
-            SELECT 1 FROM pagamentos p
-            WHERE p.colaborador_id = c.id AND p.status = 'Confirmado'
-          )
+          AND p.id IS NULL
         GROUP BY c.idtipopgto
       `
       const rowsPendentes = arrayOf(
@@ -72,7 +70,43 @@ routerAdd(
       )
       $app.db().newQuery(queryPendentes).bind({ minRef: minJanelaRef }).all(rowsPendentes)
 
-      // 4. Totais por Referência (histórico completo para gráficos de referência)
+      // 4. Contagem de colaboradores distintos no histórico completo:
+      // - Colaboradores com pagamento Confirmado (histórico completo de pagamentos confirmados)
+      // - UNION com colaboradores pendentes válidos (janela ativa OU liberado_pagamento = 1 fora da janela, sem confirmação)
+      const queryColaboradoresCount = `
+        SELECT COUNT(DISTINCT registro) AS total_colaboradores FROM (
+          SELECT registro
+          FROM pagamentos
+          WHERE status = 'Confirmado' AND registro IS NOT NULL AND registro != ''
+          UNION
+          SELECT c.registro
+          FROM colaboradores c
+          LEFT JOIN pagamentos p ON p.colaborador_id = c.id AND p.status = 'Confirmado'
+          WHERE (c.foto_confirmacao_url IS NULL OR c.foto_confirmacao_url = '')
+            AND (c.referencia >= {:minRef} OR c.liberado_pagamento = 1)
+            AND p.id IS NULL
+            AND c.registro IS NOT NULL
+            AND c.registro != ''
+        ) AS distinct_colabs
+      `
+      let totalColaboradores = 0
+      try {
+        const colabCountModel = new DynamicModel({ total_colaboradores: 0 })
+        $app
+          .db()
+          .newQuery(queryColaboradoresCount)
+          .bind({ minRef: minJanelaRef })
+          .one(colabCountModel)
+        totalColaboradores = Number(colabCountModel.total_colaboradores) || 0
+      } catch (errColabCount) {
+        console.log(
+          'HOOK_WARN_COLAB_COUNT:',
+          errColabCount && errColabCount.message ? errColabCount.message : String(errColabCount),
+        )
+        totalColaboradores = 0
+      }
+
+      // 5. Totais por Referência (histórico completo para gráficos de referência)
       const queryRefPagos = `
         SELECT
           COALESCE(c.referencia, 0) AS referencia,
@@ -95,7 +129,7 @@ routerAdd(
       )
       $app.db().newQuery(queryRefPagos).all(rowsRef)
 
-      // 5. Nomes distintos de tipo_pagamento para alimentar filtros do app sem varredura em pagamentos
+      // 6. Nomes distintos de tipo_pagamento para alimentar filtros do app sem varredura em pagamentos
       const queryTiposDistintos = `
         SELECT DISTINCT tipo_pagamento
         FROM pagamentos
@@ -197,7 +231,7 @@ routerAdd(
         }
       }
 
-      // 6. Distribuição por Filial (histórico completo de pagamentos confirmados)
+      // 7. Distribuição por Filial (histórico completo de pagamentos confirmados)
       const queryFilialPagos = `
         SELECT
           CASE
@@ -230,7 +264,7 @@ routerAdd(
         filialTotals = []
       }
 
-      // 7. Distribuição por Dia (histórico completo de pagamentos confirmados, horário de Brasília UTC-3)
+      // 8. Distribuição por Dia (histórico completo de pagamentos confirmados, horário de Brasília UTC-3)
       const queryDailyPagos = `
         SELECT
           strftime('%Y-%m-%d', datetime(
@@ -292,6 +326,7 @@ routerAdd(
           pendenteAP,
           confirmadoCount,
           pendenteCount,
+          totalColaboradores,
         },
         maxRef,
         referencias,

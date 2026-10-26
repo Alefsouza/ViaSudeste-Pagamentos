@@ -50,6 +50,7 @@ export interface PagamentosDashboardTotals {
     pendenteAP: number
     confirmadoCount: number
     pendenteCount: number
+    totalColaboradores?: number
   }
   maxRef: number
   referencias: Array<{

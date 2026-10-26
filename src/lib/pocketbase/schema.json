@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-26T15:52:44.121Z",
+  "generatedAt": "2026-10-26T16:09:19.653Z",
   "collections": [
     {
       "name": "users",
@@ -209,7 +209,8 @@
         "CREATE INDEX `idx_colab_data_lib` ON `colaboradores` (data_liberacao)",
         "CREATE INDEX `idx_colab_filial_id` ON `colaboradores` (filial_id)",
         "CREATE INDEX `idx_colab_liberado_pagamento` ON `colaboradores` (liberado_pagamento)",
-        "CREATE INDEX `idx_colab_registro_lookup` ON `colaboradores` (registro)"
+        "CREATE INDEX `idx_colab_registro_lookup` ON `colaboradores` (registro)",
+        "CREATE INDEX `idx_colab_ref_liberado` ON `colaboradores` (referencia,liberado_pagamento)"
       ]
     },
     {
@@ -342,7 +343,8 @@
         "CREATE INDEX `idx_pagamentos_data_pagamento` ON `pagamentos` (data_pagamento)",
         "CREATE INDEX `idx_pagamentos_colaborador_id` ON `pagamentos` (colaborador_id)",
         "CREATE INDEX `idx_pagamentos_status_data` ON `pagamentos` (status,data_pagamento)",
-        "CREATE INDEX `idx_pagamentos_colab_status` ON `pagamentos` (colaborador_id,status)"
+        "CREATE INDEX `idx_pagamentos_colab_status` ON `pagamentos` (colaborador_id,status)",
+        "CREATE INDEX `idx_pagamentos_status_idtipopgto` ON `pagamentos` (status,idtipopgto)"
       ]
     },
     {

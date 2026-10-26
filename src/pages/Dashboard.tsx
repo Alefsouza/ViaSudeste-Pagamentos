@@ -202,6 +202,8 @@ export default function Dashboard() {
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const debouncedFiltersRef = useRef(debouncedFilters)
+  // Guarda se a última busca no banco foi feita restrita à janela das 6 referências (dados completos da janela carregados)
+  const isWindowLoadedRef = useRef(false)
 
   useEffect(() => {
     selectedChartRefRef.current = selectedChartRef
@@ -415,6 +417,23 @@ export default function Dashboard() {
 
         setStatsData(mergedStats)
         setMaxRef(result.maxRef)
+        // Se a busca executada não restringiu a uma referência específica fora da janela ou busca avulsa,
+        // mas sim à janela das 6 referências, registramos que os dados da janela estão carregados na íntegra
+        const chartRefsList =
+          explicitChartRefs !== undefined
+            ? explicitChartRefs
+            : Array.from(selectedChartRefRef.current)
+                .map((r) => Number(r))
+                .filter((n) => !isNaN(n) && n > 0)
+        const hasSpecificRef = Boolean(
+          (debouncedFiltersRef.current.referencia &&
+            debouncedFiltersRef.current.referencia !== 'Todas') ||
+          (chartRefsList && chartRefsList.length > 0),
+        )
+        const hasSearch = Boolean(
+          debouncedFiltersRef.current.search && String(debouncedFiltersRef.current.search).trim(),
+        )
+        isWindowLoadedRef.current = !hasSpecificRef && !hasSearch
         setError(false)
         setIsRetrying(false)
         setFetchError(false)
@@ -1009,15 +1028,35 @@ export default function Dashboard() {
   }, [filteredStatsData, isGlobalUnfiltered, serverTotals, maxRef])
 
   // Calculations
-  const uniqueColabs = new Set(
-    filteredStatsData
-      .filter((c) => {
-        let status = getEvaluatedStatus(c, maxRef)
-        return status !== 'Agendado' && status !== 'Cancelado' && status !== 'Bloqueado'
-      })
-      .map((c) => c.registro)
-      .filter(Boolean),
-  ).size
+  // Se estiver sem filtros contextuais ativos, usa a contagem do histórico completo retornada pelo backend
+  const uniqueColabs = useMemo(() => {
+    if (
+      isGlobalUnfiltered &&
+      serverTotals?.totals?.totalColaboradores !== undefined &&
+      serverTotals.totals.totalColaboradores > 0
+    ) {
+      return serverTotals.totals.totalColaboradores
+    }
+
+    return new Set(
+      filteredStatsData
+        .filter((c) => {
+          let status = getEvaluatedStatus(c, maxRef)
+          // Critério: Confirmados (já pagos) OU Pendentes válidos (janela ativa OU liberado fora da janela)
+          if (status === 'Confirmado') return true
+          if (status === 'Pendente') {
+            const colabRef = c.referencia
+            const isDentroDaJanela =
+              !maxRef || maxRef <= 5 || (colabRef != null && colabRef >= maxRef - 5)
+            const isLiberado = Boolean(c.liberado_pagamento)
+            return isDentroDaJanela || isLiberado
+          }
+          return false
+        })
+        .map((c) => c.registro)
+        .filter(Boolean),
+    ).size
+  }, [isGlobalUnfiltered, serverTotals, filteredStatsData, maxRef])
 
   const confirmedPayments = filteredStatsData.filter((c) => {
     let status = getEvaluatedStatus(c, maxRef)
@@ -1287,10 +1326,28 @@ export default function Dashboard() {
                   variant="secondary"
                   className="cursor-pointer gap-1"
                   onClick={() => {
+                    const currentRefs = Array.from(selectedChartRefRef.current)
+                      .map((r) => Number(r))
+                      .filter((n) => !isNaN(n) && n > 0)
+                    const minJanela = maxRef > 5 ? maxRef - 5 : 1
+                    const wasInsideWindow =
+                      currentRefs.length > 0 &&
+                      currentRefs.every((r) => r >= minJanela && r <= maxRef) &&
+                      isWindowLoadedRef.current
+
                     setSelectedChartRef(new Set())
                     selectedChartRefRef.current = new Set()
                     setPage(1)
-                    performFetch(true, false, [])
+
+                    if (!wasInsideWindow) {
+                      // Se continha referências antigas que vieram de busca na base inteira,
+                      // refaz a busca padrão da janela
+                      performFetch(true, false, [])
+                    } else {
+                      // Dentro da janela: restaura instantaneamente sem chamada de rede,
+                      // apenas agendando revalidação suave em segundo plano se necessário
+                      scheduleRefresh()
+                    }
                   }}
                 >
                   Ref: {Array.from(selectedChartRef).join(', ')}
@@ -1314,13 +1371,25 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  const currentRefs = Array.from(selectedChartRefRef.current)
+                    .map((r) => Number(r))
+                    .filter((n) => !isNaN(n) && n > 0)
+                  const minJanela = maxRef > 5 ? maxRef - 5 : 1
+                  const hadOutsideRef =
+                    currentRefs.length > 0 && currentRefs.some((r) => r < minJanela || r > maxRef)
+
                   setSelectedChartFilial(null)
                   setSelectedChartDate(null)
                   setSelectedChartRef(new Set())
                   selectedChartRefRef.current = new Set()
                   setChartRefSearch('')
                   setPage(1)
-                  performFetch(true, false, [])
+
+                  if (hadOutsideRef || !isWindowLoadedRef.current) {
+                    performFetch(true, false, [])
+                  } else {
+                    scheduleRefresh()
+                  }
                 }}
                 className="text-muted-foreground"
               >
@@ -1776,7 +1845,29 @@ export default function Dashboard() {
                             return next
                           })
                           setPage(1)
-                          performFetch(true, false, nextRefList)
+
+                          // Verifica se todas as referências selecionadas estão dentro da janela de 6 referências já carregadas localmente
+                          const minJanela = maxRef > 5 ? maxRef - 5 : 1
+                          const allInsideWindow =
+                            nextRefList.length > 0 &&
+                            nextRefList.every((r) => r >= minJanela && r <= maxRef) &&
+                            isWindowLoadedRef.current
+
+                          if (nextRefList.length === 0) {
+                            // Se desmarcou a referência:
+                            // Se os dados da janela já estão carregados na memória, restaura instantaneamente
+                            if (isWindowLoadedRef.current) {
+                              scheduleRefresh()
+                            } else {
+                              performFetch(true, false, [])
+                            }
+                          } else if (allInsideWindow) {
+                            // Dentro da janela: filtra LOCALMENTE (zero requisição de rede, instantâneo)
+                            // A interface reage via filteredStatsData e selectedChartRef
+                          } else {
+                            // Referência antiga (fora da janela) ou dados locais incompletos: busca na base inteira sob demanda
+                            performFetch(true, false, nextRefList)
+                          }
                         }}
                         style={{ cursor: 'pointer' }}
                       >
