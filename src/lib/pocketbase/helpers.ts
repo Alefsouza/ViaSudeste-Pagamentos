@@ -56,6 +56,13 @@ export async function getAllPaginated(
             continue
           }
 
+          if (is429 && (options?.fallbackOn429 || all.length > 0)) {
+            console.warn(
+              `[getAllPaginated] 429 Too Many Requests para '${collection}'. Retornando ${all.length} registros parciais para evitar erro de runtime.`,
+            )
+            return all
+          }
+
           if (page > 1 && (err?.status === 400 || err?.status === 404)) {
             return all
           }

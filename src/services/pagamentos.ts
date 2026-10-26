@@ -232,6 +232,9 @@ export const getPagamentosForColaboradoresFilter = async (filters: any) => {
 
   if (filters.referencia && filters.referencia !== 'Todas') {
     filterConditions.push(`colaborador_id.referencia = ${filters.referencia}`)
+  } else if (filters.minReferencia && filters.minReferencia > 0) {
+    // Restringe aos pagamentos da janela de referências ativas (ex: últimas 6 referências)
+    filterConditions.push(`colaborador_id.referencia >= ${filters.minReferencia}`)
   }
 
   const filterString = filterConditions.join(' && ')
@@ -239,5 +242,6 @@ export const getPagamentosForColaboradoresFilter = async (filters: any) => {
   return getAllPaginated('pagamentos', {
     filter: filterString,
     fields: PAGAMENTOS_FOR_COLABS_FIELDS,
+    fallbackOn429: true,
   })
 }

@@ -76,11 +76,21 @@ export const fetchPagamentosForColabs = async (colabIds: string[]) => {
 }
 
 export const getPagamentosForColaboradoresFilter = async (filters: any = {}) => {
-  const filterString = buildFilterString(filters, 'colaborador_id.')
+  let filterString = buildFilterString(filters, 'colaborador_id.')
+  if (!filters.referencia || filters.referencia === 'Todas') {
+    if (filters.minReferencia && filters.minReferencia > 0) {
+      const minRefCond = `colaborador_id.referencia >= ${filters.minReferencia}`
+      filterString = filterString ? `(${filterString}) && ${minRefCond}` : minRefCond
+    }
+  }
   const finalFilter = filterString
     ? `(${filterString}) && status = "Confirmado"`
     : `status = "Confirmado"`
-  return getAllPaginated('pagamentos', { filter: finalFilter, fields: PAGAMENTO_FIELDS })
+  return getAllPaginated('pagamentos', {
+    filter: finalFilter,
+    fields: PAGAMENTO_FIELDS,
+    fallbackOn429: true,
+  })
 }
 
 export const getColaboradoresPaginated = async (
@@ -98,12 +108,27 @@ export const getColaboradoresPaginated = async (
 }
 
 export const getColaboradoresAnalytics = async (filters: any = {}) => {
+  const filterConditions: string[] = []
   const filterString = buildFilterString(filters)
+  if (filterString) {
+    filterConditions.push(filterString)
+  }
+
+  if (
+    (!filters.referencia || filters.referencia === 'Todas') &&
+    filters.minReferencia &&
+    filters.minReferencia > 0
+  ) {
+    filterConditions.push(`referencia >= ${filters.minReferencia}`)
+  }
+
+  const finalFilter = filterConditions.length > 0 ? filterConditions.join(' && ') : undefined
 
   return getAllPaginated('colaboradores', {
-    filter: filterString,
+    filter: finalFilter,
     sort: '-referencia,-created',
     fields: COLAB_FIELDS,
+    fallbackOn429: true,
   })
 }
 

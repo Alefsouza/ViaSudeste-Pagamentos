@@ -214,7 +214,10 @@ export default function Dashboard() {
   }, [filters])
 
   // Cache of pagamentos confirming records to avoid repeatedly scanning all 25+ pages of pagamentos
-  const cachedPagamentosRef = useRef<{ data: any[]; timestamp: number } | null>(null)
+  const cachedPagamentosRef = useRef<{ data: any[]; timestamp: number; cacheKey?: string } | null>(
+    null,
+  )
+  const cachedStatsRef = useRef<{ data: any[]; maxRef: number; timestamp: number } | null>(null)
 
   const fetchCoreData = async (
     filtersToUse: any,
@@ -230,41 +233,86 @@ export default function Dashboard() {
         status: 'Todos',
       }
 
+      // Descobre primeiro a maior referência para calcular a janela de 6 referências ativas
+      let currentMaxRef = maxRef
+      if (!currentMaxRef || currentMaxRef === 0) {
+        try {
+          const maxRefRec = await pb
+            .collection('colaboradores')
+            .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
+          currentMaxRef = maxRefRec?.referencia || 0
+        } catch {
+          currentMaxRef = 0
+        }
+      }
+
+      // Se não há filtro de referência específico, restringe à janela das 6 referências ativas (>= maxRef - 5)
+      const hasSpecificRef = Boolean(apiFilters.referencia && apiFilters.referencia !== 'Todas')
+      if (!hasSpecificRef && currentMaxRef > 0) {
+        apiFilters.minReferencia = Math.max(1, currentMaxRef - 5)
+      }
+
       // Check if we can reuse cached pagamentos data (valid for 60 seconds unless forced)
       const now = Date.now()
       const isFilterSpecific =
         Boolean(apiFilters.search) ||
         Boolean(apiFilters.filial && apiFilters.filial !== 'Todas') ||
         Boolean(apiFilters.tipoPagamento && apiFilters.tipoPagamento !== 'Todos') ||
-        Boolean(apiFilters.referencia && apiFilters.referencia !== 'Todas')
+        hasSpecificRef
+
+      const pagCacheKey = `${apiFilters.minReferencia || ''}:${apiFilters.referencia || ''}:${apiFilters.filial || ''}:${apiFilters.search || ''}`
 
       let pagsPromise: Promise<any[]>
       if (
         !forceRefreshPagamentos &&
-        !isFilterSpecific &&
         cachedPagamentosRef.current &&
+        cachedPagamentosRef.current.cacheKey === pagCacheKey &&
         now - cachedPagamentosRef.current.timestamp < 60000
       ) {
         pagsPromise = Promise.resolve(cachedPagamentosRef.current.data)
       } else {
-        pagsPromise = getPagamentosForColaboradoresFilter(apiFilters).then((data) => {
-          if (!isFilterSpecific) {
-            cachedPagamentosRef.current = { data, timestamp: Date.now() }
-          }
-          return data
-        })
+        pagsPromise = getPagamentosForColaboradoresFilter(apiFilters)
+          .then((data) => {
+            cachedPagamentosRef.current = { data, timestamp: Date.now(), cacheKey: pagCacheKey }
+            return data
+          })
+          .catch((err) => {
+            const is429 =
+              err?.status === 429 ||
+              err?.response?.status === 429 ||
+              err?.message?.includes('429') ||
+              err?.message?.includes('Too Many Requests')
+            if (is429 && cachedPagamentosRef.current?.data) {
+              console.warn(
+                '[Dashboard] 429 na consulta de pagamentos. Reutilizando cache existente.',
+              )
+              return cachedPagamentosRef.current.data
+            }
+            throw err
+          })
       }
 
-      const [stats, pags, maxRefRec] = await Promise.all([
-        getColaboradoresAnalytics(apiFilters),
+      const [stats, pags] = await Promise.all([
+        getColaboradoresAnalytics(apiFilters).catch((err) => {
+          const is429 =
+            err?.status === 429 ||
+            err?.response?.status === 429 ||
+            err?.message?.includes('429') ||
+            err?.message?.includes('Too Many Requests')
+          if (is429 && cachedStatsRef.current?.data) {
+            console.warn(
+              '[Dashboard] 429 na consulta de colaboradores. Reutilizando cache existente.',
+            )
+            return cachedStatsRef.current.data
+          }
+          throw err
+        }),
         pagsPromise,
-        pb
-          .collection('colaboradores')
-          .getFirstListItem('referencia > 0', { sort: '-referencia', fields: 'referencia' })
-          .catch(() => ({ referencia: 0 })),
       ])
 
-      return { stats, pags, maxRef: maxRefRec?.referencia || 0 }
+      cachedStatsRef.current = { data: stats, maxRef: currentMaxRef, timestamp: Date.now() }
+
+      return { stats, pags, maxRef: currentMaxRef }
     } catch (e: any) {
       const is429 =
         e?.status === 429 ||
@@ -277,6 +325,20 @@ export default function Dashboard() {
         await new Promise((r) => setTimeout(r, backoff))
         return fetchCoreData(filtersToUse, retries - 1, backoff * 2, forceRefreshPagamentos)
       }
+
+      // Se ainda for 429 após retries, degrada graciosamente usando caches se existirem
+      if (is429 && (cachedStatsRef.current || cachedPagamentosRef.current)) {
+        console.warn(
+          '[Dashboard] Rate limit 429 persistente. Operando em modo de degradação graciosa com dados do cache.',
+        )
+        return {
+          stats: cachedStatsRef.current?.data || [],
+          pags: cachedPagamentosRef.current?.data || [],
+          maxRef: cachedStatsRef.current?.maxRef || maxRef || 0,
+          isDegraded429: true,
+        }
+      }
+
       throw e
     }
   }
@@ -355,11 +417,38 @@ export default function Dashboard() {
         retryCountRef.current += 1
         isFetchingRef.current = false
 
+        // Se for 429 e tivermos dados anteriores em tela ou no cache, mantém os dados em exibição
+        // com aviso discreto em vez de exibir a tela de erro fatal ou lançar exceção não tratada
+        if (is429) {
+          console.warn(
+            '[Dashboard] 429 interceptado no performFetch. Mantendo dados atuais sem quebrar a interface.',
+          )
+          setIsRetrying(false)
+          setStatsLoading(false)
+          // Se já temos dados carregados, não exibimos fetchError
+          if (statsData.length === 0 && !cachedStatsRef.current?.data?.length) {
+            if (retryCountRef.current < 3) {
+              setIsRetrying(true)
+              if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
+              const retryDelay = retryCountRef.current * 3000
+              retryTimeoutRef.current = setTimeout(() => {
+                performFetch(showLoading, forceRefreshPagamentos)
+              }, retryDelay)
+            } else {
+              setFetchError(true)
+              retryCountRef.current = 0
+            }
+          } else {
+            setFetchError(false)
+            retryCountRef.current = 0
+          }
+          return
+        }
+
         if (retryCountRef.current < 3) {
           setIsRetrying(true)
           if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
-          // On 429, back off significantly (3s for first retry, 6s for second) instead of 2s
-          const retryDelay = is429 ? retryCountRef.current * 3000 : 2000
+          const retryDelay = 2000
           retryTimeoutRef.current = setTimeout(() => {
             performFetch(showLoading, forceRefreshPagamentos)
           }, retryDelay)
