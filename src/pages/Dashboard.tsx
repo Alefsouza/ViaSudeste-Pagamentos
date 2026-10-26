@@ -993,49 +993,104 @@ export default function Dashboard() {
   const minPago = confirmedValues.length ? Math.min(...confirmedValues) : 0
   const avgPago = confirmedValues.length ? pagamentosTotals.pago / confirmedValues.length : 0
 
-  // Chart Data Preparation using baseStatsData to show global filtered context without interactive charts applied yet
-  const pieDataMap = pieStatsData.reduce(
-    (acc, curr) => {
-      const filialStr =
-        curr.filial === 2 ? 'Cursino' : curr.filial === 4 ? 'Sapopemba' : curr.filial || 'Outra'
-      acc[filialStr] = (acc[filialStr] || 0) + getActualValue(curr)
-      return acc
-    },
-    {} as Record<string, number>,
-  )
+  // Chart Data Preparation:
+  // Se estiver sem filtros contextuais ativos (sem filtro de filial, data, referência, tipo, status ou busca),
+  // os gráficos de pizza (filiais) e de linha (dias) usam os agregados do HISTÓRICO COMPLETO do servidor.
+  // Quando houver filtro interativo ou global ativo, utilizam o recálculo reativo dos dados locais.
+  const pieData = useMemo(() => {
+    const isPieUnfiltered =
+      !selectedChartDate &&
+      selectedChartRef.size === 0 &&
+      !chartRefSearch &&
+      !debouncedFilters.startDate &&
+      !debouncedFilters.endDate &&
+      (!debouncedFilters.filial || debouncedFilters.filial === 'Todas') &&
+      (!debouncedFilters.tipoPagamento || debouncedFilters.tipoPagamento === 'Todos') &&
+      (!debouncedFilters.status || debouncedFilters.status === 'Todos') &&
+      (!debouncedFilters.referencia || debouncedFilters.referencia === 'Todas') &&
+      !debouncedFilters.search
 
-  const pieData = Object.entries(pieDataMap).map(([name, value]) => ({ name, value }))
+    if (isPieUnfiltered && serverTotals?.filiais && serverTotals.filiais.length > 0) {
+      return serverTotals.filiais
+    }
 
-  const dailyDataMap = dailyStatsData.reduce(
-    (acc, curr) => {
-      const status = getEvaluatedStatus(curr, maxRef)
-      if (status !== 'Confirmado') return acc
+    const pieDataMap = pieStatsData.reduce(
+      (acc, curr) => {
+        const filialStr =
+          curr.filial === 2 ? 'Cursino' : curr.filial === 4 ? 'Sapopemba' : curr.filial || 'Outra'
+        acc[filialStr] = (acc[filialStr] || 0) + getActualValue(curr)
+        return acc
+      },
+      {} as Record<string, number>,
+    )
 
-      let dateKey: string | null = null
-      const hasPhoto = curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
-      if (hasPhoto) {
-        const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
-        dateKey = toBrasiliaDateString(updatedDate)
-      }
+    return Object.entries(pieDataMap).map(([name, value]) => ({ name, value }))
+  }, [
+    selectedChartDate,
+    selectedChartRef,
+    chartRefSearch,
+    debouncedFilters,
+    serverTotals,
+    pieStatsData,
+  ])
 
-      if (!dateKey) return acc
+  const dailyData = useMemo(() => {
+    const isDailyUnfiltered =
+      !selectedChartFilial &&
+      selectedChartRef.size === 0 &&
+      !chartRefSearch &&
+      !debouncedFilters.startDate &&
+      !debouncedFilters.endDate &&
+      (!debouncedFilters.filial || debouncedFilters.filial === 'Todas') &&
+      (!debouncedFilters.tipoPagamento || debouncedFilters.tipoPagamento === 'Todos') &&
+      (!debouncedFilters.status || debouncedFilters.status === 'Todos') &&
+      (!debouncedFilters.referencia || debouncedFilters.referencia === 'Todas') &&
+      !debouncedFilters.search
 
-      acc[dateKey] = (acc[dateKey] || 0) + getActualValue(curr)
-      return acc
-    },
-    {} as Record<string, number>,
-  )
+    if (isDailyUnfiltered && serverTotals?.dias && serverTotals.dias.length > 0) {
+      return serverTotals.dias
+    }
 
-  const dailyData = Object.entries(dailyDataMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, total]) => {
-      const parts = date.split('-')
-      return {
-        date,
-        formattedDate: parts.length >= 3 ? `${parts[2]}/${parts[1]}` : date,
-        total,
-      }
-    })
+    const dailyDataMap = dailyStatsData.reduce(
+      (acc, curr) => {
+        const status = getEvaluatedStatus(curr, maxRef)
+        if (status !== 'Confirmado') return acc
+
+        let dateKey: string | null = null
+        const hasPhoto =
+          curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
+        if (hasPhoto) {
+          const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
+          dateKey = toBrasiliaDateString(updatedDate)
+        }
+
+        if (!dateKey) return acc
+
+        acc[dateKey] = (acc[dateKey] || 0) + getActualValue(curr)
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+
+    return Object.entries(dailyDataMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, total]) => {
+        const parts = date.split('-')
+        return {
+          date,
+          formattedDate: parts.length >= 3 ? `${parts[2]}/${parts[1]}` : date,
+          total,
+        }
+      })
+  }, [
+    selectedChartFilial,
+    selectedChartRef,
+    chartRefSearch,
+    debouncedFilters,
+    serverTotals,
+    dailyStatsData,
+    maxRef,
+  ])
 
   // Gráfico de distribuição por referência:
   // Se estiver sem filtros contextuais específicos de filial/data, usa as referências completas

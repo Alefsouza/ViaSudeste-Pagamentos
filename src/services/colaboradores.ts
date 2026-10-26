@@ -1,9 +1,9 @@
 import pb from '@/lib/pocketbase/client'
 import { getAllPaginated } from '@/lib/pocketbase/helpers'
 
-// Lista de campos para a carga do Dashboard sem foto_confirmacao_url (payload leve)
+// Lista de campos para a carga do Dashboard (payload leve com foto_confirmacao_url restaurado para status e comprovantes)
 export const COLAB_DASHBOARD_FIELDS =
-  'id,registro,nome,valor_a_receber,valor,filial,filial_id,referencia,idtipopgto,liberado_pagamento,data_liberacao,data_pagamento,data_pagamento_v2,data,hora_pagamento,updated,created,periodo_inicio,periodo_fim,inicio,termino,horas'
+  'id,registro,nome,valor_a_receber,valor,filial,filial_id,referencia,idtipopgto,foto_confirmacao_url,liberado_pagamento,data_liberacao,data_pagamento,data_pagamento_v2,data,hora_pagamento,updated,created,periodo_inicio,periodo_fim,inicio,termino,horas'
 
 const COLAB_FIELDS =
   'id,registro,nome,valor_a_receber,valor,filial,filial_id,referencia,idtipopgto,foto_confirmacao_url,liberado_pagamento,data_liberacao,data_pagamento,data_pagamento_v2,data,hora_pagamento,updated,created,periodo_inicio,periodo_fim,inicio,termino,horas'

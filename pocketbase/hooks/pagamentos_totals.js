@@ -167,6 +167,68 @@ routerAdd(
         }
       }
 
+      // 6. Distribuição por Filial (histórico completo de pagamentos confirmados)
+      const queryFilialPagos = `
+        SELECT
+          CASE
+            WHEN p.filial = 2 THEN 'Cursino'
+            WHEN p.filial = 4 THEN 'Sapopemba'
+            WHEN c.filial = 'Cursino' OR c.filial_id = 2 THEN 'Cursino'
+            WHEN c.filial = 'Sapopemba' OR c.filial_id = 4 THEN 'Sapopemba'
+            ELSE 'Outra'
+          END AS filial_nome,
+          SUM(COALESCE(p.valor_pago, 0)) AS total_pago
+        FROM pagamentos p
+        LEFT JOIN colaboradores c ON p.colaborador_id = c.id
+        WHERE p.status = 'Confirmado'
+        GROUP BY filial_nome
+      `
+      let filialTotals = []
+      try {
+        const rowsFilial = $app.db().newQuery(queryFilialPagos).all()
+        filialTotals = rowsFilial.map((r) => ({
+          name: String(r.filial_nome || 'Outra'),
+          value: Number(r.total_pago) || 0,
+        }))
+      } catch (errFilial) {
+        filialTotals = []
+      }
+
+      // 7. Distribuição por Dia (histórico completo de pagamentos confirmados, horário de Brasília UTC-3)
+      const queryDailyPagos = `
+        SELECT
+          strftime('%Y-%m-%d', datetime(
+            COALESCE(
+              NULLIF(p.updated, ''),
+              NULLIF(p.data_pagamento, ''),
+              p.created
+            ),
+            '-3 hours'
+          )) AS data_brasilia,
+          SUM(COALESCE(p.valor_pago, 0)) AS total_pago
+        FROM pagamentos p
+        WHERE p.status = 'Confirmado'
+        GROUP BY data_brasilia
+        HAVING data_brasilia IS NOT NULL
+        ORDER BY data_brasilia ASC
+      `
+      let dailyTotals = []
+      try {
+        const rowsDaily = $app.db().newQuery(queryDailyPagos).all()
+        dailyTotals = rowsDaily.map((r) => {
+          const dateStr = String(r.data_brasilia || '')
+          const parts = dateStr.split('-')
+          const formattedDate = parts.length >= 3 ? parts[2] + '/' + parts[1] : dateStr
+          return {
+            date: dateStr,
+            formattedDate: formattedDate,
+            total: Number(r.total_pago) || 0,
+          }
+        })
+      } catch (errDaily) {
+        dailyTotals = []
+      }
+
       const referencias = rowsRef.map((r) => ({
         referencia: Number(r.referencia),
         total_pago: Number(r.total_pago) || 0,
@@ -191,6 +253,8 @@ routerAdd(
         },
         maxRef,
         referencias,
+        filiais: filialTotals,
+        dias: dailyTotals,
         tiposPagamento,
       })
     } catch (err) {

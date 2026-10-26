@@ -58,6 +58,15 @@ export interface PagamentosDashboardTotals {
     periodo_inicio: string | null
     periodo_fim: string | null
   }>
+  filiais?: Array<{
+    name: string
+    value: number
+  }>
+  dias?: Array<{
+    date: string
+    formattedDate: string
+    total: number
+  }>
   tiposPagamento?: string[]
 }
 
