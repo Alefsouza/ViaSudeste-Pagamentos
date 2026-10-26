@@ -64,7 +64,11 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getColaboradoresAnalytics, fetchPagamentosForColabs } from '@/services/colaboradores'
-import { getPagamentosForColaboradoresFilter } from '@/services/pagamentos'
+import {
+  getPagamentosForColaboradoresFilter,
+  fetchDashboardTotals,
+  type PagamentosDashboardTotals,
+} from '@/services/pagamentos'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useAuth } from '@/hooks/use-auth'
 import pb from '@/lib/pocketbase/client'
@@ -176,6 +180,8 @@ export default function Dashboard() {
   const [isImporting, setIsImporting] = useState(false)
 
   const [statsData, setStatsData] = useState<any[]>([])
+  const [serverTotals, setServerTotals] = useState<PagamentosDashboardTotals | null>(null)
+  const [serverTotalsLoading, setServerTotalsLoading] = useState(true)
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null)
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [isPurging, setIsPurging] = useState(false)
@@ -463,6 +469,25 @@ export default function Dashboard() {
     [toast],
   )
 
+  // Carrega os totais do servidor pré-agregados
+  const loadServerTotals = useCallback(async () => {
+    try {
+      const data = await fetchDashboardTotals()
+      setServerTotals(data)
+      if (data.maxRef && data.maxRef > 0) {
+        setMaxRef((prev) => Math.max(prev, data.maxRef))
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Não foi possível carregar totais pré-agregados do servidor:', err)
+    } finally {
+      setServerTotalsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadServerTotals()
+  }, [loadServerTotals])
+
   const scheduleRefresh = useCallback(
     (forceRefreshPagamentos = false) => {
       if (debounceTimeoutRef.current) {
@@ -471,9 +496,10 @@ export default function Dashboard() {
       // Debounce realtime events by 3 seconds to batch rapid bursts of updates
       debounceTimeoutRef.current = setTimeout(() => {
         performFetch(false, forceRefreshPagamentos)
+        loadServerTotals()
       }, 3000)
     },
-    [performFetch],
+    [performFetch, loadServerTotals],
   )
 
   useEffect(() => {
@@ -608,6 +634,18 @@ export default function Dashboard() {
       setIsPurging(false)
     }
   }, [selectedChartRef, toast, performFetch])
+
+  useEffect(() => {
+    if (serverTotals?.referencias) {
+      setKnownRefs((prev) => {
+        const next = new Set(prev)
+        serverTotals.referencias.forEach((r) => {
+          if (r.referencia != null && r.referencia > 0) next.add(r.referencia)
+        })
+        return next
+      })
+    }
+  }, [serverTotals])
 
   useEffect(() => {
     if (statsData.length > 0) {
@@ -843,7 +881,30 @@ export default function Dashboard() {
 
   const showActionsColumn = canManagePayments && !allConfirmed
 
+  // Se não houver filtro ativo de pesquisa, filial, tipo, status, datas ou clique nos gráficos,
+  // os cartões de totais utilizam o agregado pré-computado do backend (fetchDashboardTotals),
+  // garantindo histórico COMPLETO instantâneo com 1 única requisição.
+  const isGlobalUnfiltered = useMemo(() => {
+    return (
+      !debouncedFilters.search &&
+      (!debouncedFilters.filial || debouncedFilters.filial === 'Todas') &&
+      (!debouncedFilters.status || debouncedFilters.status === 'Todos') &&
+      (!debouncedFilters.tipoPagamento || debouncedFilters.tipoPagamento === 'Todos') &&
+      (!debouncedFilters.referencia || debouncedFilters.referencia === 'Todas') &&
+      !debouncedFilters.startDate &&
+      !debouncedFilters.endDate &&
+      !selectedChartFilial &&
+      !selectedChartDate &&
+      selectedChartRef.size === 0 &&
+      !chartRefSearch
+    )
+  }, [debouncedFilters, selectedChartFilial, selectedChartDate, selectedChartRef, chartRefSearch])
+
   const pagamentosTotals = useMemo(() => {
+    if (isGlobalUnfiltered && serverTotals?.totals) {
+      return serverTotals.totals
+    }
+
     return filteredStatsData.reduce(
       (acc, curr) => {
         const val = getActualValue(curr)
@@ -909,7 +970,7 @@ export default function Dashboard() {
         pendenteCount: 0,
       },
     )
-  }, [filteredStatsData])
+  }, [filteredStatsData, isGlobalUnfiltered, serverTotals, maxRef])
 
   // Calculations
   const uniqueColabs = new Set(
@@ -976,51 +1037,90 @@ export default function Dashboard() {
       }
     })
 
-  const refDataMap = refStatsData.reduce(
-    (acc, curr) => {
-      const actualRef = curr.referencia
-      const ref = actualRef != null ? String(actualRef) : 'N/A'
+  // Gráfico de distribuição por referência:
+  // Se estiver sem filtros contextuais específicos de filial/data, usa as referências completas
+  // agregadas no servidor (serverTotals.referencias), cobrindo todo o histórico de referências!
+  const refData = useMemo(() => {
+    if (
+      !selectedChartFilial &&
+      !selectedChartDate &&
+      serverTotals?.referencias &&
+      serverTotals.referencias.length > 0 &&
+      !debouncedFilters.startDate &&
+      !debouncedFilters.endDate &&
+      (!debouncedFilters.filial || debouncedFilters.filial === 'Todas') &&
+      (!debouncedFilters.tipoPagamento || debouncedFilters.tipoPagamento === 'Todos') &&
+      !debouncedFilters.search
+    ) {
+      let list = serverTotals.referencias
+      if (chartRefSearch) {
+        list = list.filter((r) =>
+          String(r.referencia).toLowerCase().includes(chartRefSearch.toLowerCase()),
+        )
+      }
+      return [...list]
+        .sort((a, b) => a.referencia - b.referencia)
+        .map((r) => ({
+          referenciaName: String(r.referencia),
+          total: r.total_pago,
+          periodo_inicio: r.periodo_inicio,
+          periodo_fim: r.periodo_fim,
+        }))
+    }
 
-      if (chartRefSearch && !ref.toLowerCase().includes(chartRefSearch.toLowerCase())) {
+    const refDataMap = refStatsData.reduce(
+      (acc, curr) => {
+        const actualRef = curr.referencia
+        const ref = actualRef != null ? String(actualRef) : 'N/A'
+
+        if (chartRefSearch && !ref.toLowerCase().includes(chartRefSearch.toLowerCase())) {
+          return acc
+        }
+        if (!acc[ref]) {
+          acc[ref] = { total: 0, periodo_inicio: null, periodo_fim: null }
+        }
+        acc[ref].total += getActualValue(curr)
+
+        if (!acc[ref].periodo_inicio) {
+          acc[ref].periodo_inicio = curr.periodo_inicio || null
+        }
+        if (!acc[ref].periodo_fim) {
+          acc[ref].periodo_fim = curr.periodo_fim || null
+        }
+
         return acc
-      }
-      if (!acc[ref]) {
-        acc[ref] = { total: 0, periodo_inicio: null, periodo_fim: null }
-      }
-      acc[ref].total += getActualValue(curr)
+      },
+      {} as Record<
+        string,
+        { total: number; periodo_inicio: string | null; periodo_fim: string | null }
+      >,
+    )
 
-      if (!acc[ref].periodo_inicio) {
-        acc[ref].periodo_inicio = curr.periodo_inicio || null
-      }
-      if (!acc[ref].periodo_fim) {
-        acc[ref].periodo_fim = curr.periodo_fim || null
-      }
-
-      return acc
-    },
-    {} as Record<
-      string,
-      { total: number; periodo_inicio: string | null; periodo_fim: string | null }
-    >,
-  )
-
-  const refData = Object.entries(refDataMap)
-    .sort(([a], [b]) => {
-      const numA = Number(a)
-      const numB = Number(b)
-      const isNumA = !isNaN(numA) && a.trim() !== '' && a !== 'N/A'
-      const isNumB = !isNaN(numB) && b.trim() !== '' && b !== 'N/A'
-      if (isNumA && isNumB) return numA - numB
-      if (isNumA && !isNumB) return -1
-      if (!isNumA && isNumB) return 1
-      return a.localeCompare(b)
-    })
-    .map(([ref, data]: [string, any]) => ({
-      referenciaName: ref,
-      total: data.total,
-      periodo_inicio: data.periodo_inicio,
-      periodo_fim: data.periodo_fim,
-    }))
+    return Object.entries(refDataMap)
+      .sort(([a], [b]) => {
+        const numA = Number(a)
+        const numB = Number(b)
+        const isNumA = !isNaN(numA) && a.trim() !== '' && a !== 'N/A'
+        const isNumB = !isNaN(numB) && b.trim() !== '' && b !== 'N/A'
+        if (isNumA && isNumB) return numA - numB
+        if (isNumA && !isNumB) return -1
+        if (!isNumA && isNumB) return 1
+        return a.localeCompare(b)
+      })
+      .map(([ref, data]: [string, any]) => ({
+        referenciaName: ref,
+        total: data.total,
+        periodo_inicio: data.periodo_inicio,
+        periodo_fim: data.periodo_fim,
+      }))
+  }, [
+    selectedChartFilial,
+    selectedChartDate,
+    serverTotals,
+    debouncedFilters,
+    chartRefSearch,
+    refStatsData,
+  ])
 
   const isEmpty = baseStatsData.length === 0 && !statsLoading
 
@@ -1266,7 +1366,9 @@ export default function Dashboard() {
               <DollarSign className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">
-              {statsLoading ? (
+              {isGlobalUnfiltered && serverTotalsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : !isGlobalUnfiltered && statsLoading ? (
                 <Skeleton className="h-8 w-24" />
               ) : (
                 <div className="flex flex-col h-full space-y-1">
@@ -1289,7 +1391,9 @@ export default function Dashboard() {
               <AlertCircle className="h-4 w-4 text-amber-500" />
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">
-              {statsLoading ? (
+              {isGlobalUnfiltered && serverTotalsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : !isGlobalUnfiltered && statsLoading ? (
                 <Skeleton className="h-8 w-24" />
               ) : (
                 <div className="flex flex-col h-full space-y-1">

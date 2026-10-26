@@ -59,6 +59,7 @@ import {
 } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 import { getAllPaginated } from '@/lib/pocketbase/helpers'
+import { fetchDashboardTotals } from '@/services/pagamentos'
 
 export default function RelatorioRecebedoria() {
   const { user } = useAuth()
@@ -107,9 +108,9 @@ export default function RelatorioRecebedoria() {
   useEffect(() => {
     async function fetchFilterOptions() {
       try {
-        const [usersPage, pagamentosRes] = await Promise.all([
+        const [usersPage, dashboardTotals] = await Promise.all([
           pb.collection('users').getList(1, 500, { sort: 'name', fields: 'id,name,email' }),
-          getAllPaginated('pagamentos', { fields: 'tipo_pagamento' }),
+          fetchDashboardTotals().catch(() => null),
         ])
         const allUsersRes = usersPage.items
 
@@ -122,10 +123,17 @@ export default function RelatorioRecebedoria() {
         setUsuariosRecebedoria(allUsersRes)
         setAllUsers(allUsersRes)
 
-        const uniqueTipos = Array.from(
-          new Set(pagamentosRes.map((p: any) => p.tipo_pagamento).filter(Boolean)),
-        )
-        setTiposPagamento(uniqueTipos as string[])
+        if (dashboardTotals?.tiposPagamento && dashboardTotals.tiposPagamento.length > 0) {
+          setTiposPagamento(dashboardTotals.tiposPagamento)
+        } else {
+          // Fallback padrão baseado nos tipos de pagamento mapeados no sistema
+          setTiposPagamento([
+            'Hora Extra',
+            'Vale Refeição',
+            'Férias Trabalhada',
+            'Adicional Periculosidade',
+          ])
+        }
       } catch (err) {
         console.error('Error fetching filter options:', err)
       }

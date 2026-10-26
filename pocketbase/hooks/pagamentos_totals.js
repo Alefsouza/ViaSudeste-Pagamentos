@@ -38,12 +38,16 @@ routerAdd(
       // 3. Consulta de Pendentes agrupados por tipo (da tabela colaboradores onde ainda não foi confirmado)
       const queryPendentes = `
         SELECT
-          COALESCE(idtipopgto, 0) AS idtipopgto,
-          SUM(COALESCE(valor_a_receber, valor, 0)) AS total_pendente,
+          COALESCE(c.idtipopgto, 0) AS idtipopgto,
+          SUM(COALESCE(c.valor_a_receber, c.valor, 0)) AS total_pendente,
           COUNT(*) AS total_count
-        FROM colaboradores
-        WHERE (foto_confirmacao_url IS NULL OR foto_confirmacao_url = '')
-        GROUP BY idtipopgto
+        FROM colaboradores c
+        WHERE (c.foto_confirmacao_url IS NULL OR c.foto_confirmacao_url = '')
+          AND NOT EXISTS (
+            SELECT 1 FROM pagamentos p
+            WHERE p.colaborador_id = c.id AND p.status = 'Confirmado'
+          )
+        GROUP BY c.idtipopgto
       `
       const rowsPendentes = $app.db().newQuery(queryPendentes).all()
 
@@ -61,6 +65,39 @@ routerAdd(
         ORDER BY c.referencia DESC
       `
       const rowsRef = $app.db().newQuery(queryRefPagos).all()
+
+      // 5. Nomes distintos de tipo_pagamento para alimentar filtros do app sem varredura em pagamentos
+      const queryTiposDistintos = `
+        SELECT DISTINCT tipo_pagamento
+        FROM pagamentos
+        WHERE tipo_pagamento IS NOT NULL AND tipo_pagamento != ''
+        UNION
+        SELECT DISTINCT CASE
+          WHEN idtipopgto = 1 THEN 'Hora Extra'
+          WHEN idtipopgto = 2 THEN 'Vale Refeição'
+          WHEN idtipopgto = 3 THEN 'Férias Trabalhada'
+          WHEN idtipopgto = 4 THEN 'Vale Refeição'
+          WHEN idtipopgto = 5 THEN 'Adicional Periculosidade'
+          ELSE ''
+        END AS tipo_pagamento
+        FROM colaboradores
+        WHERE idtipopgto IS NOT NULL AND idtipopgto > 0
+      `
+      let tiposPagamento = []
+      try {
+        const rowsTipos = $app.db().newQuery(queryTiposDistintos).all()
+        tiposPagamento = rowsTipos
+          .map((r) => String(r.tipo_pagamento || '').trim())
+          .filter((t) => t.length > 0)
+          .filter((t, idx, arr) => arr.indexOf(t) === idx)
+      } catch (err) {
+        tiposPagamento = [
+          'Hora Extra',
+          'Vale Refeição',
+          'Férias Trabalhada',
+          'Adicional Periculosidade',
+        ]
+      }
 
       // Mapear acumuladores por tipo (1=HE, 3=FT, 4=VR, 5=AP)
       let pago = 0
@@ -154,6 +191,7 @@ routerAdd(
         },
         maxRef,
         referencias,
+        tiposPagamento,
       })
     } catch (err) {
       $app.logger().error('Erro ao calcular totais de pagamentos', 'error', err.message)

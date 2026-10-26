@@ -58,6 +58,7 @@ export interface PagamentosDashboardTotals {
     periodo_inicio: string | null
     periodo_fim: string | null
   }>
+  tiposPagamento?: string[]
 }
 
 export const fetchDashboardTotals = async (): Promise<PagamentosDashboardTotals> => {

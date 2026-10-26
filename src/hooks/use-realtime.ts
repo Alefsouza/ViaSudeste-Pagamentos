@@ -53,7 +53,14 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
             err?.message?.includes('Missing or invalid client id') ||
             err?.response?.message?.includes('Missing or invalid client id')
 
-          // Se passar do número máximo de tentativas de reconexão ou erro contínuo de client id,
+          if (isInvalidClientId) {
+            console.warn(
+              `[useRealtime] Assinatura da coleção '${collectionName}' desativada (erro 404 client id). Polling garantirá atualização.`,
+            )
+            return
+          }
+
+          // Se passar do número máximo de tentativas de reconexão,
           // aplica backoff exponencial e interrompe novas tentativas após MAX_RETRIES para evitar loop infinito
           if (consecutiveErrors <= MAX_RETRIES && !cancelled) {
             const backoffDelay = Math.min(30000, Math.pow(2, consecutiveErrors) * 1000)
@@ -62,9 +69,9 @@ export function useRealtime<TRecord extends RecordModel = RecordModel>(
                 connect()
               }
             }, backoffDelay)
-          } else if (isInvalidClientId) {
+          } else {
             console.warn(
-              `[useRealtime] Assinatura da coleção '${collectionName}' desativada após falhas de client ID. Polling continuará ativo.`,
+              `[useRealtime] Limite de tentativas atingido para '${collectionName}'. Reconexão automática suspensa.`,
             )
           }
         })
