@@ -346,16 +346,29 @@ export const normalizeTimestampForSort = (dateStr?: string | null): string => {
 }
 
 export const getBrasiliaStartUTC = (dateStr: string): string => {
-  return `${dateStr} 03:00:00`
+  return `${dateStr} 03:00:00.000Z`
 }
 
 export const getBrasiliaEndUTC = (dateStr: string): string => {
-  const date = new Date(dateStr + 'T00:00:00')
-  date.setDate(date.getDate() + 1)
-  const yyyy = date.getFullYear()
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd} 02:59:59`
+  // Parse year, month, day explicitly from YYYY-MM-DD string to avoid any local timezone shifts
+  const parts = dateStr.split('-')
+  if (parts.length === 3) {
+    const yyyy = parseInt(parts[0], 10)
+    const mm = parseInt(parts[1], 10) - 1
+    const dd = parseInt(parts[2], 10)
+    // Next day in UTC
+    const nextDay = new Date(Date.UTC(yyyy, mm, dd + 1))
+    const nextY = nextDay.getUTCFullYear()
+    const nextM = String(nextDay.getUTCMonth() + 1).padStart(2, '0')
+    const nextD = String(nextDay.getUTCDate()).padStart(2, '0')
+    return `${nextY}-${nextM}-${nextD} 02:59:59.999Z`
+  }
+  const date = new Date(dateStr + 'T00:00:00Z')
+  date.setUTCDate(date.getUTCDate() + 1)
+  const yyyy = date.getUTCFullYear()
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(date.getUTCDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} 02:59:59.999Z`
 }
 
 export const toBrasiliaDateString = (dateStr?: string | null): string | null => {

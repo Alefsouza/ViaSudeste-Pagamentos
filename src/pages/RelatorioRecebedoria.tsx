@@ -37,12 +37,14 @@ import {
   Download,
   Image as ImageIcon,
   FileText,
+  Filter,
   FilterX,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
   SearchX,
   ArrowDown,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -75,21 +77,59 @@ export default function RelatorioRecebedoria() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
 
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0])
+  const todayStr = () => new Date().toISOString().split('T')[0]
+
+  // Form input states (editable locally without triggering refetch)
+  const [startDate, setStartDate] = useState(todayStr)
+  const [endDate, setEndDate] = useState(todayStr)
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
-  const [timeError, setTimeError] = useState('')
-
   const [statusFilter, setStatusFilter] = useState('Todos')
   const [usuarioFilter, setUsuarioFilter] = useState('Todos')
   const [tipoPagamentoFilter, setTipoPagamentoFilter] = useState('Todos')
-
   const [searchTerm, setSearchTerm] = useState('')
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
-
   const [referenciaFilter, setReferenciaFilter] = useState('')
-  const [debouncedReferenciaFilter, setDebouncedReferenciaFilter] = useState('')
+
+  // Applied filter state (only updated on "Aplicar Filtro" or "Limpar Filtros")
+  const [appliedFilters, setAppliedFilters] = useState(() => ({
+    startDate: todayStr(),
+    endDate: todayStr(),
+    startTime: '',
+    endTime: '',
+    statusFilter: 'Todos',
+    usuarioFilter: 'Todos',
+    tipoPagamentoFilter: 'Todos',
+    searchTerm: '',
+    referenciaFilter: '',
+  }))
+
+  const [timeError, setTimeError] = useState('')
+
+  // Check if form inputs have changed compared to the currently applied filters
+  const hasPendingFilters = React.useMemo(() => {
+    return (
+      startDate !== appliedFilters.startDate ||
+      endDate !== appliedFilters.endDate ||
+      startTime !== appliedFilters.startTime ||
+      endTime !== appliedFilters.endTime ||
+      statusFilter !== appliedFilters.statusFilter ||
+      usuarioFilter !== appliedFilters.usuarioFilter ||
+      tipoPagamentoFilter !== appliedFilters.tipoPagamentoFilter ||
+      searchTerm !== appliedFilters.searchTerm ||
+      referenciaFilter !== appliedFilters.referenciaFilter
+    )
+  }, [
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+    statusFilter,
+    usuarioFilter,
+    tipoPagamentoFilter,
+    searchTerm,
+    referenciaFilter,
+    appliedFilters,
+  ])
 
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [usuariosRecebedoria, setUsuariosRecebedoria] = useState<any[]>([])
@@ -141,82 +181,68 @@ export default function RelatorioRecebedoria() {
     fetchFilterOptions()
   }, [])
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm)
-      setDebouncedReferenciaFilter(referenciaFilter)
-      setPage(1)
-    }, 500)
-    return () => clearTimeout(handler)
-  }, [searchTerm, referenciaFilter])
-
   const buildFilter = useCallback(() => {
     const conditions: string[] = []
 
-    if (startDate && endDate) {
-      const startUTC = getBrasiliaStartUTC(startDate)
-      const endUTC = getBrasiliaEndUTC(endDate)
+    if (appliedFilters.startDate && appliedFilters.endDate) {
+      const startUTC = getBrasiliaStartUTC(appliedFilters.startDate)
+      const endUTC = getBrasiliaEndUTC(appliedFilters.endDate)
       conditions.push(
         `updated >= "${startUTC}" && updated <= "${endUTC}" && foto_confirmacao_url != ""`,
       )
     }
-    if (startTime) {
-      conditions.push(`hora_pagamento >= "${startTime}"`)
+    if (appliedFilters.startTime) {
+      conditions.push(`hora_pagamento >= "${appliedFilters.startTime}"`)
     }
-    if (endTime) {
-      conditions.push(`hora_pagamento <= "${endTime}"`)
+    if (appliedFilters.endTime) {
+      conditions.push(`hora_pagamento <= "${appliedFilters.endTime}"`)
     }
-    if (debouncedSearchTerm) {
-      const isNumeric = /^\d+$/.test(debouncedSearchTerm)
+    if (appliedFilters.searchTerm) {
+      const trimmed = appliedFilters.searchTerm.trim()
+      const isNumeric = /^\d+$/.test(trimmed)
       if (isNumeric) {
         conditions.push(
-          `(nome ~ "${debouncedSearchTerm}" || registro = "${debouncedSearchTerm}" || colaborador_id.nome ~ "${debouncedSearchTerm}" || colaborador_id.registro = "${debouncedSearchTerm}")`,
+          `(nome ~ "${trimmed}" || registro = "${trimmed}" || colaborador_id.nome ~ "${trimmed}" || colaborador_id.registro = "${trimmed}")`,
         )
       } else {
         conditions.push(
-          `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}" || colaborador_id.nome ~ "${debouncedSearchTerm}" || colaborador_id.registro ~ "${debouncedSearchTerm}")`,
+          `(nome ~ "${trimmed}" || registro ~ "${trimmed}" || colaborador_id.nome ~ "${trimmed}" || colaborador_id.registro ~ "${trimmed}")`,
         )
       }
     }
-    if (debouncedReferenciaFilter && !isNaN(Number(debouncedReferenciaFilter))) {
-      conditions.push(`colaborador_id.referencia = ${Number(debouncedReferenciaFilter)}`)
+    if (appliedFilters.referenciaFilter && !isNaN(Number(appliedFilters.referenciaFilter))) {
+      conditions.push(`colaborador_id.referencia = ${Number(appliedFilters.referenciaFilter)}`)
     }
-    if (statusFilter && statusFilter !== 'Todos') {
-      if (statusFilter === 'Confirmado') {
+    if (appliedFilters.statusFilter && appliedFilters.statusFilter !== 'Todos') {
+      if (appliedFilters.statusFilter === 'Confirmado') {
         conditions.push(`(status = "Confirmado" || foto_confirmacao_url != "")`)
-      } else if (statusFilter === 'Pendente') {
+      } else if (appliedFilters.statusFilter === 'Pendente') {
         conditions.push(`(status = "Pendente" || status = "")`)
-      } else if (statusFilter === 'Cancelado') {
+      } else if (appliedFilters.statusFilter === 'Cancelado') {
         conditions.push(`status = "Cancelado"`)
       } else {
-        conditions.push(`status = "${statusFilter}"`)
+        conditions.push(`status = "${appliedFilters.statusFilter}"`)
       }
     }
-    if (usuarioFilter && usuarioFilter !== 'Todos') {
-      conditions.push(`user_id = "${usuarioFilter}"`)
+    if (appliedFilters.usuarioFilter && appliedFilters.usuarioFilter !== 'Todos') {
+      conditions.push(`user_id = "${appliedFilters.usuarioFilter}"`)
     }
-    if (tipoPagamentoFilter && tipoPagamentoFilter !== 'Todos') {
-      conditions.push(`tipo_pagamento = "${tipoPagamentoFilter}"`)
+    if (appliedFilters.tipoPagamentoFilter && appliedFilters.tipoPagamentoFilter !== 'Todos') {
+      conditions.push(`tipo_pagamento = "${appliedFilters.tipoPagamentoFilter}"`)
     }
 
     return conditions.length > 0 ? conditions.join(' && ') : ''
-  }, [
-    startDate,
-    endDate,
-    startTime,
-    endTime,
-    debouncedSearchTerm,
-    debouncedReferenciaFilter,
-    statusFilter,
-    usuarioFilter,
-    tipoPagamentoFilter,
-  ])
+  }, [appliedFilters])
 
   const loadData = useCallback(
     async (isInitialOrFilterChange = false) => {
       if (!user) return
 
-      if (startTime && endTime && endTime < startTime) {
+      if (
+        appliedFilters.startTime &&
+        appliedFilters.endTime &&
+        appliedFilters.endTime < appliedFilters.startTime
+      ) {
         setTimeError('Horário Final não pode ser menor que o Horário Inicial.')
         setLoading(false)
         return
@@ -247,7 +273,21 @@ export default function RelatorioRecebedoria() {
             'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor,expand.colaborador_id.referencia',
         })
 
-        const sortedData = [...summaryRes].sort((a: any, b: any) => {
+        // Filter out any payments whose effective confirmation date is outside the selected Brasilia date range
+        // This guarantees that even if edge cases in UTC conversion occur, payments from other dates (e.g. dia 25 when filtering dia 23) will never appear.
+        const dateFilteredRes = summaryRes.filter((item: any) => {
+          if (!appliedFilters.startDate && !appliedFilters.endDate) return true
+          const displayDate = getPaymentDisplayDate(item)
+          if (!displayDate) return true
+          const dateOnly = toBrasiliaDateString(displayDate)
+          if (!dateOnly) return true
+
+          if (appliedFilters.startDate && dateOnly < appliedFilters.startDate) return false
+          if (appliedFilters.endDate && dateOnly > appliedFilters.endDate) return false
+          return true
+        })
+
+        const sortedData = [...dateFilteredRes].sort((a: any, b: any) => {
           const pagA = normalizeTimestampForSort(a.data_pagamento) || ''
           const pagB = normalizeTimestampForSort(b.data_pagamento) || ''
           if (pagA !== pagB) return pagB.localeCompare(pagA)
@@ -313,7 +353,7 @@ export default function RelatorioRecebedoria() {
         }
       }
     },
-    [user, startTime, endTime, page, buildFilter, summaryData.length, toast],
+    [user, appliedFilters, page, buildFilter, summaryData.length, toast],
   )
 
   const loadAntigasData = useCallback(async () => {
@@ -333,13 +373,12 @@ export default function RelatorioRecebedoria() {
         const notIn = uniqueRefs.map((r) => `referencia != ${r}`).join(' && ')
         antigasConditions.push(`(${notIn})`)
       }
-      if (debouncedSearchTerm) {
-        antigasConditions.push(
-          `(nome ~ "${debouncedSearchTerm}" || registro ~ "${debouncedSearchTerm}")`,
-        )
+      if (appliedFilters.searchTerm) {
+        const trimmed = appliedFilters.searchTerm.trim()
+        antigasConditions.push(`(nome ~ "${trimmed}" || registro ~ "${trimmed}")`)
       }
-      if (debouncedReferenciaFilter && !isNaN(Number(debouncedReferenciaFilter))) {
-        antigasConditions.push(`referencia = ${Number(debouncedReferenciaFilter)}`)
+      if (appliedFilters.referenciaFilter && !isNaN(Number(appliedFilters.referenciaFilter))) {
+        antigasConditions.push(`referencia = ${Number(appliedFilters.referenciaFilter)}`)
       }
 
       const [antigasRes, confirmadosRes] = await Promise.all([
@@ -376,11 +415,7 @@ export default function RelatorioRecebedoria() {
     } catch (err) {
       console.error('Error loading antigas data:', err)
     }
-  }, [debouncedSearchTerm, debouncedReferenciaFilter])
-
-  useEffect(() => {
-    setPage(1)
-  }, [startDate, endDate, startTime, endTime, statusFilter, usuarioFilter, tipoPagamentoFilter])
+  }, [appliedFilters.searchTerm, appliedFilters.referenciaFilter])
 
   useEffect(() => {
     retryCountRef.current = 0
@@ -421,19 +456,65 @@ export default function RelatorioRecebedoria() {
     { pollingIntervalMs: 20000, maxConsecutiveErrors: 3 },
   )
 
+  const handleApplyFilter = () => {
+    if (startTime && endTime && endTime < startTime) {
+      setTimeError('Horário Final não pode ser menor que o Horário Inicial.')
+      toast({
+        title: 'Horário inválido',
+        description: 'Horário Final não pode ser menor que o Horário Inicial.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (startDate && endDate && endDate < startDate) {
+      toast({
+        title: 'Data inválida',
+        description: 'Data Final não pode ser menor que a Data Inicial.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setTimeError('')
+    setPage(1)
+    setAppliedFilters({
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      statusFilter,
+      usuarioFilter,
+      tipoPagamentoFilter,
+      searchTerm,
+      referenciaFilter,
+    })
+  }
+
   const clearFilters = () => {
+    const today = todayStr()
+    setStartDate(today)
+    setEndDate(today)
+    setStartTime('')
+    setEndTime('')
+    setTimeError('')
     setStatusFilter('Todos')
     setUsuarioFilter('Todos')
     setTipoPagamentoFilter('Todos')
     setSearchTerm('')
     setReferenciaFilter('')
-    setStartTime('')
-    setEndTime('')
-    setTimeError('')
-    const today = new Date().toISOString().split('T')[0]
-    setStartDate(today)
-    setEndDate(today)
     setPage(1)
+
+    // Reaplica imediatamente com os valores padrão
+    setAppliedFilters({
+      startDate: today,
+      endDate: today,
+      startTime: '',
+      endTime: '',
+      statusFilter: 'Todos',
+      usuarioFilter: 'Todos',
+      tipoPagamentoFilter: 'Todos',
+      searchTerm: '',
+      referenciaFilter: '',
+    })
   }
 
   const handleExport = () => {
@@ -630,17 +711,18 @@ export default function RelatorioRecebedoria() {
         <div className="grid grid-cols-2 gap-4 text-black">
           <div>
             <p>
-              <span className="font-bold">Período:</span> {formatDateStringSafe(startDate)} a{' '}
-              {formatDateStringSafe(endDate)}
+              <span className="font-bold">Período:</span>{' '}
+              {formatDateStringSafe(appliedFilters.startDate)} a{' '}
+              {formatDateStringSafe(appliedFilters.endDate)}
             </p>
           </div>
           <div className="text-right">
             <p>
               <span className="font-bold">Usuário:</span>{' '}
-              {usuarioFilter === 'Todos'
+              {appliedFilters.usuarioFilter === 'Todos'
                 ? 'Todos'
-                : usuariosRecebedoria.find((u) => u.id === usuarioFilter)?.name ||
-                  usuariosRecebedoria.find((u) => u.id === usuarioFilter)?.email ||
+                : usuariosRecebedoria.find((u) => u.id === appliedFilters.usuarioFilter)?.name ||
+                  usuariosRecebedoria.find((u) => u.id === appliedFilters.usuarioFilter)?.email ||
                   'N/A'}
             </p>
           </div>
@@ -683,11 +765,11 @@ export default function RelatorioRecebedoria() {
             )}
           </div>
           <p className="text-muted-foreground mt-1 print:text-slate-700">
-            {usuarioFilter === 'Todos'
+            {appliedFilters.usuarioFilter === 'Todos'
               ? 'Todos os pagamentos processados.'
               : `Pagamentos processados por ${
-                  usuariosRecebedoria.find((u) => u.id === usuarioFilter)?.name ||
-                  usuariosRecebedoria.find((u) => u.id === usuarioFilter)?.email ||
+                  usuariosRecebedoria.find((u) => u.id === appliedFilters.usuarioFilter)?.name ||
+                  usuariosRecebedoria.find((u) => u.id === appliedFilters.usuarioFilter)?.email ||
                   'N/A'
                 }.`}
           </p>
@@ -699,7 +781,7 @@ export default function RelatorioRecebedoria() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border space-y-4 print:hidden">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           <div className="space-y-2">
             <Label>Data Inicial</Label>
             <Input
@@ -747,9 +829,10 @@ export default function RelatorioRecebedoria() {
           <div className="space-y-2">
             <Label>Busca</Label>
             <Input
-              placeholder="Buscar..."
+              placeholder="Buscar por nome ou registro..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
               className="bg-white dark:bg-slate-950"
             />
           </div>
@@ -760,6 +843,7 @@ export default function RelatorioRecebedoria() {
               placeholder="Buscar ref..."
               value={referenciaFilter}
               onChange={(e) => setReferenciaFilter(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
               className="bg-white dark:bg-slate-950"
             />
           </div>
@@ -797,16 +881,51 @@ export default function RelatorioRecebedoria() {
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="hidden sm:block h-5"></div>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground w-full sm:w-auto">
+            {hasPendingFilters && (
+              <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium animate-pulse">
+                <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />
+                Filtros alterados — clique em &quot;Aplicar Filtro&quot; para atualizar a lista
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={clearFilters}
-              className="text-slate-500 w-full h-10 hover:bg-slate-100 dark:hover:bg-slate-800"
+              disabled={loading}
+              className="flex-1 sm:flex-initial"
             >
               <FilterX className="h-4 w-4 mr-2" />
-              Limpar
+              Limpar Filtros
+            </Button>
+            <Button
+              onClick={handleApplyFilter}
+              disabled={loading}
+              className={cn(
+                'flex-1 sm:flex-initial transition-all font-medium',
+                hasPendingFilters
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md ring-2 ring-blue-500/30'
+                  : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900',
+              )}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Filtrando...
+                </>
+              ) : (
+                <>
+                  <Filter className="h-4 w-4 mr-2" />
+                  Aplicar Filtro
+                  {hasPendingFilters && (
+                    <span className="ml-1.5 h-2 w-2 rounded-full bg-amber-300 inline-block" />
+                  )}
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -1393,9 +1512,9 @@ export default function RelatorioRecebedoria() {
                         <p className="text-slate-500 font-medium">
                           Nenhum pagamento pendente de referências antigas encontrado.
                         </p>
-                        {debouncedReferenciaFilter && (
+                        {appliedFilters.referenciaFilter && (
                           <p className="text-sm text-slate-400 mt-1">
-                            A referência {debouncedReferenciaFilter} pode estar entre as mais
+                            A referência {appliedFilters.referenciaFilter} pode estar entre as mais
                             recentes ou não ter pendências.
                           </p>
                         )}
