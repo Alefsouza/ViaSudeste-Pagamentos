@@ -85,10 +85,11 @@ export function DashboardPaymentModal({
     if (!search.trim()) return
     setLoading(true)
     try {
-      const isNumeric = /^\d+$/.test(search.trim())
+      const trimmed = search.trim()
+      const isNumeric = /^\d+$/.test(trimmed)
       const filterStr = isNumeric
-        ? `registro = "${search.trim()}" && foto_confirmacao_url = ""`
-        : `(nome ~ "${search.trim()}" || registro = "${search.trim()}") && foto_confirmacao_url = ""`
+        ? `registro = "${trimmed}" && foto_confirmacao_url = ""`
+        : `nome ~ "${trimmed}" && foto_confirmacao_url = ""`
 
       let attempts = 0
       let res: any = null
@@ -117,6 +118,7 @@ export function DashboardPaymentModal({
         if (checkIsLocked(r.data_liberacao)) return false
         const ref = r.referencia || 0
         if (ref > 0 && maxRef > 0 && ref < maxRef - 5) {
+          // Se estiver fora da janela das 6 referências mais recentes, deve ter liberado_pagamento = true
           return r.liberado_pagamento === true
         }
         return true

@@ -232,8 +232,13 @@ export default function Dashboard() {
     forceRefreshPagamentos = false,
   ): Promise<any> => {
     try {
+      const chartRefsList = Array.from(selectedChartRef)
+        .map((r) => Number(r))
+        .filter((n) => !isNaN(n) && n > 0)
+
       const apiFilters = {
         ...filtersToUse,
+        chartRefs: chartRefsList,
         startDate: '',
         endDate: '',
         status: 'Todos',
@@ -252,21 +257,28 @@ export default function Dashboard() {
         }
       }
 
-      // Se não há filtro de referência específico, restringe à janela das 6 referências ativas (>= maxRef - 5)
-      const hasSpecificRef = Boolean(apiFilters.referencia && apiFilters.referencia !== 'Todas')
-      if (!hasSpecificRef && currentMaxRef > 0) {
+      // Se não há filtro de referência específico, nem seleção de referência no gráfico,
+      // e nem pesquisa por texto/registro, restringe à janela das 6 referências ativas (>= maxRef - 5)
+      const hasSpecificRef = Boolean(
+        (apiFilters.referencia && apiFilters.referencia !== 'Todas') ||
+        (apiFilters.chartRefs && apiFilters.chartRefs.length > 0),
+      )
+      const hasSearch = Boolean(apiFilters.search && String(apiFilters.search).trim())
+
+      if (!hasSpecificRef && !hasSearch && currentMaxRef > 0) {
         apiFilters.minReferencia = Math.max(1, currentMaxRef - 5)
       }
 
       // Check if we can reuse cached pagamentos data (valid for 60 seconds unless forced)
       const now = Date.now()
       const isFilterSpecific =
-        Boolean(apiFilters.search) ||
+        hasSearch ||
         Boolean(apiFilters.filial && apiFilters.filial !== 'Todas') ||
         Boolean(apiFilters.tipoPagamento && apiFilters.tipoPagamento !== 'Todos') ||
         hasSpecificRef
 
-      const pagCacheKey = `${apiFilters.minReferencia || ''}:${apiFilters.referencia || ''}:${apiFilters.filial || ''}:${apiFilters.search || ''}`
+      const chartRefsKey = chartRefsList.sort().join(',')
+      const pagCacheKey = `${apiFilters.minReferencia || ''}:${apiFilters.referencia || ''}:${chartRefsKey}:${apiFilters.filial || ''}:${apiFilters.search || ''}`
 
       let pagsPromise: Promise<any[]>
       if (
@@ -513,6 +525,7 @@ export default function Dashboard() {
     debouncedFilters.filial,
     debouncedFilters.tipoPagamento,
     debouncedFilters.referencia,
+    selectedChartRef,
     performFetch,
   ])
 

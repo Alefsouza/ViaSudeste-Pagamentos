@@ -80,11 +80,14 @@ export const getPagamentosTotals = async (filters: any) => {
   const filterConditions: string[] = []
 
   if (filters.search) {
-    const isNumeric = /^\d+$/.test(filters.search)
-    if (isNumeric) {
-      filterConditions.push(`registro = "${filters.search}"`)
-    } else {
-      filterConditions.push(`(nome ~ "${filters.search}" || registro ~ "${filters.search}")`)
+    const term = String(filters.search).trim()
+    if (term) {
+      const isNumeric = /^\d+$/.test(term)
+      if (isNumeric) {
+        filterConditions.push(`registro = "${term}"`)
+      } else {
+        filterConditions.push(`nome ~ "${term}"`)
+      }
     }
   }
 
@@ -135,15 +138,14 @@ export const getPagamentosPaginated = async (page: number, perPage: number, filt
   const filterConditions: string[] = []
 
   if (filters.search) {
-    const isNumeric = /^\d+$/.test(filters.search)
-    if (isNumeric) {
-      filterConditions.push(
-        `(registro = "${filters.search}" || colaborador_id.registro = "${filters.search}")`,
-      )
-    } else {
-      filterConditions.push(
-        `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
-      )
+    const term = String(filters.search).trim()
+    if (term) {
+      const isNumeric = /^\d+$/.test(term)
+      if (isNumeric) {
+        filterConditions.push(`(registro = "${term}" || colaborador_id.registro = "${term}")`)
+      } else {
+        filterConditions.push(`(nome ~ "${term}" || colaborador_id.nome ~ "${term}")`)
+      }
     }
   }
 
@@ -189,15 +191,14 @@ export const getPagamentosAnalytics = async (filters: any) => {
   const filterConditions: string[] = []
 
   if (filters.search) {
-    const isNumeric = /^\d+$/.test(filters.search)
-    if (isNumeric) {
-      filterConditions.push(
-        `(registro = "${filters.search}" || colaborador_id.registro = "${filters.search}")`,
-      )
-    } else {
-      filterConditions.push(
-        `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
-      )
+    const term = String(filters.search).trim()
+    if (term) {
+      const isNumeric = /^\d+$/.test(term)
+      if (isNumeric) {
+        filterConditions.push(`(registro = "${term}" || colaborador_id.registro = "${term}")`)
+      } else {
+        filterConditions.push(`(nome ~ "${term}" || colaborador_id.nome ~ "${term}")`)
+      }
     }
   }
 
@@ -249,15 +250,14 @@ export const getPagamentosForColaboradoresFilter = async (filters: any) => {
   const filterConditions: string[] = ['status = "Confirmado"']
 
   if (filters.search) {
-    const isNumeric = /^\d+$/.test(filters.search)
-    if (isNumeric) {
-      filterConditions.push(
-        `(registro = "${filters.search}" || colaborador_id.registro = "${filters.search}")`,
-      )
-    } else {
-      filterConditions.push(
-        `(nome ~ "${filters.search}" || registro ~ "${filters.search}" || colaborador_id.nome ~ "${filters.search}" || colaborador_id.registro ~ "${filters.search}")`,
-      )
+    const term = String(filters.search).trim()
+    if (term) {
+      const isNumeric = /^\d+$/.test(term)
+      if (isNumeric) {
+        filterConditions.push(`(registro = "${term}" || colaborador_id.registro = "${term}")`)
+      } else {
+        filterConditions.push(`(nome ~ "${term}" || colaborador_id.nome ~ "${term}")`)
+      }
     }
   }
 
@@ -274,11 +274,32 @@ export const getPagamentosForColaboradoresFilter = async (filters: any) => {
     }
   }
 
+  const hasSpecificRef = Boolean(
+    (filters.referencia && filters.referencia !== 'Todas') ||
+    (filters.chartRefs && Array.isArray(filters.chartRefs) && filters.chartRefs.length > 0),
+  )
+  const hasSearch = Boolean(filters.search && String(filters.search).trim())
+
   if (filters.referencia && filters.referencia !== 'Todas') {
     filterConditions.push(`colaborador_id.referencia = ${filters.referencia}`)
-  } else if (filters.minReferencia && filters.minReferencia > 0) {
+  } else if (
+    filters.chartRefs &&
+    Array.isArray(filters.chartRefs) &&
+    filters.chartRefs.length > 0
+  ) {
+    if (filters.chartRefs.length === 1) {
+      filterConditions.push(`colaborador_id.referencia = ${filters.chartRefs[0]}`)
+    } else {
+      filterConditions.push(
+        `(${filters.chartRefs.map((r: any) => `colaborador_id.referencia = ${r}`).join(' || ')})`,
+      )
+    }
+  } else if (!hasSpecificRef && !hasSearch && filters.minReferencia && filters.minReferencia > 0) {
     // Restringe aos pagamentos da janela de referências ativas (ex: últimas 6 referências)
-    filterConditions.push(`colaborador_id.referencia >= ${filters.minReferencia}`)
+    // ou pagamentos de colaboradores liberados
+    filterConditions.push(
+      `(colaborador_id.referencia >= ${filters.minReferencia} || colaborador_id.liberado_pagamento = true)`,
+    )
   }
 
   const filterString = filterConditions.join(' && ')

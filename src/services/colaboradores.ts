@@ -23,13 +23,14 @@ const buildFilterString = (filters: any, prefix = '') => {
   const conditions: string[] = []
 
   if (filters.search) {
-    const isNumeric = /^\d+$/.test(filters.search)
-    if (isNumeric) {
-      conditions.push(`(${prefix}registro = "${filters.search}")`)
-    } else {
-      conditions.push(
-        `(${prefix}nome ~ "${filters.search}" || ${prefix}registro ~ "${filters.search}")`,
-      )
+    const term = String(filters.search).trim()
+    if (term) {
+      const isNumeric = /^\d+$/.test(term)
+      if (isNumeric) {
+        conditions.push(`(${prefix}registro = "${term}")`)
+      } else {
+        conditions.push(`(${prefix}nome ~ "${term}")`)
+      }
     }
   }
   if (filters.filial && filters.filial !== 'Todas') {
@@ -47,6 +48,18 @@ const buildFilterString = (filters: any, prefix = '') => {
   }
   if (filters.referencia && filters.referencia !== 'Todas') {
     conditions.push(`${prefix}referencia = ${filters.referencia}`)
+  } else if (
+    filters.chartRefs &&
+    Array.isArray(filters.chartRefs) &&
+    filters.chartRefs.length > 0
+  ) {
+    if (filters.chartRefs.length === 1) {
+      conditions.push(`${prefix}referencia = ${filters.chartRefs[0]}`)
+    } else {
+      conditions.push(
+        `(${filters.chartRefs.map((r: any) => `${prefix}referencia = ${r}`).join(' || ')})`,
+      )
+    }
   }
 
   if (filters.data_pagamento_text) {
@@ -81,9 +94,15 @@ export const fetchPagamentosForColabs = async (colabIds: string[]) => {
 
 export const getPagamentosForColaboradoresFilter = async (filters: any = {}) => {
   let filterString = buildFilterString(filters, 'colaborador_id.')
-  if (!filters.referencia || filters.referencia === 'Todas') {
+  const hasSpecificRef = Boolean(
+    (filters.referencia && filters.referencia !== 'Todas') ||
+    (filters.chartRefs && Array.isArray(filters.chartRefs) && filters.chartRefs.length > 0),
+  )
+  const hasSearch = Boolean(filters.search && String(filters.search).trim())
+
+  if (!hasSpecificRef && !hasSearch) {
     if (filters.minReferencia && filters.minReferencia > 0) {
-      const minRefCond = `colaborador_id.referencia >= ${filters.minReferencia}`
+      const minRefCond = `(colaborador_id.referencia >= ${filters.minReferencia} || colaborador_id.liberado_pagamento = true)`
       filterString = filterString ? `(${filterString}) && ${minRefCond}` : minRefCond
     }
   }
@@ -118,12 +137,16 @@ export const getColaboradoresAnalytics = async (filters: any = {}) => {
     filterConditions.push(filterString)
   }
 
-  if (
-    (!filters.referencia || filters.referencia === 'Todas') &&
-    filters.minReferencia &&
-    filters.minReferencia > 0
-  ) {
-    filterConditions.push(`referencia >= ${filters.minReferencia}`)
+  const hasSpecificRef = Boolean(
+    (filters.referencia && filters.referencia !== 'Todas') ||
+    (filters.chartRefs && Array.isArray(filters.chartRefs) && filters.chartRefs.length > 0),
+  )
+  const hasSearch = Boolean(filters.search && String(filters.search).trim())
+
+  if (!hasSpecificRef && !hasSearch && filters.minReferencia && filters.minReferencia > 0) {
+    filterConditions.push(
+      `(referencia >= ${filters.minReferencia} || (liberado_pagamento = true && foto_confirmacao_url = ""))`,
+    )
   }
 
   const finalFilter = filterConditions.length > 0 ? filterConditions.join(' && ') : undefined

@@ -224,10 +224,11 @@ export default function Camera() {
   const fetchColaboradorSilent = useCallback(async () => {
     if (!registro) return
     try {
-      // Limit to 50 records per colaborador to reduce payload and response time
+      const trimmed = registro.trim()
+      // Busca pelo registro na base inteira (sem restrição de 6 referências)
       const res = await pb
         .collection('colaboradores')
-        .getList(1, 50, { filter: `registro = "${registro}"` })
+        .getList(1, 50, { filter: `registro = "${trimmed}"` })
       const records = res.items
       if (records && records.length > 0) {
         setColaborador({
@@ -278,8 +279,15 @@ export default function Camera() {
     setFotoCapturada(null)
 
     try {
+      const trimmed = registro.trim()
+      // Busca pelo registro ou nome na base inteira sob demanda (sem restrição de 6 referências)
+      const isNumeric = /^\d+$/.test(trimmed)
+      const searchFilter = isNumeric
+        ? `registro = "${trimmed}"`
+        : `(nome ~ "${trimmed}" || registro = "${trimmed}")`
+
       const res = await pb.collection('colaboradores').getList(1, 50, {
-        filter: `registro = "${registro}"`,
+        filter: searchFilter,
       })
       const records = res.items
 
@@ -575,7 +583,7 @@ export default function Camera() {
 
     try {
       const vRes = await pb.collection('colaboradores').getList(1, 50, {
-        filter: `registro = "${colaborador.registro}"`,
+        filter: `registro = "${colaborador.registro.trim()}"`,
       })
       const validationRecords = vRes.items
       const currentValidRecordsIds = new Set(
