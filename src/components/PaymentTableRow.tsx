@@ -17,7 +17,10 @@ import {
 function getEvaluatedStatus(curr: any, maxRef: number): string {
   if (curr.pagamento_relacionado?.status === 'Cancelado') return 'Cancelado'
   if (curr.pagamento_relacionado?.status === 'Confirmado') return 'Confirmado'
-  let status = curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
+  const isReconstrucao = String(
+    curr.observacao || curr.pagamento_relacionado?.observacao || '',
+  ).includes('RECONSTRUÇÃO')
+  let status = curr.foto_confirmacao_url || isReconstrucao ? 'Confirmado' : 'Pendente'
   const liberadoPagamento = curr.liberado_pagamento
   const dataLiberacao = curr.data_liberacao
   const ref = curr.referencia || 0

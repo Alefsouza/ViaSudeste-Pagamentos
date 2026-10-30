@@ -1132,12 +1132,11 @@ export default function RelatorioRecebedoria() {
                   ) : (
                     data.map((item: any) => {
                       const isReconstrucao = String(item.observacao || '').includes('RECONSTRUÇÃO')
-                      const isConfirmado = !!item.foto_confirmacao_url || isReconstrucao
-                      const statusBadge = isReconstrucao ? (
-                        <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 shadow-none border-none">
-                          Reconstruído (Sem foto)
-                        </Badge>
-                      ) : isConfirmado ? (
+                      const isConfirmado =
+                        item.status === 'Confirmado' ||
+                        !!item.foto_confirmacao_url ||
+                        isReconstrucao
+                      const statusBadge = isConfirmado ? (
                         <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
                           Confirmado
                         </Badge>
@@ -1241,12 +1240,9 @@ export default function RelatorioRecebedoria() {
               ) : (
                 data.map((item: any) => {
                   const isReconstrucao = String(item.observacao || '').includes('RECONSTRUÇÃO')
-                  const isConfirmado = !!item.foto_confirmacao_url || isReconstrucao
-                  const statusBadge = isReconstrucao ? (
-                    <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 shadow-none border-none">
-                      Reconstruído (Sem foto)
-                    </Badge>
-                  ) : isConfirmado ? (
+                  const isConfirmado =
+                    item.status === 'Confirmado' || !!item.foto_confirmacao_url || isReconstrucao
+                  const statusBadge = isConfirmado ? (
                     <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
                       Confirmado
                     </Badge>
@@ -1698,11 +1694,9 @@ export default function RelatorioRecebedoria() {
                     Status
                   </span>
                   <div>
-                    {String(detailsModal.observacao || '').includes('RECONSTRUÇÃO') ? (
-                      <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 shadow-none border-none">
-                        Reconstruído (Sem foto)
-                      </Badge>
-                    ) : detailsModal.foto_confirmacao_url ? (
+                    {detailsModal.status === 'Confirmado' ||
+                    detailsModal.foto_confirmacao_url ||
+                    String(detailsModal.observacao || '').includes('RECONSTRUÇÃO') ? (
                       <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
                         Confirmado
                       </Badge>
