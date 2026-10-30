@@ -66,6 +66,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getColaboradoresAnalytics, fetchPagamentosForColabs } from '@/services/colaboradores'
 import {
   getPagamentosForColaboradoresFilter,
+  getPagamentosByDateBrasilia,
   fetchDashboardTotals,
   type PagamentosDashboardTotals,
 } from '@/services/pagamentos'
@@ -195,9 +196,40 @@ export default function Dashboard() {
   // Chart Interactive Filters
   const [selectedChartFilial, setSelectedChartFilial] = useState<string | null>(null)
   const [selectedChartDate, setSelectedChartDate] = useState<string | null>(null)
+  const [chartDatePayments, setChartDatePayments] = useState<any[]>([])
+  const [chartDateLoading, setChartDateLoading] = useState(false)
   const [selectedChartRef, setSelectedChartRef] = useState<Set<string>>(new Set())
   const selectedChartRefRef = useRef(selectedChartRef)
   const [chartRefSearch, setChartRefSearch] = useState('')
+
+  // Effect para buscar pagamentos do dia selecionado no gráfico sob demanda
+  useEffect(() => {
+    if (!selectedChartDate) {
+      setChartDatePayments([])
+      setChartDateLoading(false)
+      return
+    }
+
+    let isMounted = true
+    setChartDateLoading(true)
+
+    getPagamentosByDateBrasilia(selectedChartDate)
+      .then((pags) => {
+        if (!isMounted) return
+        setChartDatePayments(pags || [])
+      })
+      .catch((err) => {
+        console.warn('[Dashboard] Erro ao buscar pagamentos para a data selecionada:', err)
+        if (isMounted) setChartDatePayments([])
+      })
+      .finally(() => {
+        if (isMounted) setChartDateLoading(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [selectedChartDate])
 
   // Concurrency & Debounce Refs
   const isFetchingRef = useRef(false)
@@ -826,13 +858,12 @@ export default function Dashboard() {
       }
 
       if (selectedChartDate) {
-        const hasPhoto =
-          curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
-        let dateKey: string | null = null
-        if (hasPhoto) {
-          const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
-          dateKey = toBrasiliaDateString(updatedDate)
-        }
+        const dateField =
+          curr.pagamento_relacionado?.data_pagamento ||
+          curr.data_pagamento ||
+          curr.pagamento_relacionado?.updated ||
+          curr.updated
+        const dateKey = toBrasiliaDateString(dateField)
 
         if (!dateKey || dateKey !== selectedChartDate) return false
       }
@@ -856,13 +887,12 @@ export default function Dashboard() {
         if (!cRef.toLowerCase().includes(chartRefSearch.toLowerCase())) return false
       }
       if (selectedChartDate) {
-        const hasPhoto =
-          curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
-        let dateKey: string | null = null
-        if (hasPhoto) {
-          const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
-          dateKey = toBrasiliaDateString(updatedDate)
-        }
+        const dateField =
+          curr.pagamento_relacionado?.data_pagamento ||
+          curr.data_pagamento ||
+          curr.pagamento_relacionado?.updated ||
+          curr.updated
+        const dateKey = toBrasiliaDateString(dateField)
         if (!dateKey || dateKey !== selectedChartDate) return false
       }
       return true
@@ -875,13 +905,12 @@ export default function Dashboard() {
         curr.filial === 2 ? 'Cursino' : curr.filial === 4 ? 'Sapopemba' : curr.filial || 'Outra'
       if (selectedChartFilial && filialStr !== selectedChartFilial) return false
       if (selectedChartDate) {
-        const hasPhoto =
-          curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
-        let dateKey: string | null = null
-        if (hasPhoto) {
-          const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
-          dateKey = toBrasiliaDateString(updatedDate)
-        }
+        const dateField =
+          curr.pagamento_relacionado?.data_pagamento ||
+          curr.data_pagamento ||
+          curr.pagamento_relacionado?.updated ||
+          curr.updated
+        const dateKey = toBrasiliaDateString(dateField)
         if (!dateKey || dateKey !== selectedChartDate) return false
       }
       return true
@@ -908,7 +937,87 @@ export default function Dashboard() {
   }, [baseStatsData, selectedChartFilial, selectedChartRef, chartRefSearch])
 
   const tableData = useMemo(() => {
-    const grouped = groupPaymentsByPhoto(filteredStatsData, maxRef)
+    // Se o usuário filtrou por dia no gráfico de linha ("Total Pago por Dia"):
+    // Mesclamos os registros locais (filteredStatsData) com quaisquer pagamentos diretos daquele dia
+    // (chartDatePayments), convertendo os pagamentos diretos para a estrutura esperada pela tabela
+    // quando não estiverem já presentes na lista local.
+    let baseList = filteredStatsData
+
+    if (selectedChartDate && chartDatePayments.length > 0) {
+      const existingPaymentIds = new Set<string>()
+      const existingColabIds = new Set<string>()
+
+      for (const item of filteredStatsData) {
+        if (item.id) existingColabIds.add(String(item.id))
+        const pId = item.pagamento_relacionado?.id || item.id
+        if (pId) existingPaymentIds.add(String(pId))
+        if (item._records) {
+          for (const sub of item._records) {
+            if (sub.id) existingColabIds.add(String(sub.id))
+            const subPId = sub.pagamento_relacionado?.id || sub.id
+            if (subPId) existingPaymentIds.add(String(subPId))
+          }
+        }
+      }
+
+      // Para cada pagamento vindo da busca direta do dia:
+      const syntheticItems: any[] = []
+      for (const pag of chartDatePayments) {
+        // Se já está na tabela via pagamento_relacionado ou ID, ignora para não duplicar
+        if (existingPaymentIds.has(String(pag.id))) continue
+        if (pag.colaborador_id && existingColabIds.has(String(pag.colaborador_id))) continue
+
+        // Verifica filtros interativos adicionais (ex.: filial, referência)
+        if (selectedChartFilial) {
+          const pagFilialStr =
+            pag.filial === 2
+              ? 'Cursino'
+              : pag.filial === 4
+                ? 'Sapopemba'
+                : pag.filial
+                  ? String(pag.filial)
+                  : 'Outra'
+          if (pagFilialStr !== selectedChartFilial) continue
+        }
+
+        if (selectedChartRef.size > 0) {
+          const pagRef = pag.referencia != null ? String(pag.referencia) : 'N/A'
+          if (!selectedChartRef.has(pagRef)) continue
+        }
+
+        if (chartRefSearch) {
+          const pagRef = pag.referencia != null ? String(pag.referencia) : 'N/A'
+          if (!pagRef.toLowerCase().includes(chartRefSearch.toLowerCase())) continue
+        }
+
+        // Constrói objeto unificado compatível com PaymentTableRow e groupPaymentsByPhoto
+        const syntheticItem = {
+          id: pag.colaborador_id || pag.id,
+          nome: pag.nome || (pag.registro ? `Registro ${pag.registro}` : 'Avulso'),
+          registro: pag.registro || '-',
+          referencia: pag.referencia,
+          filial: pag.filial,
+          idtipopgto: pag.idtipopgto,
+          tipo_pagamento: pag.tipo_pagamento || getTipoPagamento(pag.idtipopgto) || 'Outros',
+          valor_a_receber: Number(pag.valor_pago || pag.valor || 0),
+          valor: Number(pag.valor_pago || pag.valor || 0),
+          observacao: pag.observacao || '',
+          data_pagamento: pag.data_pagamento,
+          created: pag.created,
+          updated: pag.updated,
+          foto_confirmacao_url: pag.foto_confirmacao_url,
+          liberado_pagamento: true,
+          pagamento_relacionado: pag,
+        }
+        syntheticItems.push(syntheticItem)
+      }
+
+      if (syntheticItems.length > 0) {
+        baseList = [...filteredStatsData, ...syntheticItems]
+      }
+    }
+
+    const grouped = groupPaymentsByPhoto(baseList, maxRef)
     const sorted = [...grouped].sort((a, b) => {
       const dateA = getPaymentSortDate(a)
       const dateB = getPaymentSortDate(b)
@@ -952,7 +1061,16 @@ export default function Dashboard() {
       items,
       totalPages: Math.ceil(sorted.length / 20) || 1,
     }
-  }, [filteredStatsData, page, maxRef])
+  }, [
+    filteredStatsData,
+    selectedChartDate,
+    chartDatePayments,
+    selectedChartFilial,
+    selectedChartRef,
+    chartRefSearch,
+    page,
+    maxRef,
+  ])
 
   const allConfirmed = useMemo(() => {
     if (tableData.items.length === 0) return false
@@ -1166,20 +1284,12 @@ export default function Dashboard() {
         const status = getEvaluatedStatus(curr, maxRef)
         if (status !== 'Confirmado') return acc
 
-        let dateKey: string | null = null
-        const hasPhoto =
-          curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
-        const isReconstrucao = String(
-          curr.observacao || curr.pagamento_relacionado?.observacao || '',
-        ).includes('RECONSTRUÇÃO')
-        if (hasPhoto || isReconstrucao) {
-          const dateField =
-            curr.pagamento_relacionado?.data_pagamento ||
-            curr.data_pagamento ||
-            curr.pagamento_relacionado?.updated ||
-            curr.updated
-          dateKey = toBrasiliaDateString(dateField)
-        }
+        const dateField =
+          curr.pagamento_relacionado?.data_pagamento ||
+          curr.data_pagamento ||
+          curr.pagamento_relacionado?.updated ||
+          curr.updated
+        const dateKey = toBrasiliaDateString(dateField)
 
         if (!dateKey) return acc
 
@@ -2181,7 +2291,7 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {statsLoading ? (
+              {statsLoading || (selectedChartDate && chartDateLoading) ? (
                 <div className="space-y-4">
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />

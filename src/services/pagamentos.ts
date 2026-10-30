@@ -250,6 +250,32 @@ export const getPagamentosAnalytics = async (filters: any) => {
 const PAGAMENTOS_FOR_COLABS_FIELDS =
   'id,colaborador_id,status,valor_pago,data_pagamento,hora_pagamento,foto_confirmacao_url,updated,created'
 
+export const getPagamentosByDateBrasilia = async (dateStr: string) => {
+  // dateStr é esperado no formato "YYYY-MM-DD"
+  // Intervalo do dia em UTC para cobrir UTC-3 (03:00:00 do dia até 02:59:59 do dia seguinte)
+  const parts = dateStr.split('-')
+  if (parts.length !== 3) return []
+  const yyyy = parseInt(parts[0], 10)
+  const mm = parseInt(parts[1], 10) - 1
+  const dd = parseInt(parts[2], 10)
+
+  const startUTC = `${dateStr} 03:00:00.000Z`
+  const nextDay = new Date(Date.UTC(yyyy, mm, dd + 1))
+  const nextY = nextDay.getUTCFullYear()
+  const nextM = String(nextDay.getUTCMonth() + 1).padStart(2, '0')
+  const nextD = String(nextDay.getUTCDate()).padStart(2, '0')
+  const endUTC = `${nextY}-${nextM}-${nextD} 02:59:59.999Z`
+
+  // Consulta direta por data_pagamento na faixa UTC correspondente ao dia de Brasília
+  const filterString = `status = "Confirmado" && data_pagamento >= "${startUTC}" && data_pagamento <= "${endUTC}"`
+
+  return getAllPaginated('pagamentos', {
+    filter: filterString,
+    fields: PAGAMENTO_FIELDS + ',observacao',
+    fallbackOn429: true,
+  })
+}
+
 export const getPagamentosForColaboradoresFilter = async (filters: any) => {
   const filterConditions: string[] = ['status = "Confirmado"']
 
