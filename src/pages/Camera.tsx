@@ -225,11 +225,22 @@ export default function Camera() {
     if (!registro) return
     try {
       const trimmed = registro.trim()
-      // Busca pelo registro na base inteira (sem restrição de 6 referências)
-      const res = await pb
-        .collection('colaboradores')
-        .getList(1, 50, { filter: `registro = "${trimmed}"` })
-      const records = res.items
+      // Prioriza pendentes/liberados e depois os mais recentes
+      const filterPending = `registro = "${trimmed}" && liberado_pagamento = true && foto_confirmacao_url = ""`
+      const pendingRes = await pb.collection('colaboradores').getList(1, 100, {
+        filter: filterPending,
+        sort: '-created',
+      })
+
+      let records = pendingRes.items
+      if (records.length === 0) {
+        const fallbackRes = await pb.collection('colaboradores').getList(1, 100, {
+          filter: `registro = "${trimmed}"`,
+          sort: '-created',
+        })
+        records = fallbackRes.items
+      }
+
       if (records && records.length > 0) {
         setColaborador({
           registro: records[0].registro,
@@ -286,10 +297,25 @@ export default function Camera() {
         ? `registro = "${trimmed}"`
         : `(nome ~ "${trimmed}" || registro = "${trimmed}")`
 
-      const res = await pb.collection('colaboradores').getList(1, 50, {
-        filter: searchFilter,
+      // 1. Tenta buscar primeiro os lançamentos liberados e pendentes (sem foto de confirmação), ordenados pelos mais recentes
+      const pendingFilter = isNumeric
+        ? `registro = "${trimmed}" && liberado_pagamento = true && foto_confirmacao_url = ""`
+        : `(nome ~ "${trimmed}" || registro = "${trimmed}") && liberado_pagamento = true && foto_confirmacao_url = ""`
+
+      let res = await pb.collection('colaboradores').getList(1, 100, {
+        filter: pendingFilter,
+        sort: '-created',
       })
-      const records = res.items
+      let records = res.items
+
+      // 2. Se não encontrou pendente/liberado direto, busca no histórico completo ordenando pelos mais recentes (-created)
+      if (!records || records.length === 0) {
+        res = await pb.collection('colaboradores').getList(1, 100, {
+          filter: searchFilter,
+          sort: '-created',
+        })
+        records = res.items
+      }
 
       if (!records || records.length === 0) {
         const msg = 'Não há pagamento para esse colaborador.'
@@ -582,8 +608,9 @@ export default function Camera() {
     }
 
     try {
-      const vRes = await pb.collection('colaboradores').getList(1, 50, {
+      const vRes = await pb.collection('colaboradores').getList(1, 100, {
         filter: `registro = "${colaborador.registro.trim()}"`,
+        sort: '-created',
       })
       const validationRecords = vRes.items
       const currentValidRecordsIds = new Set(
