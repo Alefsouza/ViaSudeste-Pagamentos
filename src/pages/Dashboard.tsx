@@ -95,7 +95,10 @@ import { purgeReference } from '@/services/purge'
 export const getEvaluatedStatus = (curr: any, maxRef: number) => {
   if (curr.pagamento_relacionado?.status === 'Cancelado') return 'Cancelado'
   if (curr.pagamento_relacionado?.status === 'Confirmado') return 'Confirmado'
-  let status = curr.foto_confirmacao_url ? 'Confirmado' : 'Pendente'
+  const isReconstrucao = String(
+    curr.observacao || curr.pagamento_relacionado?.observacao || '',
+  ).includes('RECONSTRUÇÃO')
+  let status = curr.foto_confirmacao_url || isReconstrucao ? 'Confirmado' : 'Pendente'
 
   const liberadoPagamento = curr.liberado_pagamento
   const dataLiberacao = curr.data_liberacao
@@ -1166,9 +1169,16 @@ export default function Dashboard() {
         let dateKey: string | null = null
         const hasPhoto =
           curr.pagamento_relacionado?.foto_confirmacao_url || curr.foto_confirmacao_url
-        if (hasPhoto) {
-          const updatedDate = curr.pagamento_relacionado?.updated || curr.updated
-          dateKey = toBrasiliaDateString(updatedDate)
+        const isReconstrucao = String(
+          curr.observacao || curr.pagamento_relacionado?.observacao || '',
+        ).includes('RECONSTRUÇÃO')
+        if (hasPhoto || isReconstrucao) {
+          const dateField =
+            curr.pagamento_relacionado?.data_pagamento ||
+            curr.data_pagamento ||
+            curr.pagamento_relacionado?.updated ||
+            curr.updated
+          dateKey = toBrasiliaDateString(dateField)
         }
 
         if (!dateKey) return acc

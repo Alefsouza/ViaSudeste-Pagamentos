@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-30T01:19:22.937Z",
+  "generatedAt": "2026-10-30T12:38:49.842Z",
   "collections": [
     {
       "name": "users",
@@ -339,6 +339,12 @@
         },
         {
           "name": "horas",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacao",
           "type": "text",
           "required": false,
           "system": false

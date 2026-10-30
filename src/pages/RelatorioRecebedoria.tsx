@@ -188,7 +188,7 @@ export default function RelatorioRecebedoria() {
       const startUTC = getBrasiliaStartUTC(appliedFilters.startDate)
       const endUTC = getBrasiliaEndUTC(appliedFilters.endDate)
       conditions.push(
-        `updated >= "${startUTC}" && updated <= "${endUTC}" && foto_confirmacao_url != ""`,
+        `((updated >= "${startUTC}" && updated <= "${endUTC}") || (data_pagamento >= "${startUTC}" && data_pagamento <= "${endUTC}")) && (foto_confirmacao_url != "" || observacao ~ "RECONSTRUÇÃO")`,
       )
     }
     if (appliedFilters.startTime) {
@@ -217,7 +217,9 @@ export default function RelatorioRecebedoria() {
       if (appliedFilters.statusFilter === 'Confirmado') {
         conditions.push(`(status = "Confirmado" || foto_confirmacao_url != "")`)
       } else if (appliedFilters.statusFilter === 'Pendente') {
-        conditions.push(`(status = "Pendente" || status = "")`)
+        conditions.push(
+          `(status = "Pendente" || status = "") && (observacao !~ "RECONSTRUÇÃO" || observacao = null)`,
+        )
       } else if (appliedFilters.statusFilter === 'Cancelado') {
         conditions.push(`status = "Cancelado"`)
       } else {
@@ -270,7 +272,7 @@ export default function RelatorioRecebedoria() {
           sort: '-data_pagamento,-created',
           expand: 'colaborador_id,user_id',
           fields:
-            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor,expand.colaborador_id.referencia,expand.colaborador_id.liberado_pagamento,expand.colaborador_id.liberado_por',
+            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,observacao,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor,expand.colaborador_id.referencia,expand.colaborador_id.liberado_pagamento,expand.colaborador_id.liberado_por',
         })
 
         // Filter out any payments whose effective confirmation date is outside the selected Brasilia date range
@@ -547,7 +549,9 @@ export default function RelatorioRecebedoria() {
 
   const summaryArray = React.useMemo(() => {
     const summary = summaryData.reduce((acc: any, item: any) => {
-      const isConfirmado = item.status === 'Confirmado' && !!item.foto_confirmacao_url
+      const isConfirmado =
+        item.status === 'Confirmado' &&
+        (!!item.foto_confirmacao_url || String(item.observacao || '').includes('RECONSTRUÇÃO'))
       if (!isConfirmado) return acc
 
       const nome = item.expand?.colaborador_id?.nome || item.nome || 'Desconhecido'
@@ -588,7 +592,9 @@ export default function RelatorioRecebedoria() {
     > = {}
 
     summaryData.forEach((item) => {
-      const isConfirmado = item.status === 'Confirmado' && !!item.foto_confirmacao_url
+      const isConfirmado =
+        item.status === 'Confirmado' &&
+        (!!item.foto_confirmacao_url || String(item.observacao || '').includes('RECONSTRUÇÃO'))
       if (!isConfirmado) return
 
       const tipoRaw = (item.tipo_pagamento || getTipoPagamento(item.idtipopgto) || '').toLowerCase()
@@ -1125,8 +1131,13 @@ export default function RelatorioRecebedoria() {
                     </TableRow>
                   ) : (
                     data.map((item: any) => {
-                      const isConfirmado = !!item.foto_confirmacao_url
-                      const statusBadge = isConfirmado ? (
+                      const isReconstrucao = String(item.observacao || '').includes('RECONSTRUÇÃO')
+                      const isConfirmado = !!item.foto_confirmacao_url || isReconstrucao
+                      const statusBadge = isReconstrucao ? (
+                        <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 shadow-none border-none">
+                          Reconstruído (Sem foto)
+                        </Badge>
+                      ) : isConfirmado ? (
                         <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
                           Confirmado
                         </Badge>
@@ -1184,15 +1195,19 @@ export default function RelatorioRecebedoria() {
                             </div>
                           </TableCell>
                           <TableCell className="text-center print:hidden">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={!isConfirmado}
-                              onClick={() => setPhotoModal(item.foto_confirmacao_url)}
-                              className="text-slate-600 print:hidden"
-                            >
-                              <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
-                            </Button>
+                            {isReconstrucao ? (
+                              <span className="text-xs text-slate-400 italic">Sem foto</span>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!item.foto_confirmacao_url}
+                                onClick={() => setPhotoModal(item.foto_confirmacao_url)}
+                                className="text-slate-600 print:hidden"
+                              >
+                                <ImageIcon className="h-4 w-4 mr-2" /> Ver Foto
+                              </Button>
+                            )}
                           </TableCell>
                           <TableCell className="text-right print:hidden">
                             <Button
@@ -1225,8 +1240,13 @@ export default function RelatorioRecebedoria() {
                 </div>
               ) : (
                 data.map((item: any) => {
-                  const isConfirmado = !!item.foto_confirmacao_url
-                  const statusBadge = isConfirmado ? (
+                  const isReconstrucao = String(item.observacao || '').includes('RECONSTRUÇÃO')
+                  const isConfirmado = !!item.foto_confirmacao_url || isReconstrucao
+                  const statusBadge = isReconstrucao ? (
+                    <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 shadow-none border-none">
+                      Reconstruído (Sem foto)
+                    </Badge>
+                  ) : isConfirmado ? (
                     <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
                       Confirmado
                     </Badge>
@@ -1277,15 +1297,21 @@ export default function RelatorioRecebedoria() {
                             })()}
                           </div>
                           <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              disabled={!isConfirmado}
-                              onClick={() => setPhotoModal(item.foto_confirmacao_url)}
-                            >
-                              <ImageIcon className="h-4 w-4" />
-                            </Button>
+                            {isReconstrucao ? (
+                              <span className="text-xs text-slate-400 italic self-center">
+                                Sem foto
+                              </span>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={!item.foto_confirmacao_url}
+                                onClick={() => setPhotoModal(item.foto_confirmacao_url)}
+                              >
+                                <ImageIcon className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="secondary"
                               size="sm"
@@ -1672,7 +1698,11 @@ export default function RelatorioRecebedoria() {
                     Status
                   </span>
                   <div>
-                    {detailsModal.foto_confirmacao_url ? (
+                    {String(detailsModal.observacao || '').includes('RECONSTRUÇÃO') ? (
+                      <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 shadow-none border-none">
+                        Reconstruído (Sem foto)
+                      </Badge>
+                    ) : detailsModal.foto_confirmacao_url ? (
                       <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 shadow-none border-none">
                         Confirmado
                       </Badge>
@@ -1702,6 +1732,16 @@ export default function RelatorioRecebedoria() {
                         : 'Não informado / Padrão')}
                   </p>
                 </div>
+                {detailsModal.observacao && (
+                  <div className="col-span-2">
+                    <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                      Observação / Auditoria
+                    </span>
+                    <p className="font-medium text-xs text-purple-800 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 p-2 rounded border border-purple-200 dark:border-purple-800">
+                      {detailsModal.observacao}
+                    </p>
+                  </div>
+                )}
               </div>
               {detailsModal.foto_confirmacao_url && (
                 <div className="mt-4">

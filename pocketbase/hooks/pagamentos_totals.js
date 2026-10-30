@@ -296,8 +296,8 @@ routerAdd(
         SELECT
           strftime('%Y-%m-%d', datetime(
             COALESCE(
-              NULLIF(p.updated, ''),
               NULLIF(p.data_pagamento, ''),
+              NULLIF(p.updated, ''),
               p.created
             ),
             '-3 hours'
