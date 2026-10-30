@@ -571,7 +571,11 @@ export default function Dashboard() {
         const liberadoPagamento = payment.liberado_pagamento
         const newStatus = !liberadoPagamento
 
-        const dataUpdate: any = { liberado_pagamento: newStatus }
+        const userName = user?.name || user?.email || 'Usuário'
+        const dataUpdate: any = {
+          liberado_pagamento: newStatus,
+          liberado_por: newStatus ? userName : '',
+        }
         if (newStatus) {
           dataUpdate.data_liberacao = new Date().toISOString()
         }
@@ -581,9 +585,37 @@ export default function Dashboard() {
           await pb.collection('colaboradores').update(record.id, dataUpdate)
         }
 
+        // Auditoria de liberação
+        try {
+          await pb.collection('auditoria_liberacoes').create({
+            user: user?.id || null,
+            responsavel: userName,
+            origem: 'dashboard',
+            acao: newStatus ? 'liberar' : 'bloquear',
+            colaborador_id: records.map((r: any) => r.id).join(','),
+            registro: records
+              .map((r: any) => r.registro)
+              .filter(Boolean)
+              .join(', '),
+            nome: records
+              .map((r: any) => r.nome)
+              .filter(Boolean)
+              .join(', '),
+            referencia: Number(records[0]?.referencia) || 0,
+            quantidade: records.length,
+            detalhes: {
+              ids: records.map((r: any) => r.id),
+              registros: records.map((r: any) => r.registro),
+              liberado: newStatus,
+            },
+          })
+        } catch (auditErr) {
+          console.warn('Erro ao registrar auditoria de liberação:', auditErr)
+        }
+
         toast({
           title: newStatus
-            ? `${records.length} pagamento(s) liberado(s) com sucesso.`
+            ? `${records.length} pagamento(s) liberado(s) com sucesso por ${userName}.`
             : `${records.length} pagamento(s) bloqueado(s) com sucesso.`,
         })
         scheduleRefresh()
@@ -2295,9 +2327,16 @@ export default function Dashboard() {
                                   }
                                   if (status === 'Pendente') {
                                     return (
-                                      <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
-                                        Pendente
-                                      </Badge>
+                                      <div className="flex flex-col items-start gap-0.5">
+                                        <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
+                                          Pendente
+                                        </Badge>
+                                        {p.liberado_pagamento && p.liberado_por && (
+                                          <span className="text-[10px] text-muted-foreground">
+                                            Lib: {p.liberado_por}
+                                          </span>
+                                        )}
+                                      </div>
                                     )
                                   }
                                   if (status === 'Cancelado')

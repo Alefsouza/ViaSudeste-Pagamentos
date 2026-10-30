@@ -114,10 +114,10 @@ routerAdd(
             record.set('referencia', numRef)
           }
 
-          if (item.liberado_pagamento !== undefined) {
-            record.set('liberado_pagamento', !!item.liberado_pagamento)
-          } else {
-            record.set('liberado_pagamento', true)
+          var isLiberado = item.liberado_pagamento !== undefined ? !!item.liberado_pagamento : true
+          record.set('liberado_pagamento', isLiberado)
+          if (isLiberado) {
+            record.set('liberado_por', 'Importação (Planilha)')
           }
 
           txApp.save(record)
@@ -133,18 +133,65 @@ routerAdd(
         txApp
           .db()
           .newQuery(
-            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 1\n          WHERE referencia IN (\n            SELECT DISTINCT referencia\n            FROM colaboradores\n            WHERE referencia IS NOT NULL\n            ORDER BY referencia DESC\n            LIMIT 6\n          ) AND liberado_pagamento = 0\n        ',
+            `
+          UPDATE colaboradores
+          SET liberado_pagamento = 1,
+              liberado_por = CASE WHEN liberado_por IS NULL OR liberado_por = '' THEN 'Importação (Janela Ativa)' ELSE liberado_por END
+          WHERE referencia IN (
+            SELECT DISTINCT referencia
+            FROM colaboradores
+            WHERE referencia IS NOT NULL
+            ORDER BY referencia DESC
+            LIMIT 6
+          ) AND liberado_pagamento = 0
+        `,
           )
           .execute()
 
         txApp
           .db()
           .newQuery(
-            '\n          UPDATE colaboradores\n          SET liberado_pagamento = 0\n          WHERE (\n            referencia IS NULL\n            OR referencia NOT IN (\n              SELECT DISTINCT referencia\n              FROM colaboradores\n              WHERE referencia IS NOT NULL\n              ORDER BY referencia DESC\n              LIMIT 6\n            )\n          ) AND liberado_pagamento = 1\n        ',
+            `
+          UPDATE colaboradores
+          SET liberado_pagamento = 0,
+              liberado_por = ''
+          WHERE (
+            referencia IS NULL
+            OR referencia NOT IN (
+              SELECT DISTINCT referencia
+              FROM colaboradores
+              WHERE referencia IS NOT NULL
+              ORDER BY referencia DESC
+              LIMIT 6
+            )
+          ) AND liberado_pagamento = 1
+        `,
           )
           .execute()
       } catch (err) {
         console.log('Erro na limpeza de referencias antigas:', err.message)
+      }
+
+      try {
+        var auditCol = txApp.findCollectionByNameOrId('auditoria_liberacoes')
+        var auditRecord = new Record(auditCol)
+        auditRecord.set('user', authRecord.id)
+        auditRecord.set(
+          'responsavel',
+          authRecord.getString('name') || authRecord.getString('email') || 'Usuário',
+        )
+        auditRecord.set('origem', 'importacao')
+        auditRecord.set('acao', 'liberar')
+        auditRecord.set('referencia', Number(body.referencia) || 0)
+        auditRecord.set('quantidade', count)
+        auditRecord.set('detalhes', {
+          registros_importados: count,
+          usuario_id: authRecord.id,
+          usuario_email: authRecord.getString('email'),
+        })
+        txApp.save(auditRecord)
+      } catch (auditErr) {
+        console.log('Erro ao gravar auditoria na importação:', auditErr.message)
       }
     })
 

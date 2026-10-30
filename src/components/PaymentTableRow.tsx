@@ -128,7 +128,17 @@ function PaymentTableRowComponent({
           </Badge>
         )}
         {status === 'Pendente' && (
-          <Badge className="bg-amber-500 hover:bg-amber-600 text-white">Pendente</Badge>
+          <div className="flex flex-col items-start gap-0.5">
+            <Badge className="bg-amber-500 hover:bg-amber-600 text-white">Pendente</Badge>
+            {p.liberado_pagamento && p.liberado_por && (
+              <span
+                className="text-[11px] text-muted-foreground whitespace-nowrap"
+                title={`Liberado por: ${p.liberado_por}`}
+              >
+                Lib: {p.liberado_por}
+              </span>
+            )}
+          </div>
         )}
         {status === 'Cancelado' && <Badge variant="destructive">Cancelado</Badge>}
         {!['Confirmado', 'Agendado', 'Bloqueado', 'Pendente', 'Cancelado'].includes(status) && (

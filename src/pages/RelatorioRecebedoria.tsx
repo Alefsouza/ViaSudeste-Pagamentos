@@ -270,7 +270,7 @@ export default function RelatorioRecebedoria() {
           sort: '-data_pagamento,-created',
           expand: 'colaborador_id,user_id',
           fields:
-            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor,expand.colaborador_id.referencia',
+            'id,colaborador_id,valor_pago,data_pagamento,data_pagamento_v2,hora_pagamento,foto_confirmacao_url,status,tipo_pagamento,idtipopgto,inicio,termino,horas,filial,registro,nome,user_id,updated,created,expand.colaborador_id.id,expand.colaborador_id.data,expand.colaborador_id.nome,expand.colaborador_id.registro,expand.colaborador_id.valor_a_receber,expand.colaborador_id.filial,expand.colaborador_id.valor,expand.colaborador_id.referencia,expand.colaborador_id.liberado_pagamento,expand.colaborador_id.liberado_por',
         })
 
         // Filter out any payments whose effective confirmation date is outside the selected Brasilia date range
@@ -385,7 +385,8 @@ export default function RelatorioRecebedoria() {
         getAllPaginated('colaboradores', {
           filter: antigasConditions.join(' && '),
           sort: '-referencia,-created',
-          fields: 'id,registro,nome,valor,valor_a_receber,referencia,data,filial,updated,created',
+          fields:
+            'id,registro,nome,valor,valor_a_receber,referencia,data,filial,liberado_pagamento,liberado_por,updated,created',
         }),
         getAllPaginated('pagamentos', {
           filter: 'status = "Confirmado"',
@@ -1169,7 +1170,19 @@ export default function RelatorioRecebedoria() {
                           <TableCell className="text-left print:text-black">
                             {getTipoPagamento(item.idtipopgto) || item.tipo_pagamento}
                           </TableCell>
-                          <TableCell className="text-center">{statusBadge}</TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              {statusBadge}
+                              {item.expand?.colaborador_id?.liberado_por && (
+                                <span
+                                  className="text-[10px] text-slate-500 whitespace-nowrap"
+                                  title={`Liberado por: ${item.expand.colaborador_id.liberado_por}`}
+                                >
+                                  Lib: {item.expand.colaborador_id.liberado_por}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-center print:hidden">
                             <Button
                               variant="outline"
@@ -1482,6 +1495,7 @@ export default function RelatorioRecebedoria() {
                     <TableHead>Dt. Ref.</TableHead>
                     <TableHead>Referência</TableHead>
                     <TableHead className="text-left">Valor</TableHead>
+                    <TableHead>Liberado por</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1533,6 +1547,9 @@ export default function RelatorioRecebedoria() {
                         <TableCell className="text-left font-medium">
                           {formatBRL(item.valor || item.valor_a_receber || 0)}
                         </TableCell>
+                        <TableCell className="text-xs text-slate-600 dark:text-slate-400">
+                          {item.liberado_por || (item.liberado_pagamento ? 'Sim' : '-')}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -1541,7 +1558,7 @@ export default function RelatorioRecebedoria() {
                   <tfoot className="bg-slate-50 dark:bg-slate-800/50 border-t-2 border-slate-300">
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="p-3 font-bold text-lg text-slate-900 dark:text-slate-100 uppercase text-left"
                       >
                         Total
@@ -1672,6 +1689,17 @@ export default function RelatorioRecebedoria() {
                   </span>
                   <p className="font-medium">
                     {detailsModal.expand?.colaborador_id?.filial || detailsModal.filial || 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 text-xs uppercase block mb-1">
+                    Liberado Por
+                  </span>
+                  <p className="font-medium">
+                    {detailsModal.expand?.colaborador_id?.liberado_por ||
+                      (detailsModal.expand?.colaborador_id?.liberado_pagamento
+                        ? 'Sim'
+                        : 'Não informado / Padrão')}
                   </p>
                 </div>
               </div>

@@ -98,7 +98,7 @@ export function DashboardPaymentModal({
           res = await pb.collection('colaboradores').getList(1, 50, {
             filter: filterStr,
             fields:
-              'id,registro,nome,valor_a_receber,valor,referencia,liberado_pagamento,data_liberacao,idtipopgto,tipo_pagamento,inicio,termino,horas,filial,filial_id,data',
+              'id,registro,nome,valor_a_receber,valor,referencia,liberado_pagamento,liberado_por,data_liberacao,idtipopgto,tipo_pagamento,inicio,termino,horas,filial,filial_id,data',
           })
           break
         } catch (err: any) {
@@ -305,7 +305,12 @@ export function DashboardPaymentModal({
                       <TableCell>
                         {r.referencia || '-'}
                         {r.liberado_pagamento && (
-                          <span className="ml-2 text-xs text-emerald-600">(Liberado)</span>
+                          <span
+                            className="ml-2 text-xs text-emerald-600"
+                            title={r.liberado_por ? `Liberado por: ${r.liberado_por}` : 'Liberado'}
+                          >
+                            (Liberado{r.liberado_por ? ` por ${r.liberado_por}` : ''})
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="font-bold text-emerald-600">
