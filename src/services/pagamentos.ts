@@ -55,7 +55,10 @@ export interface PagamentosDashboardTotals {
   maxRef: number
   referencias: Array<{
     referencia: number
+    pago?: number
+    pendente?: number
     total_pago: number
+    total_pendente?: number
     periodo_inicio: string | null
     periodo_fim: string | null
   }>

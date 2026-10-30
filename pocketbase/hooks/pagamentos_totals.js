@@ -106,7 +106,9 @@ routerAdd(
         totalColaboradores = 0
       }
 
-      // 5. Totais por Referência (histórico completo para gráficos de referência)
+      // 5. Totais por Referência (Pago e Pendente)
+      // Inclui referências com pagamentos confirmados E referências com pendências válidas
+      // (pendências da janela ativa >= minJanelaRef OU liberado_pagamento = 1 fora da janela)
       const queryRefPagos = `
         SELECT
           COALESCE(c.referencia, 0) AS referencia,
@@ -119,7 +121,7 @@ routerAdd(
         GROUP BY c.referencia
         ORDER BY c.referencia DESC
       `
-      const rowsRef = arrayOf(
+      const rowsRefPagos = arrayOf(
         new DynamicModel({
           referencia: 0,
           total_pago: -0,
@@ -127,7 +129,32 @@ routerAdd(
           periodo_fim: '',
         }),
       )
-      $app.db().newQuery(queryRefPagos).all(rowsRef)
+      $app.db().newQuery(queryRefPagos).all(rowsRefPagos)
+
+      const queryRefPendentes = `
+        SELECT
+          COALESCE(c.referencia, 0) AS referencia,
+          SUM(COALESCE(c.valor_a_receber, c.valor, 0)) AS total_pendente,
+          COALESCE(MIN(c.periodo_inicio), '') AS periodo_inicio,
+          COALESCE(MAX(c.periodo_fim), '') AS periodo_fim
+        FROM colaboradores c
+        LEFT JOIN pagamentos p ON p.colaborador_id = c.id AND p.status = 'Confirmado'
+        WHERE (c.foto_confirmacao_url IS NULL OR c.foto_confirmacao_url = '')
+          AND (c.referencia >= {:minRef} OR c.liberado_pagamento = 1)
+          AND p.id IS NULL
+          AND c.referencia > 0
+        GROUP BY c.referencia
+        ORDER BY c.referencia DESC
+      `
+      const rowsRefPendentes = arrayOf(
+        new DynamicModel({
+          referencia: 0,
+          total_pendente: -0,
+          periodo_inicio: '',
+          periodo_fim: '',
+        }),
+      )
+      $app.db().newQuery(queryRefPendentes).bind({ minRef: minJanelaRef }).all(rowsRefPendentes)
 
       // 6. Nomes distintos de tipo_pagamento para alimentar filtros do app sem varredura em pagamentos
       const queryTiposDistintos = `
@@ -305,12 +332,65 @@ routerAdd(
         dailyTotals = []
       }
 
-      const referencias = rowsRef.map((r) => ({
-        referencia: Number(r.referencia),
-        total_pago: Number(r.total_pago) || 0,
-        periodo_inicio: r.periodo_inicio || null,
-        periodo_fim: r.periodo_fim || null,
-      }))
+      // Combina rowsRefPagos e rowsRefPendentes em um único mapa indexado por referência
+      const refMap = {}
+
+      for (let k = 0; k < rowsRefPagos.length; k++) {
+        const rp = rowsRefPagos[k]
+        const refNum = Number(rp.referencia) || 0
+        if (refNum <= 0) continue
+        if (!refMap[refNum]) {
+          refMap[refNum] = {
+            referencia: refNum,
+            pago: 0,
+            pendente: 0,
+            total_pago: 0,
+            total_pendente: 0,
+            periodo_inicio: rp.periodo_inicio || null,
+            periodo_fim: rp.periodo_fim || null,
+          }
+        }
+        const valPago = Number(rp.total_pago) || 0
+        refMap[refNum].pago = valPago
+        refMap[refNum].total_pago = valPago
+        if (!refMap[refNum].periodo_inicio && rp.periodo_inicio) {
+          refMap[refNum].periodo_inicio = rp.periodo_inicio
+        }
+        if (!refMap[refNum].periodo_fim && rp.periodo_fim) {
+          refMap[refNum].periodo_fim = rp.periodo_fim
+        }
+      }
+
+      for (let m = 0; m < rowsRefPendentes.length; m++) {
+        const rpend = rowsRefPendentes[m]
+        const refNum = Number(rpend.referencia) || 0
+        if (refNum <= 0) continue
+        if (!refMap[refNum]) {
+          refMap[refNum] = {
+            referencia: refNum,
+            pago: 0,
+            pendente: 0,
+            total_pago: 0,
+            total_pendente: 0,
+            periodo_inicio: rpend.periodo_inicio || null,
+            periodo_fim: rpend.periodo_fim || null,
+          }
+        }
+        const valPend = Number(rpend.total_pendente) || 0
+        refMap[refNum].pendente = valPend
+        refMap[refNum].total_pendente = valPend
+        if (!refMap[refNum].periodo_inicio && rpend.periodo_inicio) {
+          refMap[refNum].periodo_inicio = rpend.periodo_inicio
+        }
+        if (!refMap[refNum].periodo_fim && rpend.periodo_fim) {
+          refMap[refNum].periodo_fim = rpend.periodo_fim
+        }
+      }
+
+      const referencias = Object.keys(refMap)
+        .map((k) => refMap[k])
+        .filter((r) => r.pago > 0 || r.pendente > 0)
+        .sort((a, b) => b.referencia - a.referencia)
 
       return e.json(200, {
         totals: {

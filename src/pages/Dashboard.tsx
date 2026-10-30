@@ -1169,7 +1169,7 @@ export default function Dashboard() {
 
   // Gráfico de distribuição por referência:
   // Se estiver sem filtros contextuais específicos de filial/data, usa as referências completas
-  // agregadas no servidor (serverTotals.referencias), cobrindo todo o histórico de referências!
+  // agregadas no servidor (serverTotals.referencias), cobrindo todo o histórico de referências (Pago e Pendente)!
   const refData = useMemo(() => {
     if (
       !selectedChartFilial &&
@@ -1192,12 +1192,18 @@ export default function Dashboard() {
       }
       return [...list]
         .sort((a, b) => a.referencia - b.referencia)
-        .map((r) => ({
-          referenciaName: String(r.referencia),
-          total: r.total_pago,
-          periodo_inicio: r.periodo_inicio,
-          periodo_fim: r.periodo_fim,
-        }))
+        .map((r) => {
+          const pagoVal = r.pago !== undefined ? r.pago : r.total_pago || 0
+          const pendenteVal = r.pendente !== undefined ? r.pendente : r.total_pendente || 0
+          return {
+            referenciaName: String(r.referencia),
+            pago: pagoVal,
+            pendente: pendenteVal,
+            total: pagoVal + pendenteVal,
+            periodo_inicio: r.periodo_inicio,
+            periodo_fim: r.periodo_fim,
+          }
+        })
     }
 
     const refDataMap = refStatsData.reduce(
@@ -1209,9 +1215,25 @@ export default function Dashboard() {
           return acc
         }
         if (!acc[ref]) {
-          acc[ref] = { total: 0, periodo_inicio: null, periodo_fim: null }
+          acc[ref] = { pago: 0, pendente: 0, periodo_inicio: null, periodo_fim: null }
         }
-        acc[ref].total += getActualValue(curr)
+
+        const val = getActualValue(curr)
+        const status = getEvaluatedStatus(curr, maxRef)
+
+        if (status === 'Confirmado') {
+          acc[ref].pago += val
+        } else if (status === 'Pendente') {
+          // Critério consistente: janela ativa (6 mais recentes) OU liberado_pagamento = true fora da janela
+          const colabRef = curr.referencia
+          const isDentroDaJanela =
+            !maxRef || maxRef <= 5 || (colabRef != null && colabRef >= maxRef - 5)
+          const isLiberado = Boolean(curr.liberado_pagamento)
+
+          if (isDentroDaJanela || isLiberado) {
+            acc[ref].pendente += val
+          }
+        }
 
         if (!acc[ref].periodo_inicio) {
           acc[ref].periodo_inicio = curr.periodo_inicio || null
@@ -1224,7 +1246,12 @@ export default function Dashboard() {
       },
       {} as Record<
         string,
-        { total: number; periodo_inicio: string | null; periodo_fim: string | null }
+        {
+          pago: number
+          pendente: number
+          periodo_inicio: string | null
+          periodo_fim: string | null
+        }
       >,
     )
 
@@ -1241,7 +1268,9 @@ export default function Dashboard() {
       })
       .map(([ref, data]: [string, any]) => ({
         referenciaName: ref,
-        total: data.total,
+        pago: data.pago,
+        pendente: data.pendente,
+        total: data.pago + data.pendente,
         periodo_inicio: data.periodo_inicio,
         periodo_fim: data.periodo_fim,
       }))
@@ -1252,6 +1281,7 @@ export default function Dashboard() {
     debouncedFilters,
     chartRefSearch,
     refStatsData,
+    maxRef,
   ])
 
   const isEmpty = baseStatsData.length === 0 && !statsLoading
@@ -1724,7 +1754,19 @@ export default function Dashboard() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Distribuição por Referência</CardTitle>
+                <div className="flex flex-col gap-1">
+                  <CardTitle>Distribuição por Referência</CardTitle>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
+                      Pago
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
+                      Pendente
+                    </span>
+                  </div>
+                </div>
                 <div className="flex items-center gap-2">
                   {isAuthorized && selectedChartRef.size > 0 && (
                     <Button
@@ -1758,7 +1800,10 @@ export default function Dashboard() {
                   <Skeleton className="h-[300px] w-full" />
                 ) : (
                   <ChartContainer
-                    config={{ total: { label: 'Total', color: '#22c55e' } }}
+                    config={{
+                      pago: { label: 'Pago', color: '#22c55e' },
+                      pendente: { label: 'Pendente', color: '#f59e0b' },
+                    }}
                     className="h-[300px] w-full"
                   >
                     <BarChart data={refData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -1782,9 +1827,9 @@ export default function Dashboard() {
                             const data = payload[0].payload
 
                             return (
-                              <div className="rounded-lg border bg-background p-3 shadow-md text-sm space-y-1 min-w-[220px]">
+                              <div className="rounded-lg border bg-background p-3 shadow-md text-sm space-y-1 min-w-[240px]">
                                 <div className="font-medium text-foreground mb-2 pb-1 border-b">
-                                  Período da Referência: {data.referenciaName}
+                                  Referência: {data.referenciaName}
                                 </div>
                                 <div className="flex justify-between gap-4">
                                   <span className="text-muted-foreground">Data Início:</span>
@@ -1799,11 +1844,31 @@ export default function Dashboard() {
                                   </span>
                                 </div>
                                 <div className="flex justify-between gap-4 pt-1 mt-1 border-t">
-                                  <span className="text-muted-foreground">Total Pago:</span>
+                                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
+                                    Pago:
+                                  </span>
                                   <span className="font-bold text-emerald-600 dark:text-emerald-500">
-                                    {formatBRL(data.total)}
+                                    {formatBRL(data.pago || 0)}
                                   </span>
                                 </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
+                                    Pendente:
+                                  </span>
+                                  <span className="font-bold text-amber-600 dark:text-amber-500">
+                                    {formatBRL(data.pendente || 0)}
+                                  </span>
+                                </div>
+                                {data.pago > 0 && data.pendente > 0 && (
+                                  <div className="flex justify-between gap-4 pt-1 mt-1 border-t text-xs">
+                                    <span className="text-muted-foreground">Total da Ref:</span>
+                                    <span className="font-semibold text-foreground">
+                                      {formatBRL(data.total || 0)}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             )
                           }
@@ -1811,9 +1876,11 @@ export default function Dashboard() {
                         }}
                       />
                       <Bar
-                        dataKey="total"
-                        radius={[4, 4, 0, 0]}
-                        fill="var(--color-total)"
+                        dataKey="pago"
+                        name="Pago"
+                        stackId="a"
+                        radius={[0, 0, 0, 0]}
+                        fill="#22c55e"
                         onClick={(data: any, index: number, event: any) => {
                           const refVal =
                             data?.referenciaName ||
@@ -1854,8 +1921,6 @@ export default function Dashboard() {
                             isWindowLoadedRef.current
 
                           if (nextRefList.length === 0) {
-                            // Se desmarcou a referência:
-                            // Se os dados da janela já estão carregados na memória, restaura instantaneamente
                             if (isWindowLoadedRef.current) {
                               scheduleRefresh()
                             } else {
@@ -1863,7 +1928,6 @@ export default function Dashboard() {
                             }
                           } else if (allInsideWindow) {
                             // Dentro da janela: filtra LOCALMENTE (zero requisição de rede, instantâneo)
-                            // A interface reage via filteredStatsData e selectedChartRef
                           } else {
                             // Referência antiga (fora da janela) ou dados locais incompletos: busca na base inteira sob demanda
                             performFetch(true, false, nextRefList)
@@ -1873,8 +1937,83 @@ export default function Dashboard() {
                       >
                         {refData.map((entry, index) => (
                           <Cell
-                            key={`cell-${index}`}
-                            fill="var(--color-total)"
+                            key={`cell-pago-${index}`}
+                            fill="#22c55e"
+                            style={{
+                              opacity:
+                                selectedChartRef.size === 0 ||
+                                selectedChartRef.has(entry.referenciaName)
+                                  ? 1
+                                  : 0.3,
+                              transition: 'opacity 0.2s',
+                              outline: 'none',
+                            }}
+                          />
+                        ))}
+                      </Bar>
+                      <Bar
+                        dataKey="pendente"
+                        name="Pendente"
+                        stackId="a"
+                        radius={[4, 4, 0, 0]}
+                        fill="#f59e0b"
+                        onClick={(data: any, index: number, event: any) => {
+                          const refVal =
+                            data?.referenciaName ||
+                            data?.payload?.referenciaName ||
+                            (refData[index] && refData[index].referenciaName)
+                          if (!refVal) return
+                          const isCtrl = event && (event.ctrlKey || event.metaKey)
+                          let nextRefList: number[] = []
+                          setSelectedChartRef((prev) => {
+                            const next = new Set(prev)
+                            if (isCtrl) {
+                              if (next.has(refVal)) {
+                                next.delete(refVal)
+                              } else {
+                                next.add(refVal)
+                              }
+                            } else {
+                              if (next.size === 1 && next.has(refVal)) {
+                                next.clear()
+                              } else {
+                                next.clear()
+                                next.add(refVal)
+                              }
+                            }
+                            selectedChartRefRef.current = next
+                            nextRefList = Array.from(next)
+                              .map((r) => Number(r))
+                              .filter((n) => !isNaN(n) && n > 0)
+                            return next
+                          })
+                          setPage(1)
+
+                          const minJanela = maxRef > 5 ? maxRef - 5 : 1
+                          const allInsideWindow =
+                            nextRefList.length > 0 &&
+                            nextRefList.every((r) => r >= minJanela && r <= maxRef) &&
+                            isWindowLoadedRef.current
+
+                          if (nextRefList.length === 0) {
+                            if (isWindowLoadedRef.current) {
+                              scheduleRefresh()
+                            } else {
+                              performFetch(true, false, [])
+                            }
+                          } else if (allInsideWindow) {
+                            // Dentro da janela: filtra LOCALMENTE
+                          } else {
+                            // Fora da janela: busca na base inteira sob demanda
+                            performFetch(true, false, nextRefList)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {refData.map((entry, index) => (
+                          <Cell
+                            key={`cell-pend-${index}`}
+                            fill="#f59e0b"
                             style={{
                               opacity:
                                 selectedChartRef.size === 0 ||
