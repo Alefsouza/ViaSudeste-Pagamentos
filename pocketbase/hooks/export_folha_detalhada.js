@@ -27,60 +27,129 @@ routerAdd(
     }
 
     try {
-      // Busca PAGINADA: o servidor externo (PocketBase) limita cada consulta a
-      // ~500 itens por página, então registros com 10k+ linhas saíam cortados
-      // quando pedíamos tudo em uma única requisição. Agora acumulamos todas
-      // as páginas até esgotar (para quando a página vier com menos itens que
-      // o tamanho do lote, ou nenhum).
+      // Tamanho do lote usado nas duas formas de paginação suportadas pela fonte:
+      // - formato PocketBase (envelope com `items`): page/perPage;
+      // - array puro (PostgREST/Supabase, ex.: a view VW): limit/offset.
       var PAGE_SIZE = 500
       var MAX_PAGES = 2000 // guarda de segurança: 2000 * 500 = 1M de linhas
+      var MAX_BLOCKS = 200 // guarda de segurança para a paginação limit/offset: 200 * 500 = 100k linhas
       var separator = viewUrl.includes('?') ? '&' : '?'
 
       var allItems = []
-      var page = 1
-      var totalPages = MAX_PAGES
 
-      while (page <= totalPages) {
-        var pageUrl = viewUrl + separator + 'page=' + page + '&perPage=' + PAGE_SIZE
+      // Primeira requisição: descobre o formato da fonte.
+      var firstRes = $http.send({
+        url: viewUrl + separator + 'page=1&perPage=' + PAGE_SIZE,
+        method: 'GET',
+        timeout: 30,
+      })
 
-        var res = $http.send({
-          url: pageUrl,
-          method: 'GET',
-          timeout: 30,
-        })
+      if (firstRes.statusCode !== 200) {
+        $app
+          .logger()
+          .error('Erro HTTP ao buscar FOLHA_DETALHES', 'status', firstRes.statusCode, 'page', 1)
+        return e.internalServerError('Falha ao buscar dados externos')
+      }
 
-        if (res.statusCode !== 200) {
-          $app
-            .logger()
-            .error('Erro HTTP ao buscar FOLHA_DETALHES', 'status', res.statusCode, 'page', page)
-          return e.internalServerError('Falha ao buscar dados externos')
+      var firstData = firstRes.json
+
+      if (Array.isArray(firstData)) {
+        // Array puro: a fonte ignora page/perPage e respeita limit/offset.
+        // Pagina por limit/offset (0, 500, 1000, ...) até um bloco parcial ou vazio.
+        var offset = 0
+        var blocks = 0
+        var done = false
+
+        while (!done) {
+          if (blocks >= MAX_BLOCKS) {
+            $app
+              .logger()
+              .warn('FOLHA_DETALHES: limite de blocos atingido', 'blocks', blocks, 'offset', offset)
+            break
+          }
+
+          var blockRes = $http.send({
+            url: viewUrl + separator + 'limit=' + PAGE_SIZE + '&offset=' + offset,
+            method: 'GET',
+            timeout: 30,
+          })
+
+          if (blockRes.statusCode !== 200) {
+            $app
+              .logger()
+              .error(
+                'Erro HTTP ao buscar FOLHA_DETALHES',
+                'status',
+                blockRes.statusCode,
+                'offset',
+                offset,
+              )
+            return e.internalServerError('Falha ao buscar dados externos')
+          }
+
+          var block = blockRes.json
+          if (!Array.isArray(block)) {
+            return e.internalServerError('Formato de dados externo inválido')
+          }
+
+          allItems = allItems.concat(block)
+          blocks++
+
+          // Avança pelo tamanho real do bloco (evita duplicar linhas se a fonte
+          // devolver menos que o limite pedido).
+          if (block.length === 0 || block.length < PAGE_SIZE) {
+            done = true
+          } else {
+            offset += block.length
+          }
         }
+      } else {
+        // Formato PocketBase: mantém a paginação por page/perPage.
+        var page = 1
+        var totalPages = MAX_PAGES
 
-        var data = res.json
-        var pageItems = null
-        if (Array.isArray(data)) {
-          pageItems = data
-        } else if (data && Array.isArray(data.items)) {
-          pageItems = data.items
-        } else {
-          return e.internalServerError('Formato de dados externo inválido')
+        while (page <= totalPages) {
+          var pageUrl = viewUrl + separator + 'page=' + page + '&perPage=' + PAGE_SIZE
+
+          var res = $http.send({
+            url: pageUrl,
+            method: 'GET',
+            timeout: 30,
+          })
+
+          if (res.statusCode !== 200) {
+            $app
+              .logger()
+              .error('Erro HTTP ao buscar FOLHA_DETALHES', 'status', res.statusCode, 'page', page)
+            return e.internalServerError('Falha ao buscar dados externos')
+          }
+
+          var data = res.json
+          var pageItems = null
+          if (Array.isArray(data)) {
+            pageItems = data
+          } else if (data && Array.isArray(data.items)) {
+            pageItems = data.items
+          } else {
+            return e.internalServerError('Formato de dados externo inválido')
+          }
+
+          allItems = allItems.concat(pageItems)
+
+          // Resposta em array puro: a fonte não suporta paginação, uma única
+          // requisição já trouxe tudo.
+          if (Array.isArray(data)) break
+
+          if (pageItems.length < PAGE_SIZE) break
+
+          if (data.totalPages && Number(data.totalPages) > 0) {
+            totalPages = Math.min(Number(data.totalPages), MAX_PAGES)
+          }
+          // Sem totalPages: continua enquanto a página vier cheia (o laço para
+          // sozinho na primeira página parcial ou vazia).
+
+          page++
         }
-
-        allItems = allItems.concat(pageItems)
-
-        // Resposta em array puro: a fonte não suporta paginação, uma única
-        // requisição já trouxe tudo.
-        if (Array.isArray(data)) break
-
-        if (pageItems.length < PAGE_SIZE) break
-
-        if (data.totalPages && Number(data.totalPages) > 0) {
-          totalPages = Math.min(Number(data.totalPages), MAX_PAGES)
-        }
-        // Sem totalPages: continua enquanto a página vier cheia (o laço para
-        // sozinho na primeira página parcial ou vazia).
-
-        page++
       }
 
       var normalizeReg = function (val) {
