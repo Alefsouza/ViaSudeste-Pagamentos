@@ -103,6 +103,61 @@ routerAdd(
             offset += block.length
           }
         }
+      } else if (firstData && Array.isArray(firstData.items) && firstData.hasMore !== undefined) {
+        // Formato ORDS (view Oracle): envelope {items, hasMore, limit, offset, count, links}.
+        // A ORDS ignora page/perPage: pagina por limit/offset (0, 500, ...), avançando
+        // pelo tamanho real de cada bloco recebido, até hasMore virar false.
+        // Não reaproveita a primeira resposta (veio com page/perPage ignorados).
+        var ordsOffset = 0
+        var ordsBlocks = 0
+        var ordsMore = true
+
+        while (ordsMore) {
+          if (ordsBlocks >= MAX_BLOCKS) {
+            $app
+              .logger()
+              .warn(
+                'FOLHA_DETALHES (ORDS): limite de blocos atingido',
+                'blocks',
+                ordsBlocks,
+                'offset',
+                ordsOffset,
+              )
+            break
+          }
+
+          var ordsRes = $http.send({
+            url: viewUrl + separator + 'limit=' + PAGE_SIZE + '&offset=' + ordsOffset,
+            method: 'GET',
+            timeout: 30,
+          })
+
+          if (ordsRes.statusCode !== 200) {
+            $app
+              .logger()
+              .error(
+                'Erro HTTP ao buscar FOLHA_DETALHES',
+                'status',
+                ordsRes.statusCode,
+                'offset',
+                ordsOffset,
+              )
+            return e.internalServerError('Falha ao buscar dados externos')
+          }
+
+          var ordsData = ordsRes.json
+          if (!ordsData || !Array.isArray(ordsData.items)) {
+            return e.internalServerError('Formato de dados externo inválido')
+          }
+
+          allItems = allItems.concat(ordsData.items)
+          ordsBlocks++
+
+          // Bloco vazio encerra; senão avança pelo count real recebido (sem duplicar).
+          if (ordsData.items.length === 0) break
+          ordsOffset += ordsData.items.length
+          ordsMore = ordsData.hasMore === true || ordsData.hasMore === 'true'
+        }
       } else {
         // Formato PocketBase: mantém a paginação por page/perPage.
         var page = 1
