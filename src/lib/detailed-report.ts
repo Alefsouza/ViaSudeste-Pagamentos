@@ -1,6 +1,8 @@
 import { formatBRL, formatDateDBToBR } from '@/lib/formatters'
 import type { DetalhadaItem } from '@/services/export-folha-detalhada'
 
+const BLOB_URL_TTL_MS = 120000
+
 export function generateDetailedPDF(
   items: DetalhadaItem[],
   total: number,
@@ -8,9 +10,6 @@ export function generateDetailedPDF(
   inicio: string,
   fim: string,
 ): boolean {
-  const printWindow = window.open('', '_blank', 'width=800,height=600')
-  if (!printWindow) return false
-
   const rowsHtml = items
     .map(
       (item) => `
@@ -74,7 +73,31 @@ export function generateDetailedPDF(
 </body>
 </html>`
 
-  printWindow.document.write(html)
-  printWindow.document.close()
-  return true
+  // O documento é montado em um Blob (fora do DOM do app) e entregue por object
+  // URL — nunca via document.write, que estoura com relatórios de 10k+ linhas.
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+
+  const printWindow = window.open(url, '_blank', 'width=800,height=600')
+  if (printWindow) {
+    // Revoga o object URL depois que a janela já carregou o documento.
+    setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_TTL_MS)
+    return true
+  }
+
+  // Bloqueador de pop-ups: cai para download direto do mesmo documento.
+  try {
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `relatorio-detalhado-${registro}-${inicio}_a_${fim}.html`
+    anchor.style.display = 'none'
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_TTL_MS)
+    return true
+  } catch {
+    URL.revokeObjectURL(url)
+    return false
+  }
 }
