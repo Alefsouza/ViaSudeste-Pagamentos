@@ -23,8 +23,8 @@ export async function exportFolhaDetalhada(
   dataInicio: string,
   dataFinal: string,
 ): Promise<ExportDetalhadaResult> {
+  const params = new URLSearchParams({ registro, dataInicio, dataFinal })
   try {
-    const params = new URLSearchParams({ registro, dataInicio, dataFinal })
     const result = await pb.send(`/backend/v1/export-folha-detalhada?${params.toString()}`, {
       method: 'GET',
     })

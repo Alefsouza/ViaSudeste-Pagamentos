@@ -92,7 +92,10 @@ routerAdd(
       })
 
       if (filteredItems.length === 0) {
-        return e.notFoundError('Nenhum registro para os critérios informados.')
+        // Responde 200 com lista vazia em vez de 404: o runtime de preview
+        // reporta qualquer resposta não-OK como erro de runtime na tela.
+        // O frontend trata lista vazia com mensagem amigável.
+        return e.json(200, { items: [], total: 0, registro: cleanRegistro, nome: '' })
       }
 
       filteredItems.sort(function (a, b) {

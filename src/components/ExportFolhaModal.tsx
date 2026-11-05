@@ -40,6 +40,7 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
   const [registro, setRegistro] = useState('')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFinal, setDataFinal] = useState('')
+  const [detalhadaError, setDetalhadaError] = useState<string | null>(null)
 
   const handleClose = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -49,6 +50,7 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
       setRegistro('')
       setDataInicio('')
       setDataFinal('')
+      setDetalhadaError(null)
     }
     onOpenChange(nextOpen)
   }
@@ -120,10 +122,16 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
 
     try {
       setLoading(true)
+      setDetalhadaError(null)
       const result = await exportFolhaDetalhada(registro.trim(), dataInicio, dataFinal)
 
       if (!result.success || !result.data) {
-        toast.error(result.message || 'Nenhum registro para os critérios informados.')
+        setDetalhadaError(result.message || 'Nenhum registro para os critérios informados.')
+        return
+      }
+
+      if (result.data.items.length === 0) {
+        setDetalhadaError('Nenhum registro encontrado para o período selecionado.')
         return
       }
 
@@ -284,6 +292,15 @@ export function ExportFolhaModal({ open, onOpenChange }: ExportFolhaModalProps) 
                   disabled={loading}
                 />
               </div>
+              {detalhadaError && (
+                <p
+                  id="detalhada-error"
+                  role="alert"
+                  className="text-sm text-destructive text-center"
+                >
+                  {detalhadaError}
+                </p>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setMode('select')} disabled={loading}>
