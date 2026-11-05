@@ -74,9 +74,12 @@ export async function getAllPaginated(
   })()
 
   inFlightRequests.set(cacheKey, promise)
-  promise.finally(() => {
+  // Limpa o mapa nos dois desfechos. Usar `.then(cleanup, cleanup)` evita a promessa
+  // derivada rejeitada (não tratada) que `.finally` criaria e que virava erro de runtime global.
+  const cleanup = () => {
     inFlightRequests.delete(cacheKey)
-  })
+  }
+  promise.then(cleanup, cleanup)
 
   return promise
 }

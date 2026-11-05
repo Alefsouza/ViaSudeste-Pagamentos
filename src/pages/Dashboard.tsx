@@ -499,6 +499,17 @@ export default function Dashboard() {
         retryCountRef.current += 1
         isFetchingRef.current = false
 
+        // Erro 400 numa busca (filtro recusado ou consulta abortada pelo servidor) não se resolve
+        // repetindo a mesma consulta: mostra o aviso inline na tela, sem retry nem overlay global.
+        if (e?.status === 400 || e?.response?.status === 400) {
+          console.warn('[Dashboard] Busca recusada pelo servidor (400). Exibindo aviso inline.')
+          setIsRetrying(false)
+          setStatsLoading(false)
+          setFetchError(true)
+          retryCountRef.current = 0
+          return
+        }
+
         // Se for 429 e tivermos dados anteriores em tela ou no cache, mantém os dados em exibição
         // com aviso discreto em vez de exibir a tela de erro fatal ou lançar exceção não tratada
         if (is429) {
