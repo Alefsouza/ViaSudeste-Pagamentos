@@ -163,8 +163,13 @@ routerAdd(
     logRecord.set('user', userId)
     logRecord.set('endpoint', '/backend/v1/facial-recognition')
 
+    // Diagnóstico: mantém a mensagem exata da causa (AWS Rekognition, download da
+    // foto, tamanho) para gravar junto ao status no registro de auditoria.
+    let auditDetalhe = ''
+
     function respond(status, responseBody) {
       logRecord.set('status', status)
+      if (status !== 200 && auditDetalhe) logRecord.set('detalhes', auditDetalhe)
       $app.saveNoValidate(logRecord)
       return e.json(status, responseBody)
     }
@@ -198,9 +203,11 @@ routerAdd(
             if (!sourceB64) throw new Error('conversion failed')
             globalThis.__photoCache[cacheKey] = { data: sourceB64, time: now }
           } else {
+            auditDetalhe = 'download foto predeterminada: HTTP ' + fr.statusCode
             return respond(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
           }
         } catch (err) {
+          auditDetalhe = 'download foto predeterminada: ' + String(err)
           return respond(400, { message: 'Erro ao baixar foto do banco. Tente novamente' })
         }
       } else {
@@ -213,8 +220,10 @@ routerAdd(
     fotoCap = fotoCap.replace(/\s+/g, '')
 
     const sizeBytes = Math.round((fotoCap.length * 3) / 4)
-    if (sizeBytes > 5 * 1024 * 1024)
+    if (sizeBytes > 5 * 1024 * 1024) {
+      auditDetalhe = 'imagem maior que 5MB (' + sizeBytes + ' bytes)'
       return respond(400, { message: 'Imagem invalida. Tente capturar novamente' })
+    }
 
     let requestBody
     try {
@@ -283,9 +292,12 @@ routerAdd(
       } else if (statusCode === 400) {
         const err = res.json || {}
         awsMessage = err.message || err.Message || err.__type || ''
+        auditDetalhe =
+          'AWS Rekognition HTTP ' + statusCode + ': ' + (awsMessage || '(sem mensagem)')
       }
     } catch (err) {
       statusCode = 504
+      auditDetalhe = 'AWS Rekognition: ' + String(err)
       $app.logger().error('AWS Rekognition Error', 'error', String(err))
     }
 
